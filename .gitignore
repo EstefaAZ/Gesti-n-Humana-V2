@@ -1,0 +1,29 @@
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+
+# Python / backend
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/**/.venv/
+backend/**/venv/
+backend/**/.pytest_cache/
+backend/**/*.log
+backend/**/.env
+backend/**/.env.*
+backend/**/.coverage
+
+# System / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+.coverage
+htmlcov/

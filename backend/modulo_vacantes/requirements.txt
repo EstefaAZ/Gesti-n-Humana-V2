@@ -1,0 +1,7 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.0
+sqlalchemy==2.0.51
+psycopg2-binary==2.9.12
+PyJWT==2.13.0
+pydantic-settings==2.14.2
+python-multipart==0.0.32
