@@ -4,6 +4,10 @@ import { deepToCamel } from "./caseConverter";
 
 const BASE = `${API_URLS.candidatos}/api/v1/solicitudes`;
 
+// Solo se normalizan las llaves de PRIMER NIVEL. El contenido de
+// datosPersonales/registrosII/experiencia/conflicto/autorizacion se envía y
+// recibe tal cual, en camelCase, porque la evaluación automática del backend
+// ya espera esas llaves exactas (nivelEducativo, fechaInicio, graduado, etc.).
 function _documentosACamel(d) {
   if (!d) return { cedula: [], certificadosLaborales: [], certificadosEstudio: [], tarjetaProfesional: [] };
   return {
@@ -14,10 +18,6 @@ function _documentosACamel(d) {
   };
 }
 
-// Solo se normalizan las llaves de PRIMER NIVEL. El contenido de
-// datosPersonales/registrosII/experiencia/conflicto/autorizacion se envía y
-// recibe tal cual, en camelCase, porque la evaluación automática del backend
-// ya espera esas llaves exactas (nivelEducativo, fechaInicio, graduado, etc.).
 function _solicitudACamel(s) {
   if (!s) return s;
   return {

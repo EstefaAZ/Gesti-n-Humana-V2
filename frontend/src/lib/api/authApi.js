@@ -53,6 +53,14 @@ export async function eliminarCuenta(token) {
   await apiFetch(`${BASE}/me`, { method: "DELETE", token });
 }
 
+// NOTA: este endpoint (PATCH /me/desactivar) aún no existe en el backend de auth
+// que se compartió; hay que agregarlo allá (setear activo=false, igual que el
+// campo que ya devuelve /me y /usuarios). Se deja aquí siguiendo el mismo patrón
+// que cambiarPassword/eliminarCuenta para no bloquear el frontend.
+export async function desactivarCuenta(token) {
+  await apiFetch(`${BASE}/me/desactivar`, { method: "PATCH", token });
+}
+
 export async function obtenerEstadisticas(token) {
   const data = await apiFetch(`${BASE}/estadisticas`, { token });
   return {
