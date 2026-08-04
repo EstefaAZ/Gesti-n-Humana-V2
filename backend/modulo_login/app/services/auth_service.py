@@ -166,6 +166,33 @@ def eliminar_cuenta_propia(db: Session, usuario: Usuario) -> None:
     db.commit()
 
 
+def desactivar_cuenta_propia(db: Session, usuario: Usuario) -> None:
+    """
+    Igual que eliminar_cuenta_propia, pero reversible: marca activo=False en
+    vez de borrar la fila. El login ya rechaza usuarios inactivos (ver
+    autenticar_usuario). Un admin puede reactivarla con reactivar_cuenta().
+    Misma protección que eliminar: no se puede dejar el sistema sin ningún
+    admin activo.
+    """
+    if usuario.rol == RolUsuario.admin and _otros_admins_activos(db, usuario.id) == 0:
+        raise UltimoAdminError(
+            "No puedes desactivar tu cuenta: eres el único admin activo. Crea otro admin antes de desactivar esta cuenta."
+        )
+    usuario.activo = False
+    db.commit()
+
+
+def reactivar_cuenta(db: Session, usuario_id: str) -> Usuario:
+    """Un admin reactiva la cuenta de OTRO usuario (rol gestor_humano/admin lo llama desde una ruta protegida)."""
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise UsuarioNoEncontradoError(f"No existe un usuario con id {usuario_id}.")
+    usuario.activo = True
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
 def cambiar_password_propia(db: Session, usuario: Usuario, password_actual: str, password_nueva: str) -> None:
     if not verify_password(password_actual, usuario.password_hash):
         raise CredencialesInvalidasError("La contraseña actual no es correcta.")

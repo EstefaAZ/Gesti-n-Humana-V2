@@ -118,6 +118,10 @@ export async function obtenerAuditoria(token, limite = 100) {
   return deepToCamel(data);
 }
 
+export async function conteoPorVacante(token) {
+  return apiFetch(`${BASE}/admin/conteo-por-vacante`, { token });
+}
+
 export async function descargarDocumentoAdjunto(radicado, categoriaApi, indice, nombreArchivo, token) {
   const res = await apiFetch(`${BASE}/${radicado}/documentos/${categoriaApi}/${indice}`, { token, raw: true });
   const blob = await res.blob();

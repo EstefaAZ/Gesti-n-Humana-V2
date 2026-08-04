@@ -184,6 +184,22 @@ def test_estadisticas_requiere_rol_gestion():
     assert r.status_code == 403
 
 
+def test_conteo_por_vacante_requiere_rol_gestion():
+    r = client.get("/api/v1/solicitudes/admin/conteo-por-vacante", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 403
+
+
+def test_conteo_por_vacante_cuenta_correctamente():
+    headers_candidato_3 = {"Authorization": f"Bearer {token_para('candidato-3')}"}
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_OTRO_CANDIDATO)
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=headers_candidato_3)
+
+    r = client.get("/api/v1/solicitudes/admin/conteo-por-vacante", headers=HEADERS_GESTOR)
+    assert r.status_code == 200
+    assert r.json()["vac-1"] == 3
+
+
 def test_estadisticas_devuelve_conteos_reales():
     r1 = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
     radicado1 = r1.json()["radicado"]

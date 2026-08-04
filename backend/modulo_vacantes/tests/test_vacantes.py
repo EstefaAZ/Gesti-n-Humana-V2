@@ -196,6 +196,30 @@ def test_vacante_con_fecha_cierre_futura_no_esta_cerrada():
     assert r.json()["esta_cerrada"] is False
 
 
+def test_cerrar_manualmente_bloquea_aunque_la_fecha_de_cierre_no_haya_llegado():
+    # Bug de regresión: antes, cambiar el estado a "cerrada" a mano NO
+    # bloqueaba postulaciones si la fecha de cierre todavía no había pasado
+    # — el candidato la seguía viendo como abierta y se podía inscribir.
+    manana = (date.today() + timedelta(days=1)).isoformat()
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_cierre": manana}, headers=HEADERS_GESTOR)
+    vacante_id = r.json()["id"]
+    assert r.json()["esta_cerrada"] is False  # todavía no, la fecha no ha llegado
+
+    r_cerrar = client.patch(f"/api/v1/vacantes/{vacante_id}/estado", json={"estado": "cerrada"}, headers=HEADERS_GESTOR)
+    assert r_cerrar.json()["esta_cerrada"] is True  # ahora sí, se cerró a mano
+
+    r_detalle_publico = client.get(f"/api/v1/vacantes/{vacante_id}")
+    assert r_detalle_publico.json()["esta_cerrada"] is True  # el candidato también debe verla cerrada
+
+
+def test_cancelada_desierta_tambien_cuenta_como_cerrada():
+    r = client.post("/api/v1/vacantes", json=VACANTE_VALIDA, headers=HEADERS_GESTOR)
+    vacante_id = r.json()["id"]
+    client.patch(f"/api/v1/vacantes/{vacante_id}/estado", json={"estado": "cancelada_desierta"}, headers=HEADERS_GESTOR)
+    r_admin = client.get(f"/api/v1/vacantes/admin/{vacante_id}", headers=HEADERS_GESTOR)
+    assert r_admin.json()["esta_cerrada"] is True
+
+
 def test_estadisticas_requiere_rol_gestion():
     r = client.get("/api/v1/vacantes/admin/estadisticas", headers=HEADERS_CANDIDATO)
     assert r.status_code == 403

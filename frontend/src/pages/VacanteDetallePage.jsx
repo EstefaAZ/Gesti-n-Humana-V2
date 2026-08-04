@@ -74,9 +74,10 @@ export default function VacanteDetallePage() {
             {c.profesionKeyword && <li>Profesión / título relacionado con: "{c.profesionKeyword}"</li>}
             {c.experienciaMinAnios && <li>Experiencia mínima: {c.experienciaMinAnios} años</li>}
             {c.idiomaRequerido && <li>Idioma: {c.idiomaRequerido} — nivel mínimo {c.idiomaNivelMin} ({c.idiomaHabilidad})</li>}
-            {c.certificacionKeyword && <li>Certificación relacionada con: "{c.certificacionKeyword}"</li>}
-            {c.ciudadRequerida && <li>Ciudad de residencia: {c.ciudadRequerida}</li>}
-            {!c.nivelEducativoMin && !c.profesionKeyword && !c.experienciaMinAnios && !c.idiomaRequerido && !c.certificacionKeyword && !c.ciudadRequerida && (
+            {(c.certificacionesKeywords || []).map((cert, i) => (
+              <li key={i}>Certificación relacionada con: "{cert}"</li>
+            ))}
+            {!c.nivelEducativoMin && !c.profesionKeyword && !c.experienciaMinAnios && !c.idiomaRequerido && (c.certificacionesKeywords || []).length === 0 && (
               <li className="text-muted">Esta vacante no tiene requisitos específicos configurados.</li>
             )}
           </ul>
@@ -86,6 +87,14 @@ export default function VacanteDetallePage() {
               <h3 className="section-title" style={{ fontSize: 15 }}>Conocimientos complementarios</h3>
               <p className="text-muted">{vacante.conocimientosComplementarios}</p>
             </>
+          )}
+
+          {vacante.tieneDocumentoPdf && (
+            <div className="field mt-24">
+              <a href={vacantesApi.urlDocumentoPdf(vacante.id)} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+                📄 Ver formato oficial de la convocatoria (PDF)
+              </a>
+            </div>
           )}
 
           <div className="wizard-actions" style={{ justifyContent: "flex-end" }}>

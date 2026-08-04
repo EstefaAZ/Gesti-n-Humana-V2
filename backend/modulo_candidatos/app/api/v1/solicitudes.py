@@ -234,6 +234,15 @@ def auditoria(
     return auditoria_service.listar_eventos(db, limite=limite)
 
 
+@router.get("/admin/conteo-por-vacante", response_model=dict[str, int])
+def conteo_por_vacante(
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+):
+    """Cuántas postulaciones tiene cada vacante — {vacante_id: total}. Para la tabla de Gestión Humana."""
+    return solicitud_service.conteo_por_vacante(db)
+
+
 @router.get("/admin/estadisticas", response_model=EstadisticasSolicitudes)
 def estadisticas(
     db: Session = Depends(get_db),

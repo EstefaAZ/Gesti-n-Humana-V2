@@ -138,6 +138,14 @@ def actualizar_estado(db: Session, radicado: str, nuevo_estado: str) -> Solicitu
     return solicitud
 
 
+def conteo_por_vacante(db: Session) -> dict[str, int]:
+    """Cuántas postulaciones tiene cada vacante — para la tabla de Gestión Humana."""
+    conteo: dict[str, int] = {}
+    for (vacante_id,) in db.query(Solicitud.vacante_id).all():
+        conteo[vacante_id] = conteo.get(vacante_id, 0) + 1
+    return conteo
+
+
 def obtener_estadisticas(db: Session) -> dict:
     """Conteos reales para el Dashboard: total, por estado, por mes (últimos 6) y recientes."""
     todas = db.query(Solicitud).all()

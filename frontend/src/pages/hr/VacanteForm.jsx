@@ -2,11 +2,11 @@ import { useState } from "react";
 import { NIVELES_EDUCATIVOS, NIVELES_IDIOMA, TIPOS_VINCULACION, PUBLICO_OBJETIVO_OPCIONES } from "../../data/catalogos";
 
 const ESTADOS = [
-  { valor: "borrador", etiqueta: "Borrador (no visible para candidatos)" },
+  { valor: "borrador", etiqueta: "Borrador" },
   { valor: "publicada", etiqueta: "Publicada" },
-  { valor: "en_proceso", etiqueta: "En proceso (no visible para candidatos)" },
+  { valor: "en_proceso", etiqueta: "En proceso" },
   { valor: "cerrada", etiqueta: "Cerrada" },
-  { valor: "cancelada_desierta", etiqueta: "Cancelada / Desierta (no visible para candidatos)" },
+  { valor: "cancelada_desierta", etiqueta: "Cancelada / Desierta" },
 ];
 
 const MAX_CERTIFICACIONES = 5;
@@ -91,7 +91,6 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
             <select value={v.estado} onChange={(e) => set({ estado: e.target.value })}>
               {ESTADOS.map((e) => <option key={e.valor} value={e.valor}>{e.etiqueta}</option>)}
             </select>
-            <span className="hint">Solo "Publicada" y "Cerrada" son visibles para los candidatos.</span>
           </div>
           <div className="field"><label>Fecha de apertura</label><input type="date" value={v.fechaApertura} onChange={(e) => set({ fechaApertura: e.target.value })} /></div>
           <div className="field"><label>Fecha de cierre</label><input type="date" value={v.fechaCierre} onChange={(e) => set({ fechaCierre: e.target.value })} /></div>

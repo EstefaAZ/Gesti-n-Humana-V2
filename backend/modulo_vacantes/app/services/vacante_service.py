@@ -20,7 +20,15 @@ class DocumentoNoEncontradoError(Exception):
     pass
 
 
+ESTADOS_QUE_BLOQUEAN_POSTULACION = ("cerrada", "cancelada_desierta")
+
+
 def esta_cerrada(vacante: Vacante) -> bool:
+    # Un cierre MANUAL (Gestión Humana cambió el estado a "cerrada" o
+    # "cancelada_desierta") debe bloquear postulaciones YA, sin esperar a
+    # que llegue la fecha de cierre automática.
+    if vacante.estado in ESTADOS_QUE_BLOQUEAN_POSTULACION:
+        return True
     if not vacante.fecha_cierre:
         return False
     try:

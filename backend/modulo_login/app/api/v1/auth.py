@@ -143,6 +143,51 @@ def eliminar_cuenta_propia(
     )
 
 
+@router.patch("/me/desactivar", status_code=status.HTTP_204_NO_CONTENT)
+def desactivar_cuenta_propia(
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(obtener_usuario_actual),
+):
+    """
+    Igual que eliminar, pero reversible: la cuenta queda inactiva (no puede
+    volver a iniciar sesión) hasta que un admin la reactive con
+    PATCH /usuarios/{id}/activar. No borra ningún dato.
+    """
+    nombre_previo, rol_previo, id_previo = usuario.nombre_completo, usuario.rol.value, usuario.id
+    try:
+        auth_service.desactivar_cuenta_propia(db, usuario)
+    except auth_service.UltimoAdminError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    auditoria_service.registrar_evento(
+        db, tipo="cuenta_desactivada",
+        descripcion=f"{nombre_previo} desactivó su propia cuenta ({rol_previo}).",
+        actor_id=id_previo, actor_nombre=nombre_previo, actor_rol=rol_previo,
+        entidad_tipo="usuario", entidad_id=id_previo,
+    )
+
+
+@router.patch("/usuarios/{usuario_id}/activar", response_model=UsuarioOut)
+def reactivar_cuenta(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    admin_actual: Usuario = Depends(requerir_roles(RolUsuario.admin)),
+):
+    """Un admin reactiva una cuenta que se había desactivado (propia o ajena, ej. tras desactivarse por error)."""
+    try:
+        reactivada = auth_service.reactivar_cuenta(db, usuario_id)
+    except auth_service.UsuarioNoEncontradoError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+    auditoria_service.registrar_evento(
+        db, tipo="cuenta_reactivada",
+        descripcion=f"{admin_actual.nombre_completo} reactivó la cuenta de {reactivada.nombre_completo}.",
+        actor_id=admin_actual.id, actor_nombre=admin_actual.nombre_completo, actor_rol=admin_actual.rol.value,
+        entidad_tipo="usuario", entidad_id=reactivada.id,
+    )
+    return reactivada
+
+
 @router.patch("/me", response_model=UsuarioOut)
 def actualizar_mi_perfil(
     datos: ActualizarPerfil,

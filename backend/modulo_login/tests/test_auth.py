@@ -275,6 +275,93 @@ def test_admin_si_puede_eliminarse_cuando_hay_otro_admin_activo():
     assert r.status_code == 204
 
 
+def test_desactivar_cuenta_propia_impide_volver_a_iniciar_sesion():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    token = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+
+    r = client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 204
+
+    # A diferencia de eliminar, los datos siguen ahí — pero no puede volver a entrar.
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    assert r_login.status_code == 403
+
+
+def test_desactivar_cuenta_no_borra_los_datos_a_diferencia_de_eliminar():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    token = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token}"})
+
+    # El correo debe seguir "ocupado" — a diferencia de eliminar, no queda libre para registrarse de nuevo.
+    r_registro_de_nuevo = client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    assert r_registro_de_nuevo.status_code == 409
+
+
+def test_ultimo_admin_no_puede_desactivar_su_propia_cuenta():
+    from app.core.security import hash_password
+    from app.models.usuario import Usuario, RolUsuario as R
+
+    db = TestingSessionLocal()
+    unico = Usuario(nombre_completo="Único Admin Desact", email="unico-desact@example.com",
+                     password_hash=hash_password("ClaveAdmin123"), rol=R.admin)
+    db.add(unico)
+    db.commit()
+    db.close()
+
+    token = _token_de("unico-desact@example.com", "ClaveAdmin123")
+    r = client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 409
+
+
+def test_admin_puede_reactivar_una_cuenta_desactivada():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+
+    token_admin = _crear_admin()
+    r_reactivar = client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_admin}"})
+    assert r_reactivar.status_code == 200
+    assert r_reactivar.json()["activo"] is True
+
+    # Ahora sí puede volver a iniciar sesión.
+    r_login_de_nuevo = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    assert r_login_de_nuevo.status_code == 200
+
+
+def test_reactivar_requiere_rol_admin():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+
+    r = client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_candidato}"})
+    assert r.status_code == 403
+
+
+def test_reactivar_usuario_inexistente_da_404():
+    token_admin = _crear_admin()
+    r = client.patch("/api/v1/auth/usuarios/no-existe/activar", headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 404
+
+
+def test_auditoria_registra_desactivar_y_reactivar():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+
+    token_admin = _crear_admin()
+    client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_admin}"})
+
+    r_auditoria = client.get("/api/v1/auth/auditoria", headers={"Authorization": f"Bearer {token_admin}"})
+    tipos = [e["tipo"] for e in r_auditoria.json()]
+    assert "cuenta_desactivada" in tipos
+    assert "cuenta_reactivada" in tipos
+
+
 def _crear_admin(email="admin-gestion@example.com", password="ClaveAdmin123"):
     from app.core.security import hash_password
     from app.models.usuario import Usuario, RolUsuario as R

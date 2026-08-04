@@ -7,6 +7,7 @@ import HojaII from "../components/steps/HojaII";
 import HojaVI from "../components/steps/HojaVI";
 import HojaVII from "../components/steps/HojaVII";
 import HojaVIII from "../components/steps/HojaVIII";
+import HojaDocumentos from "../components/steps/HojaDocumentos";
 import Confirmacion from "../components/steps/Confirmacion";
 import {
   STEPS, initialSolicitudState, nuevoRegistroII, nuevaExperiencia, nuevoFamiliar,
@@ -93,6 +94,8 @@ export default function SolicitudPage() {
   const setDatos = (patch) => setState((s) => ({ ...s, datosPersonales: { ...s.datosPersonales, ...patch } }));
   const setConflicto = (patch) => setState((s) => ({ ...s, conflicto: { ...s.conflicto, ...patch } }));
   const setAutorizacion = (patch) => setState((s) => ({ ...s, autorizacion: { ...s.autorizacion, ...patch } }));
+  const setDocumentos = (updater) =>
+    setState((s) => ({ ...s, documentos: typeof updater === "function" ? updater(s.documentos) : { ...s.documentos, ...updater } }));
 
   const addRegistro = () =>
     setState((s) => (s.registrosII.length >= 15 ? s : { ...s, registrosII: [...s.registrosII, nuevoRegistroII()] }));
@@ -157,13 +160,30 @@ export default function SolicitudPage() {
       }
     }
 
+    if (step === "DOCS") {
+      const requeridos = {
+        cedula: "Debes adjuntar tu cédula de ciudadanía.",
+        certificadosLaborales: "Debes adjuntar al menos un certificado laboral con funciones.",
+        certificadosEstudio: "Debes adjuntar al menos un certificado de estudio y/o curso.",
+        tarjetaProfesional: "Debes adjuntar tu tarjeta profesional.",
+      };
+      Object.entries(requeridos).forEach(([clave, mensaje]) => {
+        if ((state.documentos[clave] || []).length === 0) {
+          nuevosErrores[clave] = mensaje;
+        }
+      });
+      if (Object.keys(nuevosErrores).length > 0) {
+        alert("Te falta adjuntar: " + Object.values(nuevosErrores).join(" "));
+      }
+    }
+
     setErrors(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   }
 
   function onSiguiente() {
     if (!validarPasoActual()) return;
-    if (STEPS[stepIndex] === "VIII") {
+    if (STEPS[stepIndex] === "DOCS") {
       finalizarSolicitud();
       return;
     }
@@ -188,6 +208,7 @@ export default function SolicitudPage() {
           experiencia: state.experiencias,
           conflicto: state.conflicto,
           autorizacion: state.autorizacion,
+          documentosAdjuntos: state.documentos,
         },
         token
       );
@@ -209,6 +230,12 @@ export default function SolicitudPage() {
       <DocHeader title={`Solicitud de Inscripción — ${vacante.cargo}`} />
       <main className="page">
         <div className="card">
+          {!enviado && (
+            <div className="notice notice--info">
+              Proceso {vacante.procesoNo} — {vacante.cargo}. El proceso y la fecha de cierre quedan tomados de esta
+              convocatoria y no se pueden editar.
+            </div>
+          )}
           {errorEnvio && <div className="notice notice--danger">{errorEnvio}</div>}
 
           {!enviado && <FolioNav steps={STEPS} activeStep={activeStep} doneSteps={doneSteps} />}
@@ -233,6 +260,9 @@ export default function SolicitudPage() {
           {activeStep === "VIII" && (
             <HojaVIII autorizacion={state.autorizacion} setAutorizacion={setAutorizacion} errors={errors} />
           )}
+          {activeStep === "DOCS" && (
+            <HojaDocumentos documentos={state.documentos} setDocumentos={setDocumentos} errors={errors} />
+          )}
           {activeStep === "confirmacion" && (
             <Confirmacion radicado={radicado} onDescargarPdf={() => solicitudesApi.descargarPdf(radicado, token)} />
           )}
@@ -243,7 +273,7 @@ export default function SolicitudPage() {
                 Atrás
               </button>
               <button type="button" className="btn btn-primary" onClick={onSiguiente} disabled={enviando}>
-                {enviando ? "Enviando…" : STEPS[stepIndex] === "VIII" ? "Enviar solicitud" : "Siguiente"}
+                {enviando ? "Enviando…" : STEPS[stepIndex] === "DOCS" ? "Enviar solicitud" : "Siguiente"}
               </button>
             </div>
           )}
