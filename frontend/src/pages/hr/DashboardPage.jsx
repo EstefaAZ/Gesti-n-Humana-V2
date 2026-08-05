@@ -64,11 +64,23 @@ export default function DashboardPage() {
     );
   }
 
-  const datosDonut = [
-    { name: "Abiertas", value: vacantesStats.abiertas },
-    { name: "Cerradas", value: vacantesStats.cerradas },
-  ];
-  const COLORES_DONUT = ["#2EA04A", "#B7C4C2"];
+  const ETIQUETA_ESTADO_VACANTE = {
+    publicada: "Publicada",
+    en_proceso: "En proceso",
+    cerrada: "Cerrada",
+    borrador: "Borrador",
+    cancelada_desierta: "Cancelada/Desierta",
+  };
+  const COLOR_ESTADO_VACANTE = {
+    publicada: "#2EA04A",
+    en_proceso: "#E8B93A",
+    cerrada: "#C0574F",
+    borrador: "#B7C4C2",
+    cancelada_desierta: "#4E8FD1",
+  };
+  const datosDonut = Object.entries(vacantesStats.porEstado || {})
+    .map(([estado, valor]) => ({ name: ETIQUETA_ESTADO_VACANTE[estado] || estado, estado, value: valor }))
+    .filter((d) => d.value > 0);
 
   const datosBarras = candidatosStats.porMes.map((p) => ({ mes: formatearMes(p.mes), total: p.total }));
 
@@ -130,15 +142,19 @@ export default function DashboardPage() {
 
           <div className="card">
             <h3 className="section-title" style={{ fontSize: 15 }}>Vacantes por estado</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={datosDonut} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={2}>
-                  {datosDonut.map((_, i) => <Cell key={i} fill={COLORES_DONUT[i]} />)}
-                </Pie>
-                <Legend />
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {datosDonut.length === 0 ? (
+              <p className="text-muted" style={{ fontSize: 13, textAlign: "center", padding: "80px 0" }}>Todavía no hay vacantes creadas.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={datosDonut} dataKey="value" nameKey="name" innerRadius={55} outerRadius={80} paddingAngle={2}>
+                    {datosDonut.map((d) => <Cell key={d.estado} fill={COLOR_ESTADO_VACANTE[d.estado] || "#B7C4C2"} />)}
+                  </Pie>
+                  <Legend />
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div className="card">

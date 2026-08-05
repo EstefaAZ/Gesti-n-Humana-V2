@@ -69,6 +69,10 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
         <div className="field-grid">
           <div className="field"><label>Proceso de selección No. *</label><input type="text" value={v.procesoNo} onChange={(e) => set({ procesoNo: e.target.value })} /></div>
           <div className="field field--span2"><label>Cargo *</label><input type="text" value={v.cargo} onChange={(e) => set({ cargo: e.target.value })} /></div>
+          <div className="field field--span2">
+            <label>Descripción breve (la verá el candidato en el listado y el detalle de la vacante)</label>
+            <textarea value={v.descripcion} onChange={(e) => set({ descripcion: e.target.value })} placeholder="Ej: Buscamos un perfil analítico con experiencia en tratamiento de aguas residuales…" />
+          </div>
           <div className="field"><label>Proceso / Área</label><input type="text" value={v.area} onChange={(e) => set({ area: e.target.value })} /></div>
           <div className="field"><label>Salario básico</label><input type="text" value={v.salario} onChange={(e) => set({ salario: e.target.value })} /></div>
           <div className="field">
@@ -91,6 +95,7 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
             <select value={v.estado} onChange={(e) => set({ estado: e.target.value })}>
               {ESTADOS.map((e) => <option key={e.valor} value={e.valor}>{e.etiqueta}</option>)}
             </select>
+            <span className="hint">Solo "Publicada" y "Cerrada" son visibles para los candidatos.</span>
           </div>
           <div className="field"><label>Fecha de apertura</label><input type="date" value={v.fechaApertura} onChange={(e) => set({ fechaApertura: e.target.value })} /></div>
           <div className="field"><label>Fecha de cierre</label><input type="date" value={v.fechaCierre} onChange={(e) => set({ fechaCierre: e.target.value })} /></div>
@@ -173,7 +178,7 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
           Formato oficial de la convocatoria (PDF)
         </legend>
         <p className="text-muted" style={{ fontSize: 12.5, marginTop: -4 }}>
-          Opcional. Si lo subes, el candidato va a poder verlo con un botón en el detalle de la vacante.
+          Opcional. Si lo subes, el candidato podra verlo.
         </p>
         {v.tieneDocumentoPdf && !pdfFile && (
           <p style={{ fontSize: 13 }}>📄 Ya hay un PDF subido para esta vacante. Elige otro archivo abajo si quieres reemplazarlo.</p>

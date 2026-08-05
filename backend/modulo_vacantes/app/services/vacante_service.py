@@ -8,7 +8,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.models.vacante import Vacante, ESTADOS_VISIBLES_CANDIDATO
+from app.models.vacante import Vacante, ESTADOS_VISIBLES_CANDIDATO, ESTADOS_VACANTE
 from app.schemas.vacante import VacanteCrear, VacanteActualizar, VacanteOut
 
 
@@ -125,6 +125,7 @@ def obtener_estadisticas(db: Session) -> dict:
     todas = db.query(Vacante).all()
     activas = sum(1 for v in todas if v.estado == "publicada")
     abiertas = sum(1 for v in todas if not esta_cerrada(v))
+    por_estado = {estado: sum(1 for v in todas if v.estado == estado) for estado in ESTADOS_VACANTE}
     recientes = sorted(todas, key=lambda v: v.fecha_creacion or datetime.min, reverse=True)[:5]
     return {
         "total": len(todas),
@@ -132,5 +133,6 @@ def obtener_estadisticas(db: Session) -> dict:
         "ocultas": len(todas) - activas,
         "abiertas": abiertas,
         "cerradas": len(todas) - abiertas,
+        "por_estado": por_estado,
         "recientes": [_a_out(v) for v in recientes],
     }

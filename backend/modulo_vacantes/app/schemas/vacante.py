@@ -38,6 +38,7 @@ class CriteriosEvaluacion(BaseModel):
 class VacanteBase(BaseModel):
     proceso_no: str = Field(min_length=1, max_length=50)
     cargo: str = Field(min_length=1, max_length=200)
+    descripcion: Optional[str] = None
     area: Optional[str] = None
     salario: Optional[str] = None
     tipo_vinculacion: Optional[str] = None
@@ -81,6 +82,7 @@ class EstadisticasVacantes(BaseModel):
     ocultas: int
     abiertas: int
     cerradas: int
+    por_estado: dict[str, int]
     recientes: list[VacanteOut]
 
 

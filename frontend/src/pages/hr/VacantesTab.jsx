@@ -30,6 +30,7 @@ export default function VacantesTab() {
   const [modo, setModo] = useState("lista"); // 'lista' | 'form'
   const [vacanteEnEdicion, setVacanteEnEdicion] = useState(null);
   const [enlaceCopiadoId, setEnlaceCopiadoId] = useState(null);
+  const [editandoEstadoId, setEditandoEstadoId] = useState(null);
   const [error, setError] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("todas");
   const [busqueda, setBusqueda] = useState("");
@@ -82,6 +83,7 @@ export default function VacantesTab() {
 
   async function cambiarEstado(v, nuevoEstado) {
     await vacantesApi.cambiarEstado(v.id, nuevoEstado, token);
+    setEditandoEstadoId(null);
     await recargar();
   }
 
@@ -172,29 +174,30 @@ export default function VacantesTab() {
                     {v.tieneDocumentoPdf && <span title="Tiene PDF adjunto" style={{ marginLeft: 6, fontSize: 12 }}>📄</span>}
                   </td>
                   <td>{v.sede || "—"}</td>
-                  <td>
-                    {v.fechaCierre || "—"} {v.horaCierre || ""}
-                    {v.estaCerrada && <span className="vac-status-pill vac-status-pill--cerrada" style={{ marginLeft: 6 }}>Cerrada</span>}
-                  </td>
+                  <td>{v.fechaCierre || "—"} {v.horaCierre || ""}</td>
                   <td style={{ textAlign: "center", fontWeight: 700 }}>{conteo[v.id] || 0}</td>
                   <td>{v.fechaCreacion ? new Date(v.fechaCreacion).toLocaleDateString("es-CO") : "—"}</td>
                   <td>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
-                      <span className={`vac-status-pill ${CLASE_ESTADO[v.estado] || ""}`}>{ETIQUETA_ESTADO[v.estado]}</span>
+                    {editandoEstadoId === v.id ? (
                       <select
+                        autoFocus
                         value={v.estado}
                         onChange={(e) => cambiarEstado(v, e.target.value)}
+                        onBlur={() => setEditandoEstadoId(null)}
                         className="vac-status-select"
                       >
                         {Object.entries(ETIQUETA_ESTADO).map(([valor, etiqueta]) => (
                           <option key={valor} value={valor}>{etiqueta}</option>
                         ))}
                       </select>
-                    </div>
+                    ) : (
+                      <span className={`vac-status-pill ${CLASE_ESTADO[v.estado] || ""}`}>{ETIQUETA_ESTADO[v.estado]}</span>
+                    )}
                   </td>
                   <td>
                     <AccionesMenu
                       acciones={[
+                        { etiqueta: "Cambiar estado", onClick: () => setEditandoEstadoId(v.id) },
                         { etiqueta: "Editar", onClick: () => editar(v) },
                         { etiqueta: enlaceCopiadoId === v.id ? "¡Copiado!" : "Copiar enlace", onClick: () => copiarEnlace(v) },
                         { etiqueta: "Eliminar", onClick: () => eliminar(v.id), danger: true },

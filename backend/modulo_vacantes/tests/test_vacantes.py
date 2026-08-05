@@ -225,6 +225,16 @@ def test_estadisticas_requiere_rol_gestion():
     assert r.status_code == 403
 
 
+def test_vacante_guarda_y_devuelve_la_descripcion():
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "descripcion": "Buscamos un perfil analítico con experiencia en tratamiento de aguas."}, headers=HEADERS_GESTOR)
+    assert r.status_code == 201
+    assert r.json()["descripcion"] == "Buscamos un perfil analítico con experiencia en tratamiento de aguas."
+
+    vacante_id = r.json()["id"]
+    r_publico = client.get(f"/api/v1/vacantes/{vacante_id}")
+    assert r_publico.json()["descripcion"] == "Buscamos un perfil analítico con experiencia en tratamiento de aguas."
+
+
 def test_estadisticas_devuelve_conteos_reales():
     ayer = (date.today() - timedelta(days=1)).isoformat()
     manana = (date.today() + timedelta(days=1)).isoformat()
@@ -233,16 +243,25 @@ def test_estadisticas_devuelve_conteos_reales():
     client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "borrador"}, headers=HEADERS_GESTOR)  # no publicada
     client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_cierre": ayer}, headers=HEADERS_GESTOR)  # cerrada por fecha
     client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_cierre": manana}, headers=HEADERS_GESTOR)  # abierta
+    client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "en_proceso"}, headers=HEADERS_GESTOR)
+    client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "cancelada_desierta"}, headers=HEADERS_GESTOR)
 
     r = client.get("/api/v1/vacantes/admin/estadisticas", headers=HEADERS_GESTOR)
     assert r.status_code == 200
     data = r.json()
-    assert data["total"] == 4
-    assert data["activas"] == 3  # publicada (las 3 que no son "borrador")
-    assert data["ocultas"] == 1
-    assert data["cerradas"] == 1
-    assert data["abiertas"] == 3
+    assert data["total"] == 6
+    assert data["activas"] == 3  # publicada (las 3 que no son "borrador"/en_proceso/cancelada)
+    assert data["ocultas"] == 3
+    assert data["cerradas"] == 2  # la del "ayer" + la "cancelada_desierta" (también cuenta como cerrada)
+    assert data["abiertas"] == 4
     assert len(data["recientes"]) <= 5
+
+    assert data["por_estado"]["publicada"] == 3
+    assert data["por_estado"]["borrador"] == 1
+    assert data["por_estado"]["en_proceso"] == 1
+    assert data["por_estado"]["cancelada_desierta"] == 1
+    assert data["por_estado"]["cerrada"] == 0  # ninguna tiene estado="cerrada" explícito, solo por fecha
+    assert sum(data["por_estado"].values()) == 6
 
 
 def test_auditoria_requiere_rol_admin_no_solo_gestion():

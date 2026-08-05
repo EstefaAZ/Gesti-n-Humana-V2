@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
 import * as vacantesApi from "../lib/api/vacantesApi";
+import * as solicitudesApi from "../lib/api/solicitudesApi";
+import { useAuth } from "../context/AuthContext";
 
 export default function VacanteDetallePage() {
   const { id } = useParams();
+  const { token } = useAuth();
   const [vacante, setVacante] = useState(undefined); // undefined = cargando, null = no encontrada
   const [error, setError] = useState("");
+  const [miPostulacion, setMiPostulacion] = useState(undefined); // undefined = cargando, null = no se ha postulado
 
   useEffect(() => {
     vacantesApi
@@ -14,6 +18,14 @@ export default function VacanteDetallePage() {
       .then(setVacante)
       .catch((e) => (e.status === 404 ? setVacante(null) : setError("No se pudo cargar la vacante.")));
   }, [id]);
+
+  useEffect(() => {
+    if (!token) return;
+    solicitudesApi
+      .misSolicitudes(token)
+      .then((mias) => setMiPostulacion(mias.find((s) => s.vacanteId === id) || null))
+      .catch(() => setMiPostulacion(null));
+  }, [id, token]);
 
   if (error) {
     return (
@@ -33,7 +45,6 @@ export default function VacanteDetallePage() {
         <main className="page">
           <div className="card">
             <div className="empty-state">No encontramos esta vacante. Puede que ya no esté disponible.</div>
-            <p className="text-center mt-24"><Link to="/" className="text-muted">← Ver todas las vacantes</Link></p>
           </div>
         </main>
       </>
@@ -46,19 +57,18 @@ export default function VacanteDetallePage() {
     <>
       <DocHeader title={vacante.cargo} />
       <main className="page">
-        <Link to="/" className="text-muted">← Ver todas las vacantes</Link>
         <div className="card mt-24">
           <div className="vac-card__proceso">Proceso de Selección No. {vacante.procesoNo}</div>
           <h2 className="section-title" style={{ marginTop: 4 }}>{vacante.cargo}</h2>
+          {vacante.descripcion && <p style={{ fontSize: 14, color: "var(--color-text)", margin: "4px 0 16px" }}>{vacante.descripcion}</p>}
 
           <div className="field-grid" style={{ margin: "16px 0" }}>
             <div className="info-box"><label>Proceso / Área</label><div className="value">{vacante.area || "—"}</div></div>
             <div className="info-box"><label>Salario básico</label><div className="value">{vacante.salario || "—"}</div></div>
             <div className="info-box"><label>Tipo de vinculación</label><div className="value">{vacante.tipoVinculacion || "—"}</div></div>
-            <div className="info-box"><label>Sede</label><div className="value">{vacante.sede || "—"}</div></div>
             <div className="info-box"><label>N° de plazas</label><div className="value">{vacante.plazas || "—"}</div></div>
             <div className="info-box"><label>Público objetivo</label><div className="value">{vacante.publicoObjetivo || "—"}</div></div>
-            <div className="info-box"><label>Fecha de cierre</label><div className="value">{vacante.fechaCierre || "—"} {vacante.horaCierre || ""}</div></div>
+            <div className="info-box"><label>Fecha y hora de cierre</label><div className="value">{vacante.fechaCierre || "—"} / {vacante.horaCierre || ""}</div></div>
           </div>
 
           {vacante.requisitosObligatorios && (
@@ -98,7 +108,12 @@ export default function VacanteDetallePage() {
           )}
 
           <div className="wizard-actions" style={{ justifyContent: "flex-end" }}>
-            {vacante.estaCerrada ? (
+            {miPostulacion ? (
+              <div className="notice notice--info" style={{ margin: 0 }}>
+                Ya te inscribiste a esta vacante (radicado <strong>{miPostulacion.radicado}</strong>).{" "}
+                <Link to="/mis-postulaciones">Ver mis postulaciones →</Link>
+              </div>
+            ) : vacante.estaCerrada ? (
               <div className="notice notice--danger" style={{ margin: 0 }}>
                 Esta convocatoria cerró el {vacante.fechaCierre} a las {vacante.horaCierre}. Ya no se reciben inscripciones.
               </div>

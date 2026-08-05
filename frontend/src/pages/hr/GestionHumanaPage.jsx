@@ -17,10 +17,6 @@ export default function GestionHumanaPage() {
         </div>
 
         {tab === "vacantes" ? <VacantesTab /> : <PostulacionesTab />}
-
-        <p className="text-center mt-24">
-          <Link to="/" className="text-muted">← Ver vista del candidato</Link>
-        </p>
       </main>
     </>
   );

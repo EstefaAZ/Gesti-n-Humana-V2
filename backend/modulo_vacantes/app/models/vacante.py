@@ -37,6 +37,7 @@ class Vacante(Base):
 
     proceso_no = Column(String(50), nullable=False)
     cargo = Column(String(200), nullable=False)
+    descripcion = Column(Text, nullable=True)  # breve descripción para el candidato, la escribe Gestión Humana
     area = Column(String(200), nullable=True)
     salario = Column(String(100), nullable=True)
     tipo_vinculacion = Column(String(100), nullable=True)

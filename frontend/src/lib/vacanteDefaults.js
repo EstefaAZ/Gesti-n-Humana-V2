@@ -3,6 +3,7 @@ export function vacanteVacia() {
   return {
     procesoNo: "",
     cargo: "",
+    descripcion: "",
     area: "",
     salario: "",
     tipoVinculacion: "",
