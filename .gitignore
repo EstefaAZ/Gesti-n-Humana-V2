@@ -5,6 +5,7 @@ frontend/dist-ssr/
 frontend/.vite/
 frontend/.env
 frontend/.env.*
+!frontend/.env.example
 
 # Python / backend
 backend/**/__pycache__/
@@ -18,6 +19,7 @@ backend/**/*.sqlite
 backend/**/*.sqlite3
 backend/**/.env
 backend/**/.env.*
+!backend/**/.env.example
 backend/**/.coverage
 
 # System / editor
