@@ -13,6 +13,9 @@ backend/**/.venv/
 backend/**/venv/
 backend/**/.pytest_cache/
 backend/**/*.log
+backend/**/*.db
+backend/**/*.sqlite
+backend/**/*.sqlite3
 backend/**/.env
 backend/**/.env.*
 backend/**/.coverage
