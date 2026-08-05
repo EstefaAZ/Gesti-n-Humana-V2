@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import VacanteForm from "./VacanteForm";
+import AccionesMenu from "../../components/AccionesMenu";
 import { useAuth } from "../../context/AuthContext";
 import * as vacantesApi from "../../lib/api/vacantesApi";
 import * as solicitudesApi from "../../lib/api/solicitudesApi";
@@ -17,9 +18,9 @@ const ETIQUETA_ESTADO = {
 const CLASE_ESTADO = {
   borrador: "vac-status-pill--oculta",
   publicada: "vac-status-pill--activa",
-  en_proceso: "vac-status-pill--oculta",
+  en_proceso: "vac-status-pill--en-proceso",
   cerrada: "vac-status-pill--cerrada",
-  cancelada_desierta: "vac-status-pill--cerrada",
+  cancelada_desierta: "vac-status-pill--cancelada",
 };
 
 export default function VacantesTab() {
@@ -122,7 +123,7 @@ export default function VacantesTab() {
         <button type="button" className="btn btn-primary" onClick={nuevaVacante}>+ Nueva vacante</button>
       </div>
 
-      <div className="stat-cards-grid" style={{ marginBottom: 20 }}>
+      <div className="stat-cards-grid stat-cards-grid--compact" style={{ marginBottom: 20 }}>
         {ESTADOS.map((e) => (
           <button
             key={e}
@@ -178,25 +179,27 @@ export default function VacantesTab() {
                   <td style={{ textAlign: "center", fontWeight: 700 }}>{conteo[v.id] || 0}</td>
                   <td>{v.fechaCreacion ? new Date(v.fechaCreacion).toLocaleDateString("es-CO") : "—"}</td>
                   <td>
-                    <select
-                      value={v.estado}
-                      onChange={(e) => cambiarEstado(v, e.target.value)}
-                      className={`vac-status-pill ${CLASE_ESTADO[v.estado] || ""}`}
-                      style={{ border: "none", fontSize: 12, padding: "4px 8px" }}
-                    >
-                      {Object.entries(ETIQUETA_ESTADO).map(([valor, etiqueta]) => (
-                        <option key={valor} value={valor}>{etiqueta}</option>
-                      ))}
-                    </select>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+                      <span className={`vac-status-pill ${CLASE_ESTADO[v.estado] || ""}`}>{ETIQUETA_ESTADO[v.estado]}</span>
+                      <select
+                        value={v.estado}
+                        onChange={(e) => cambiarEstado(v, e.target.value)}
+                        className="vac-status-select"
+                      >
+                        {Object.entries(ETIQUETA_ESTADO).map(([valor, etiqueta]) => (
+                          <option key={valor} value={valor}>{etiqueta}</option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td>
-                    <div className="hr-table-actions">
-                      <button className="hr-link-btn" onClick={() => editar(v)}>Editar</button>
-                      <button className="hr-link-btn" onClick={() => copiarEnlace(v)}>
-                        {enlaceCopiadoId === v.id ? "¡Copiado!" : "Copiar enlace"}
-                      </button>
-                      <button className="hr-link-btn hr-link-btn--danger" onClick={() => eliminar(v.id)}>Eliminar</button>
-                    </div>
+                    <AccionesMenu
+                      acciones={[
+                        { etiqueta: "Editar", onClick: () => editar(v) },
+                        { etiqueta: enlaceCopiadoId === v.id ? "¡Copiado!" : "Copiar enlace", onClick: () => copiarEnlace(v) },
+                        { etiqueta: "Eliminar", onClick: () => eliminar(v.id), danger: true },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))}
