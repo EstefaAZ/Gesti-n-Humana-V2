@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function VacanteDetallePage() {
   const { id } = useParams();
-  const { token } = useAuth();
+  const { token, usuario } = useAuth();
   const [vacante, setVacante] = useState(undefined); // undefined = cargando, null = no encontrada
   const [error, setError] = useState("");
   const [miPostulacion, setMiPostulacion] = useState(undefined); // undefined = cargando, null = no se ha postulado
@@ -116,6 +116,11 @@ export default function VacanteDetallePage() {
             ) : vacante.estaCerrada ? (
               <div className="notice notice--danger" style={{ margin: 0 }}>
                 Esta convocatoria cerró el {vacante.fechaCierre} a las {vacante.horaCierre}. Ya no se reciben inscripciones.
+              </div>
+            ) : usuario?.rol === "gestor_humano" || usuario?.rol === "admin" ? (
+              <div className="notice notice--info" style={{ margin: 0 }}>
+                Tu cuenta tiene rol de {usuario.rol === "admin" ? "Administrador" : "Gestión Humana"}, no puedes postularte a vacantes.
+                Administra esta convocatoria desde el panel de Gestión Humana.
               </div>
             ) : (
               <Link to={`/postularme/${vacante.id}`} className="btn btn-primary">Iniciar solicitud de inscripción</Link>

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import DocHeader from "../../components/DocHeader";
 import VacantesTab from "./VacantesTab";
 import PostulacionesTab from "./PostulacionesTab";
