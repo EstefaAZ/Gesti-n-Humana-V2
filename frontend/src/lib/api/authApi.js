@@ -75,6 +75,11 @@ export async function listarUsuarios(token) {
   return data.map(_usuarioACamel);
 }
 
+export async function listarCandidatos(token) {
+  const data = await apiFetch(`${BASE}/candidatos`, { token });
+  return data.map(_usuarioACamel);
+}
+
 export async function crearUsuarioInterno({ nombreCompleto, email, password, rol }, token) {
   const usuario = await apiFetch(`${BASE}/usuarios-internos`, {
     method: "POST",
@@ -93,6 +98,16 @@ export async function editarUsuario(usuarioId, { nombreCompleto, rol } = {}, tok
     token,
     body,
   });
+  return _usuarioACamel(usuario);
+}
+
+export async function desactivarCuentaDeOtro(usuarioId, token) {
+  const usuario = await apiFetch(`${BASE}/usuarios/${usuarioId}/desactivar`, { method: "PATCH", token });
+  return _usuarioACamel(usuario);
+}
+
+export async function reactivarCuenta(usuarioId, token) {
+  const usuario = await apiFetch(`${BASE}/usuarios/${usuarioId}/activar`, { method: "PATCH", token });
   return _usuarioACamel(usuario);
 }
 

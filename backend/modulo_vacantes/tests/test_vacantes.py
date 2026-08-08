@@ -196,6 +196,23 @@ def test_vacante_con_fecha_cierre_futura_no_esta_cerrada():
     assert r.json()["esta_cerrada"] is False
 
 
+def test_vacante_con_fecha_apertura_futura_marca_aun_no_abre():
+    manana = (date.today() + timedelta(days=1)).isoformat()
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_apertura": manana}, headers=HEADERS_GESTOR)
+    assert r.json()["aun_no_abre"] is True
+
+
+def test_vacante_con_fecha_apertura_pasada_no_marca_aun_no_abre():
+    ayer = (date.today() - timedelta(days=1)).isoformat()
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_apertura": ayer}, headers=HEADERS_GESTOR)
+    assert r.json()["aun_no_abre"] is False
+
+
+def test_vacante_sin_fecha_apertura_no_marca_aun_no_abre():
+    r = client.post("/api/v1/vacantes", json=VACANTE_VALIDA, headers=HEADERS_GESTOR)
+    assert r.json()["aun_no_abre"] is False
+
+
 def test_cerrar_manualmente_bloquea_aunque_la_fecha_de_cierre_no_haya_llegado():
     # Bug de regresión: antes, cambiar el estado a "cerrada" a mano NO
     # bloqueaba postulaciones si la fecha de cierre todavía no había pasado

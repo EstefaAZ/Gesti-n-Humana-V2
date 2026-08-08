@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import DocHeader from "../../components/DocHeader";
+import AccionesMenu from "../../components/AccionesMenu";
 import { useAuth } from "../../context/AuthContext";
 import * as authApi from "../../lib/api/authApi";
 import { ApiError } from "../../lib/api/httpClient";
@@ -21,6 +22,9 @@ export default function UsuariosPage() {
   const [editandoNombreId, setEditandoNombreId] = useState(null);
   const [nombreEnEdicion, setNombreEnEdicion] = useState("");
   const [guardandoNombre, setGuardandoNombre] = useState(false);
+  const [editandoRolId, setEditandoRolId] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [procesandoEstadoId, setProcesandoEstadoId] = useState(null);
 
   async function cargar() {
     try {
@@ -54,6 +58,7 @@ export default function UsuariosPage() {
     setCambiandoRolId(usuarioId);
     try {
       await authApi.editarUsuario(usuarioId, { rol: nuevoRol }, token);
+      setEditandoRolId(null);
       await cargar();
     } catch (err) {
       alert(err instanceof ApiError ? err.detail : "No se pudo cambiar el rol.");
@@ -84,6 +89,36 @@ export default function UsuariosPage() {
     }
   }
 
+  async function handleDesactivar(u) {
+    if (!window.confirm(`¿Desactivar la cuenta de ${u.nombreCompleto}? No podrá iniciar sesión hasta que la reactives.`)) return;
+    setProcesandoEstadoId(u.id);
+    try {
+      await authApi.desactivarCuentaDeOtro(u.id, token);
+      await cargar();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.detail : "No se pudo desactivar la cuenta.");
+    } finally {
+      setProcesandoEstadoId(null);
+    }
+  }
+
+  async function handleReactivar(u) {
+    setProcesandoEstadoId(u.id);
+    try {
+      await authApi.reactivarCuenta(u.id, token);
+      await cargar();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.detail : "No se pudo reactivar la cuenta.");
+    } finally {
+      setProcesandoEstadoId(null);
+    }
+  }
+
+  const usuariosFiltrados = (usuarios || []).filter((u) => {
+    if (!busqueda.trim()) return true;
+    return `${u.nombreCompleto} ${u.email}`.toLowerCase().includes(busqueda.toLowerCase());
+  });
+
   return (
     <>
       <DocHeader title="Usuarios" showCode={false} />
@@ -93,7 +128,7 @@ export default function UsuariosPage() {
         <div className="card">
           <div className="hr-table-actions" style={{ justifyContent: "space-between", marginBottom: mostrarForm ? 20 : 0 }}>
             <h2 className="section-title" style={{ margin: 0 }}>Usuarios registrados</h2>
-            <button type="button" className="btn btn-primary" onClick={() => setMostrarForm((v) => !v)}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setMostrarForm((v) => !v)}>
               {mostrarForm ? "Cancelar" : "+ Crear cuenta interna"}
             </button>
           </div>
@@ -136,12 +171,21 @@ export default function UsuariosPage() {
           {usuarios === null ? (
             <p className="text-muted">Cargando…</p>
           ) : (
-            <table className="plain-table">
-              <thead>
-                <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th></th></tr>
-              </thead>
-              <tbody>
-                {usuarios.map((u) => (
+            <>
+              <div className="field mt-24" style={{ maxWidth: 320 }}>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o correo…"
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                />
+              </div>
+              <table className="plain-table" style={{ marginTop: 14 }}>
+                <thead>
+                  <tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {usuariosFiltrados.map((u) => (
                   <tr key={u.id}>
                     <td>
                       {editandoNombreId === u.id ? (
@@ -158,32 +202,55 @@ export default function UsuariosPage() {
                           <button type="button" className="hr-link-btn" onClick={() => setEditandoNombreId(null)}>✕</button>
                         </div>
                       ) : (
-                        <span>
-                          {u.nombreCompleto}{" "}
-                          <button type="button" className="hr-link-btn" style={{ fontSize: 11 }} onClick={() => iniciarEdicionNombre(u)} title="Cambiar nombre">
-                            ✎
-                          </button>
-                        </span>
+                        u.nombreCompleto
                       )}
                     </td>
                     <td>{u.email}</td>
                     <td>
-                      <select
-                        value={u.rol}
-                        disabled={cambiandoRolId === u.id || u.id === usuarioActual?.id}
-                        onChange={(e) => handleCambiarRol(u.id, e.target.value)}
-                        style={{ fontSize: 12.5, padding: "4px 8px", width: "auto" }}
-                      >
-                        {ROLES_ASIGNABLES.map((r) => (
-                          <option key={r} value={r}>{ETIQUETA_ROL[r]}</option>
-                        ))}
-                      </select>
+                      {editandoRolId === u.id ? (
+                        <select
+                          autoFocus
+                          value={u.rol}
+                          disabled={cambiandoRolId === u.id}
+                          onChange={(e) => handleCambiarRol(u.id, e.target.value)}
+                          onBlur={() => setEditandoRolId(null)}
+                          style={{ fontSize: 12.5, padding: "4px 8px", width: "auto" }}
+                        >
+                          {ROLES_ASIGNABLES.map((r) => (
+                            <option key={r} value={r}>{ETIQUETA_ROL[r]}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="estado-badge estado-badge--preseleccionado">{ETIQUETA_ROL[u.rol]}</span>
+                      )}
                     </td>
-                    <td>{u.id === usuarioActual?.id && <span className="text-muted" style={{ fontSize: 11.5 }}>(tú)</span>}</td>
+                    <td>
+                      <span className={`estado-badge ${u.activo ? "estado-badge--aceptada" : "estado-badge--rechazada"}`}>
+                        {u.activo ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+                    <td>
+                      {u.id === usuarioActual?.id ? (
+                        <span className="text-muted" style={{ fontSize: 11.5 }}>(tú)</span>
+                      ) : procesandoEstadoId === u.id ? (
+                        <span className="text-muted" style={{ fontSize: 11.5 }}>Procesando…</span>
+                      ) : (
+                        <AccionesMenu
+                          acciones={[
+                            { etiqueta: "Cambiar nombre", onClick: () => iniciarEdicionNombre(u) },
+                            { etiqueta: "Cambiar rol", onClick: () => setEditandoRolId(u.id) },
+                            u.activo
+                              ? { etiqueta: "Desactivar cuenta", onClick: () => handleDesactivar(u), danger: true }
+                              : { etiqueta: "Reactivar cuenta", onClick: () => handleReactivar(u) },
+                          ]}
+                        />
+                      )}
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
       </main>

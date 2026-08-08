@@ -36,7 +36,7 @@ function itemsPara(rol) {
       ...comunes,
       { to: "/mis-postulaciones", label: "Mis postulaciones", icon: IconFolder },
       { to: "/perfil", label: "Mi perfil", icon: IconUser },
-      { label: "Documentos", icon: IconFolder, proximamente: true },
+      { to: "/documentos", label: "Documentos", icon: IconFolder },
       { label: "Notificaciones", icon: IconBell, proximamente: true },
       { label: "Configuración", icon: IconSettings, proximamente: true },
     ];
@@ -46,7 +46,7 @@ function itemsPara(rol) {
   const base = [
     ...comunes,
     { to: "/gestion-humana", label: "Gestión Humana", icon: IconUsers },
-    { label: "Candidatos", icon: IconUsers, proximamente: true },
+    { to: "/candidatos", label: "Candidatos", icon: IconUsers },
     { label: "Entrevistas", icon: IconCalendar, proximamente: true },
     { label: "Comunicación", icon: IconChat, proximamente: true },
     { label: "Reportes", icon: IconChart, proximamente: true },

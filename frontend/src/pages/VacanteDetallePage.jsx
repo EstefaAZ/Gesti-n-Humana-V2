@@ -221,6 +221,10 @@ export default function VacanteDetallePage() {
               <div className="notice notice--danger" style={{ margin: 0 }}>
                 Esta convocatoria cerró el {vacante.fechaCierre} a las {vacante.horaCierre}. Ya no se reciben inscripciones.
               </div>
+            ) : vacante.aunNoAbre ? (
+              <div className="notice notice--info" style={{ margin: 0 }}>
+                Esta convocatoria abre el <strong>{vacante.fechaApertura}</strong>. Vuelve ese día para poder inscribirte.
+              </div>
             ) : usuario?.rol === "gestor_humano" || usuario?.rol === "admin" ? (
               <div className="notice notice--info" style={{ margin: 0 }}>
                 Tu cuenta tiene rol de {usuario.rol === "admin" ? "Administrador" : "Gestión Humana"} — no puedes postularte a vacantes.

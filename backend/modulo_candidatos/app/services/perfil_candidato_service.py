@@ -25,6 +25,39 @@ def obtener_perfil(db: Session, usuario_id: str) -> Optional[PerfilCandidato]:
     return db.query(PerfilCandidato).filter(PerfilCandidato.usuario_id == usuario_id).first()
 
 
+def listar_todos(db: Session) -> list[PerfilCandidato]:
+    """Para la página "Candidatos" de Gestión Humana — todos los perfiles guardados."""
+    return db.query(PerfilCandidato).order_by(PerfilCandidato.fecha_creacion.desc()).all()
+
+
+class DocumentoNoEncontradoError(Exception):
+    pass
+
+
+CATEGORIAS_DOCUMENTOS = ("cedula", "certificados_laborales", "certificados_estudio", "tarjeta_profesional")
+
+
+def obtener_documento(db: Session, usuario_id: str, categoria: str, indice: int) -> tuple[bytes, str]:
+    import base64
+
+    perfil = obtener_perfil(db, usuario_id)
+    if not perfil:
+        raise DocumentoNoEncontradoError("Este candidato no tiene un perfil guardado.")
+    if categoria not in CATEGORIAS_DOCUMENTOS:
+        raise DocumentoNoEncontradoError(f"Categoría de documento inválida: {categoria}.")
+
+    lista = (perfil.documentos_adjuntos or {}).get(categoria, [])
+    if indice < 0 or indice >= len(lista):
+        raise DocumentoNoEncontradoError("No existe un documento con ese índice en esa categoría.")
+
+    doc = lista[indice]
+    try:
+        contenido = base64.b64decode(doc["contenido_base64"])
+    except Exception:
+        raise DocumentoNoEncontradoError("El documento está corrupto y no se pudo leer.")
+    return contenido, doc.get("nombre", f"{categoria}-{indice}.pdf")
+
+
 def obtener_estado_perfil(db: Session, usuario_id: str) -> dict:
     perfil = obtener_perfil(db, usuario_id)
     return {"existe": perfil is not None, "completado": bool(perfil and perfil.completado)}

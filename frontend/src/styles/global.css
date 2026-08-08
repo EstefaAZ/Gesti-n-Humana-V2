@@ -260,6 +260,24 @@ table.plain-table td { padding: 4px 8px 4px 0; vertical-align: top; }
 .eval-badge--ok { background: var(--color-accent-tint); color: var(--color-primary-dark); }
 .eval-badge--warn { background: var(--color-warning-tint); color: #7A4E06; }
 
+/* ---------- Estado de la postulación (candidato: "Mis postulaciones") ---------- */
+
+.estado-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.estado-badge--recibida { background: var(--color-surface-sunken); color: var(--color-text-muted); }
+.estado-badge--en-revision { background: #FFF6D9; color: #8A6D00; }
+.estado-badge--preseleccionado { background: #E3EEFC; color: #1D5DAD; }
+.estado-badge--entrevista { background: #F0E6FA; color: #6B3FA0; }
+.estado-badge--rechazada { background: var(--color-danger-tint); color: var(--color-danger); }
+.estado-badge--aceptada { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+
 .eval-motivos { font-size: 11.5px; color: var(--color-text-muted); margin: 6px 0 0; padding-left: 16px; }
 .eval-motivos li { margin-bottom: 2px; }
 

@@ -33,12 +33,38 @@ class PerfilIncompletoError(Exception):
     pass
 
 
+class PostulacionActivaError(Exception):
+    """El candidato ya tiene una postulación en curso en otra vacante — no
+    puede participar en dos procesos de selección a la vez (según el
+    formato GTH-FOR-02: 'Una persona sólo puede inscribirse en un proceso
+    de selección a la vez')."""
+    pass
+
+
+ESTADOS_VACANTE_EN_CURSO = ("publicada", "en_proceso")
+
+
+def _tiene_postulacion_activa_en_otra_vacante(db: Session, usuario_id: str, token: Optional[str]) -> bool:
+    """Revisa TODAS las solicitudes previas del candidato y consulta el estado
+    ACTUAL de cada vacante asociada (puede haber cambiado desde que se postuló).
+    Si alguna sigue "publicada" o "en_proceso", el candidato no puede postularse
+    a una vacante nueva hasta que esa se cierre o se cancele."""
+    solicitudes_previas = db.query(Solicitud).filter(Solicitud.usuario_id == usuario_id).all()
+    for sol in solicitudes_previas:
+        vacante = vacantes_client.obtener_vacante(sol.vacante_id, token=token)
+        if vacante and vacante.get("estado") in ESTADOS_VACANTE_EN_CURSO:
+            return True
+    return False
+
+
 def _validar_vacante_disponible(db: Session, vacante_id: str, usuario_id: str, token: Optional[str]) -> dict:
     vacante = vacantes_client.obtener_vacante(vacante_id, token=token)
     if not vacante:
         raise VacanteNoEncontradaError(f"No existe una vacante con id {vacante_id}.")
     if vacante.get("esta_cerrada"):
         raise VacanteCerradaError("Esta convocatoria ya cerró; no se aceptan más inscripciones.")
+    if vacante.get("aun_no_abre"):
+        raise VacanteCerradaError(f"Esta convocatoria abre el {vacante.get('fecha_apertura')}; todavía no se reciben inscripciones.")
 
     ya_existe = (
         db.query(Solicitud)
@@ -47,6 +73,12 @@ def _validar_vacante_disponible(db: Session, vacante_id: str, usuario_id: str, t
     )
     if ya_existe:
         raise YaPostuladoError("Ya existe una solicitud tuya para esta vacante.")
+
+    if _tiene_postulacion_activa_en_otra_vacante(db, usuario_id, token):
+        raise PostulacionActivaError(
+            "Ya tienes una postulación en curso en otro proceso de selección. Solo puedes participar en uno a la "
+            "vez — espera a que se cierre o se cancele para poder inscribirte a una vacante nueva."
+        )
     return vacante
 
 
@@ -123,10 +155,20 @@ def inscribirse_con_perfil(
     vacante = _validar_vacante_disponible(db, vacante_id, usuario_id, token)
     documentos_combinados = _combinar_documentos(perfil.documentos_adjuntos or {}, documentos_extra)
 
+    # El perfil guarda autorizacion.nombre_completo (snake_case, viene del esquema
+    # Pydantic AutorizacionPerfil). El resto del sistema — Hoja VIII, PDF, panel de
+    # Gestión Humana — siempre ha usado nombreCompleto (camelCase). Sin este ajuste,
+    # las solicitudes creadas por este camino guardaban la llave distinta y la
+    # sección "Autorización" se veía vacía en el panel de Gestión Humana.
+    autorizacion_normalizada = {
+        "acepta": (perfil.autorizacion or {}).get("acepta", False),
+        "nombreCompleto": (perfil.autorizacion or {}).get("nombre_completo", ""),
+    }
+
     return _guardar_solicitud(
         db, vacante, vacante_id, usuario_id,
         perfil.datos_personales, perfil.registros_ii, perfil.experiencia, perfil.conflicto,
-        perfil.autorizacion, documentos_combinados,
+        autorizacion_normalizada, documentos_combinados,
     )
 
 

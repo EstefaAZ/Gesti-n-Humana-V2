@@ -11,7 +11,7 @@ import pytest
 
 from tests.conftest import client
 from tests.test_solicitudes import (
-    token_para, HEADERS_CANDIDATO, HEADERS_OTRO_CANDIDATO, HEADERS_GESTOR, HEADERS_ADMIN, DOCUMENTOS_VALIDOS,
+    token_para, HEADERS_CANDIDATO, HEADERS_OTRO_CANDIDATO, HEADERS_GESTOR, HEADERS_ADMIN, DOCUMENTOS_VALIDOS, SOLICITUD_VALIDA,
 )
 
 pytestmark = pytest.mark.usefixtures("mock_vacantes")
@@ -161,4 +161,141 @@ def test_inscribirme_documentos_extra_no_afectan_el_perfil_guardado():
 
 def test_inscribirme_requiere_rol_candidato():
     r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_GESTOR)
+    assert r.status_code == 403
+
+
+# ---------------------------------------------------------------
+# Corrección: autorizacion.nombreCompleto (no nombre_completo) en la solicitud
+# ---------------------------------------------------------------
+
+def test_inscribirme_guarda_autorizacion_en_camelcase_como_el_resto_del_sistema():
+    # Bug de regresión: el perfil guarda autorizacion.nombre_completo (snake_case,
+    # viene del esquema Pydantic), pero el resto del sistema (Hoja VIII, PDF,
+    # panel de Gestión Humana) siempre usó nombreCompleto (camelCase). Sin la
+    # normalización, la sección "Autorización" se veía vacía en Gestión Humana.
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r.json()["autorizacion"]["nombreCompleto"] == "Candidato Uno"
+    assert r.json()["autorizacion"]["acepta"] is True
+    assert "nombre_completo" not in r.json()["autorizacion"]
+
+
+# ---------------------------------------------------------------
+# Fecha de apertura futura: no debe dejar inscribirse todavía
+# ---------------------------------------------------------------
+
+def test_inscribirme_a_vacante_que_aun_no_abre_es_rechazado():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-no-abierta"}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+    assert "abre" in r.json()["detail"].lower()
+
+
+def test_crear_solicitud_directa_a_vacante_que_aun_no_abre_tambien_es_rechazado():
+    datos = {**SOLICITUD_VALIDA, "vacante_id": "vac-no-abierta"}
+    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+
+
+# ---------------------------------------------------------------
+# Una sola postulación activa a la vez (GTH-FOR-02)
+# ---------------------------------------------------------------
+
+def test_no_puede_postularse_a_una_segunda_vacante_mientras_la_primera_sigue_publicada():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r1 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r1.status_code == 201
+
+    r2 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO)
+    assert r2.status_code == 409
+    assert "uno a la vez" in r2.json()["detail"]
+
+
+def test_no_puede_postularse_a_una_vacante_ya_cerrada_de_entrada():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-cerrada"}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+
+
+def test_si_puede_postularse_a_otra_vacante_una_vez_la_primera_paso_a_cancelada(monkeypatch):
+    from app.clients import vacantes_client as vc
+    from tests.conftest import VACANTES_MOCK
+
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r1 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r1.status_code == 201
+
+    # Simula que "vac-1" pasó a cancelada_desierta después de que se postuló.
+    vacante_1_cancelada = {**VACANTES_MOCK["vac-1"], "estado": "cancelada_desierta", "esta_cerrada": True}
+
+    def fake_obtener_vacante(vacante_id, token=None):
+        if vacante_id == "vac-1":
+            return vacante_1_cancelada
+        return VACANTES_MOCK.get(vacante_id)
+
+    monkeypatch.setattr(vc, "obtener_vacante", fake_obtener_vacante)
+
+    r2 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO)
+    assert r2.status_code == 201  # ahora sí puede, porque la primera ya no está "en curso"
+
+
+def test_una_sola_postulacion_activa_tambien_aplica_al_endpoint_viejo_crear_solicitud():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+
+    datos = {**SOLICITUD_VALIDA, "vacante_id": "vac-2"}
+    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+
+
+# ---------------------------------------------------------------
+# Página "Candidatos" de Gestión Humana: listar todos los perfiles
+# ---------------------------------------------------------------
+
+def test_listar_todos_los_perfiles_requiere_rol_gestion():
+    r = client.get("/api/v1/perfiles/admin/todos", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 403
+
+
+def test_listar_todos_los_perfiles():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.get("/api/v1/perfiles/admin/todos", headers=HEADERS_GESTOR)
+    assert r.status_code == 200
+    assert len(r.json()) == 1
+    assert r.json()[0]["datos_personales"]["nombreCompleto"] == "Candidato Uno"
+
+
+def test_listar_todos_los_perfiles_vacio_si_nadie_ha_completado_uno():
+    r = client.get("/api/v1/perfiles/admin/todos", headers=HEADERS_GESTOR)
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+# ---------------------------------------------------------------
+# Descarga de documentos del perfil (candidato propio y Gestión Humana)
+# ---------------------------------------------------------------
+
+def test_descargar_mi_documento_de_perfil():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.get("/api/v1/perfiles/me/documentos/cedula/0", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.content == b"%PDF-1.4"  # JVBERi0xLjQ= decodificado
+
+
+def test_descargar_documento_de_perfil_sin_perfil_da_404():
+    r = client.get("/api/v1/perfiles/me/documentos/cedula/0", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 404
+
+
+def test_gestion_humana_puede_descargar_documento_del_perfil_de_un_candidato():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    # HEADERS_CANDIDATO usa token_para('candidato-1'), así que "candidato-1" ES el usuario_id.
+    r = client.get("/api/v1/perfiles/admin/candidato-1/documentos/cedula/0", headers=HEADERS_GESTOR)
+    assert r.status_code == 200
+    assert r.content == b"%PDF-1.4"
+
+
+def test_candidato_no_puede_descargar_documentos_de_otro_por_admin():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.get("/api/v1/perfiles/admin/candidato-1/documentos/cedula/0", headers=HEADERS_CANDIDATO)
     assert r.status_code == 403

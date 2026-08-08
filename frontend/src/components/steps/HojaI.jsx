@@ -69,6 +69,16 @@ export default function HojaI({ datos, setDatos, errors, ocultarProceso = false 
         <Field label="Clase">
           <input type="text" value={datos.licenciaClase} onChange={set("licenciaClase")} disabled={datos.licencia !== "si"} />
         </Field>
+        <Field label="¿Tiene vehículo?">
+          <div className="radio-row">
+            <label className="radio-option">
+              <input type="radio" name="tieneVehiculo" checked={datos.tieneVehiculo === "si"} onChange={() => setDatos({ tieneVehiculo: "si" })} /> Sí
+            </label>
+            <label className="radio-option">
+              <input type="radio" name="tieneVehiculo" checked={datos.tieneVehiculo === "no"} onChange={() => setDatos({ tieneVehiculo: "no" })} /> No
+            </label>
+          </div>
+        </Field>
 
         <Field label="Correo electrónico *" span2 error={errors.correo}>
           <input type="email" value={datos.correo} onChange={set("correo")} />
@@ -115,21 +125,11 @@ export default function HojaI({ datos, setDatos, errors, ocultarProceso = false 
         <Field label="N° de hijos *" error={errors.numHijos}>
           <input type="number" min="0" value={datos.numHijos} onChange={set("numHijos")} />
         </Field>
-        <Field label="¿Tiene vehículo?">
-          <div className="radio-row">
-            <label className="radio-option">
-              <input type="radio" name="tieneVehiculo" checked={datos.tieneVehiculo === "si"} onChange={() => setDatos({ tieneVehiculo: "si" })} /> Sí
-            </label>
-            <label className="radio-option">
-              <input type="radio" name="tieneVehiculo" checked={datos.tieneVehiculo === "no"} onChange={() => setDatos({ tieneVehiculo: "no" })} /> No
-            </label>
-          </div>
-        </Field>
 
-        <Field label="Tarjeta o matrícula profesional N°">
+        <Field label="Tarjeta o matrícula profesional N° *" error={errors.tarjetaProfesional}>
           <input type="text" value={datos.tarjetaProfesional} onChange={set("tarjetaProfesional")} />
         </Field>
-        <Field label="Profesión">
+        <Field label="Profesión *" error={errors.profesion}>
           <input type="text" value={datos.profesion} onChange={set("profesion")} />
         </Field>
         <Field label="Fecha de expedición">

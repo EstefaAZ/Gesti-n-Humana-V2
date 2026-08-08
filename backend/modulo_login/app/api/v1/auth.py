@@ -188,6 +188,29 @@ def reactivar_cuenta(
     return reactivada
 
 
+@router.patch("/usuarios/{usuario_id}/desactivar", response_model=UsuarioOut)
+def desactivar_cuenta_de_otro(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    admin_actual: Usuario = Depends(requerir_roles(RolUsuario.admin)),
+):
+    """Un admin desactiva la cuenta de OTRO usuario (ej. un candidato lo pide por fuera del sitio)."""
+    try:
+        desactivada = auth_service.desactivar_cuenta_de_otro(db, usuario_id)
+    except auth_service.UsuarioNoEncontradoError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except auth_service.UltimoAdminError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    auditoria_service.registrar_evento(
+        db, tipo="cuenta_desactivada",
+        descripcion=f"{admin_actual.nombre_completo} desactivó la cuenta de {desactivada.nombre_completo}.",
+        actor_id=admin_actual.id, actor_nombre=admin_actual.nombre_completo, actor_rol=admin_actual.rol.value,
+        entidad_tipo="usuario", entidad_id=desactivada.id,
+    )
+    return desactivada
+
+
 @router.patch("/me", response_model=UsuarioOut)
 def actualizar_mi_perfil(
     datos: ActualizarPerfil,
@@ -221,6 +244,15 @@ def listar_usuarios(
 ):
     """Panel de administración: lista todos los usuarios (para saber a quién cambiarle el rol)."""
     return auth_service.listar_usuarios(db)
+
+
+@router.get("/candidatos", response_model=list[UsuarioOut])
+def listar_candidatos(
+    db: Session = Depends(get_db),
+    usuario_actual: Usuario = Depends(requerir_roles(RolUsuario.gestor_humano, RolUsuario.admin)),
+):
+    """Página "Candidatos" de Gestión Humana — solo cuentas rol=candidato, nunca cuentas internas."""
+    return auth_service.listar_candidatos(db)
 
 
 @router.get("/estadisticas", response_model=EstadisticasUsuarios)

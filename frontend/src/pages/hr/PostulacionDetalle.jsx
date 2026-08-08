@@ -73,8 +73,7 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
       <h3 className="section-title" style={{ fontSize: 14, marginTop: 20 }}>Datos personales</h3>
       <p style={{ fontSize: 13 }}>
         Residencia: {dp.direccion}, {dp.municipio}, {dp.deptoResidencia}<br />
-        Profesión: {dp.profesion || "—"}<br />
-        Estado civil: {dp.estadoCivil}
+        Profesión: {dp.profesion || "—"} · Estado civil: {dp.estadoCivil}
       </p>
 
       <h3 className="section-title" style={{ fontSize: 14 }}>Estudios, cursos, certificaciones e idiomas</h3>
@@ -122,7 +121,14 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
       })}
 
       <h3 className="section-title" style={{ fontSize: 14 }}>Autorización</h3>
-      <p style={{ fontSize: 13 }}>{solicitud.autorizacion?.nombreCompleto} — {new Date(solicitud.fechaSolicitud).toLocaleString("es-CO")}</p>
+      {solicitud.autorizacion?.acepta ? (
+        <p style={{ fontSize: 13 }}>
+          ✓ Autorización de tratamiento de datos <strong>concedida</strong> por {solicitud.autorizacion?.nombreCompleto || "el candidato"}
+          {" — "}{new Date(solicitud.fechaSolicitud).toLocaleString("es-CO")}
+        </p>
+      ) : (
+        <p style={{ fontSize: 13 }} className="text-muted">No hay registro de autorización para esta solicitud.</p>
+      )}
     </div>
   );
 }

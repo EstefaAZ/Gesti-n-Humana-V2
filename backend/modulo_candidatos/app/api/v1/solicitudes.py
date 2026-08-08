@@ -56,6 +56,8 @@ def crear_solicitud(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except solicitud_service.YaPostuladoError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except solicitud_service.PostulacionActivaError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except VacantesServiceError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -92,6 +94,8 @@ def inscribirme_con_perfil(
     except solicitud_service.VacanteCerradaError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except solicitud_service.YaPostuladoError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except solicitud_service.PostulacionActivaError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except VacantesServiceError:
         raise HTTPException(

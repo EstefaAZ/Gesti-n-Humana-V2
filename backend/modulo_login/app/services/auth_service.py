@@ -193,6 +193,25 @@ def reactivar_cuenta(db: Session, usuario_id: str) -> Usuario:
     return usuario
 
 
+def desactivar_cuenta_de_otro(db: Session, usuario_id: str) -> Usuario:
+    """
+    Un admin desactiva la cuenta de OTRO usuario (ej. un candidato lo pide por
+    otro medio — correo, teléfono). Misma protección que desactivar_cuenta_propia:
+    no se puede dejar el sistema sin ningún admin activo.
+    """
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not usuario:
+        raise UsuarioNoEncontradoError(f"No existe un usuario con id {usuario_id}.")
+    if usuario.rol == RolUsuario.admin and _otros_admins_activos(db, usuario.id) == 0:
+        raise UltimoAdminError(
+            "No puedes desactivar esta cuenta: es el único admin activo. Crea otro admin antes de desactivarla."
+        )
+    usuario.activo = False
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
 def cambiar_password_propia(db: Session, usuario: Usuario, password_actual: str, password_nueva: str) -> None:
     if not verify_password(password_actual, usuario.password_hash):
         raise CredencialesInvalidasError("La contraseña actual no es correcta.")
@@ -215,6 +234,21 @@ def actualizar_perfil_propio(db: Session, usuario: Usuario, datos: ActualizarPer
 def listar_usuarios(db: Session) -> list[Usuario]:
     """Solo para el panel de administración (requiere rol admin en la ruta)."""
     return db.query(Usuario).order_by(Usuario.fecha_creacion.desc()).all()
+
+
+def listar_candidatos(db: Session) -> list[Usuario]:
+    """
+    Solo cuentas rol=candidato — a diferencia de listar_usuarios() (admin-only,
+    ve TODAS las cuentas incluidas las de Gestión Humana/admin), esta es la que
+    usa la página "Candidatos" y SÍ puede verla gestor_humano, porque nunca
+    expone cuentas internas del sistema, solo candidatos reales.
+    """
+    return (
+        db.query(Usuario)
+        .filter(Usuario.rol == RolUsuario.candidato)
+        .order_by(Usuario.fecha_creacion.desc())
+        .all()
+    )
 
 
 def obtener_estadisticas(db: Session) -> dict:

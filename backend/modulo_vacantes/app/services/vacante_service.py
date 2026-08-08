@@ -39,9 +39,18 @@ def esta_cerrada(vacante: Vacante) -> bool:
     return datetime.now() > cierre
 
 
+def aun_no_abre(vacante: Vacante) -> bool:
+    """True si tiene fecha de apertura configurada y todavía no llega — no debe
+    aceptar postulaciones antes de esa fecha, aunque el estado ya sea 'publicada'."""
+    if not vacante.fecha_apertura:
+        return False
+    return date.today() < vacante.fecha_apertura
+
+
 def _a_out(vacante: Vacante) -> VacanteOut:
     out = VacanteOut.model_validate(vacante)
     out.esta_cerrada = esta_cerrada(vacante)
+    out.aun_no_abre = aun_no_abre(vacante)
     out.tiene_documento_pdf = bool(vacante.documento_pdf)
     return out
 

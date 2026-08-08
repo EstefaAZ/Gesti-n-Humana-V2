@@ -80,6 +80,7 @@ export default function ListaVacantesPage() {
                   <div className="vac-card__cargo">{v.cargo}</div>
                   {v.descripcion && <p className="text-muted" style={{ fontSize: 13, margin: "4px 0 0" }}>{v.descripcion}</p>}
                   <div className="vac-card__meta">
+                    <span><b>Sede:</b> {v.sede || "—"}</span>
                     <span><b>Plazas:</b> {v.plazas || "—"}</span>
                     <span><b>Cierra:</b> {v.fechaCierre || "—"} {v.horaCierre || ""}</span>
                   </div>
@@ -89,8 +90,8 @@ export default function ListaVacantesPage() {
                         {publicacion}
                       </span>
                     )}
-                    <span className={`vac-status-pill vac-card__publicado ${v.estaCerrada ? "vac-status-pill--cerrada" : "vac-status-pill--en-proceso"}`}>
-                      {v.estaCerrada ? "Cerrada" : "Abierta"}
+                    <span className={`vac-status-pill vac-card__publicado ${v.estaCerrada ? "vac-status-pill--cerrada" : v.aunNoAbre ? "vac-status-pill--oculta" : "vac-status-pill--en-proceso"}`}>
+                      {v.estaCerrada ? "Cerrada" : v.aunNoAbre ? `Abre el ${v.fechaApertura}` : "Abierta"}
                     </span>
                   </div>
                 </div>

@@ -104,7 +104,7 @@ export default function CompletarPerfilPage() {
       const requeridos = [
         "nombreCompleto", "cedula", "cedulaDe", "ciudadNacimiento", "deptoNacimiento",
         "paisNacimiento", "fechaNacimiento", "correo", "direccion", "municipio",
-        "deptoResidencia", "celular", "estadoCivil", "numHijos",
+        "deptoResidencia", "celular", "estadoCivil", "numHijos", "tarjetaProfesional", "profesion",
       ];
       requeridos.forEach((campo) => {
         if (!String(state.datosPersonales[campo] || "").trim()) {

@@ -69,6 +69,7 @@ class CambiarEstadoVacante(BaseModel):
 class VacanteOut(VacanteBase):
     id: str
     esta_cerrada: bool = False
+    aun_no_abre: bool = False
     tiene_documento_pdf: bool = False
     creada_por_nombre: Optional[str] = None
     fecha_creacion: Optional[datetime] = None

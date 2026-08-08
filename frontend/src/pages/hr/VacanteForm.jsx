@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NIVELES_EDUCATIVOS, NIVELES_IDIOMA, TIPOS_VINCULACION, PUBLICO_OBJETIVO_OPCIONES } from "../../data/catalogos";
+import { formatearMilesCOP } from "../../lib/formato";
 
 const ESTADOS = [
   { valor: "borrador", etiqueta: "Borrador" },
@@ -74,7 +75,16 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
             <textarea value={v.descripcion} onChange={(e) => set({ descripcion: e.target.value })} placeholder="Ej: Buscamos un perfil analítico con experiencia en tratamiento de aguas residuales…" />
           </div>
           <div className="field"><label>Proceso / Área</label><input type="text" value={v.area} onChange={(e) => set({ area: e.target.value })} /></div>
-          <div className="field"><label>Salario básico</label><input type="text" value={v.salario} onChange={(e) => set({ salario: e.target.value })} /></div>
+          <div className="field">
+            <label>Salario básico</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={v.salario}
+              onChange={(e) => set({ salario: formatearMilesCOP(e.target.value) })}
+              placeholder="Ej: 3.377.598"
+            />
+          </div>
           <div className="field">
             <label>Tipo de vinculación</label>
             <select value={v.tipoVinculacion} onChange={(e) => set({ tipoVinculacion: e.target.value })}>

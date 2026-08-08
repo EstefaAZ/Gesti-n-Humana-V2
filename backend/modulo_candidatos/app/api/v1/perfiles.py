@@ -3,6 +3,7 @@
 # ==============================================================
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -11,6 +12,8 @@ from app.schemas.perfil_candidato import PerfilCandidatoGuardar, PerfilCandidato
 from app.services import perfil_candidato_service
 
 router = APIRouter(prefix="/perfiles", tags=["Perfil de candidato"])
+
+ROLES_GESTION = ("gestor_humano", "admin")
 
 
 @router.get("/me/estado", response_model=EstadoPerfilOut)
@@ -44,3 +47,43 @@ def guardar_mi_perfil(
         return perfil_candidato_service.guardar_perfil(db, usuario.id, datos, nombre_cuenta=usuario.nombre or "")
     except perfil_candidato_service.NombreNoCoincideError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.get("/me/documentos/{categoria}/{indice}")
+def descargar_mi_documento(
+    categoria: str,
+    indice: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles("candidato")),
+):
+    """El candidato descarga un documento de SU PROPIO perfil (página "Documentos")."""
+    try:
+        contenido, nombre = perfil_candidato_service.obtener_documento(db, usuario.id, categoria, indice)
+    except perfil_candidato_service.DocumentoNoEncontradoError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return Response(content=contenido, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{nombre}"'})
+
+
+@router.get("/admin/todos", response_model=list[PerfilCandidatoOut])
+def listar_todos_los_perfiles(
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+):
+    """Página "Candidatos" de Gestión Humana."""
+    return perfil_candidato_service.listar_todos(db)
+
+
+@router.get("/admin/{usuario_id}/documentos/{categoria}/{indice}")
+def descargar_documento_de_candidato(
+    usuario_id: str,
+    categoria: str,
+    indice: int,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+):
+    """Gestión Humana descarga un documento del perfil de un candidato."""
+    try:
+        contenido, nombre = perfil_candidato_service.obtener_documento(db, usuario_id, categoria, indice)
+    except perfil_candidato_service.DocumentoNoEncontradoError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    return Response(content=contenido, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{nombre}"'})

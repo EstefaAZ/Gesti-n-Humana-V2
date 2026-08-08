@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
 import EvaluacionBadge from "../components/EvaluacionBadge";
+import EstadoPostulacionBadge from "../components/EstadoPostulacionBadge";
 import { useAuth } from "../context/AuthContext";
 import * as solicitudesApi from "../lib/api/solicitudesApi";
 import * as vacantesApi from "../lib/api/vacantesApi";
@@ -66,7 +67,7 @@ export default function MisPostulacionesPage() {
                   <tr key={p.radicado}>
                     <td>{vacantesPorId[p.vacanteId]?.cargo || p.vacanteId}</td>
                     <td className="mono" style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{p.radicado}</td>
-                    <td>{p.estado}</td>
+                    <td><EstadoPostulacionBadge estado={p.estado} /></td>
                     <td><EvaluacionBadge evaluacion={p.evaluacion} mostrarMotivos={false} /></td>
                     <td>
                       <button className="hr-link-btn" onClick={() => solicitudesApi.descargarPdf(p.radicado, token)}>

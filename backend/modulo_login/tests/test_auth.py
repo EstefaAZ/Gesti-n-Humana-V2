@@ -330,6 +330,58 @@ def test_admin_puede_reactivar_una_cuenta_desactivada():
     assert r_login_de_nuevo.status_code == 200
 
 
+def test_admin_puede_desactivar_la_cuenta_de_otro_usuario():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+
+    token_admin = _crear_admin()
+    r = client.patch(f"/api/v1/auth/usuarios/{candidato_id}/desactivar", headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 200
+    assert r.json()["activo"] is False
+
+    # No puede volver a iniciar sesión mientras esté desactivada.
+    r_login_de_nuevo = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    assert r_login_de_nuevo.status_code == 403
+
+
+def test_desactivar_cuenta_de_otro_requiere_rol_admin():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+
+    r = client.patch(f"/api/v1/auth/usuarios/{candidato_id}/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+    assert r.status_code == 403
+
+
+def test_desactivar_cuenta_de_otro_usuario_inexistente_da_404():
+    token_admin = _crear_admin()
+    r = client.patch("/api/v1/auth/usuarios/no-existe/desactivar", headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 404
+
+
+def test_no_se_puede_desactivar_al_unico_admin_activo():
+    token_admin = _crear_admin()
+    admin_id = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token_admin}"}).json()["id"]
+    r = client.patch(f"/api/v1/auth/usuarios/{admin_id}/desactivar", headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 409
+
+
+def test_auditoria_registra_desactivacion_de_otro_por_admin():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+
+    token_admin = _crear_admin()
+    client.patch(f"/api/v1/auth/usuarios/{candidato_id}/desactivar", headers={"Authorization": f"Bearer {token_admin}"})
+
+    r_auditoria = client.get("/api/v1/auth/auditoria", headers={"Authorization": f"Bearer {token_admin}"})
+    eventos = [e for e in r_auditoria.json() if e["tipo"] == "cuenta_desactivada"]
+    assert len(eventos) == 1
+    assert USUARIO_VALIDO["nombre_completo"] in eventos[0]["descripcion"]
+
+
 def test_reactivar_requiere_rol_admin():
     client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
     r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
@@ -441,6 +493,45 @@ def test_listar_usuarios_requiere_rol_admin():
     r_admin = client.get("/api/v1/auth/usuarios", headers={"Authorization": f"Bearer {token_admin}"})
     assert r_admin.status_code == 200
     assert len(r_admin.json()) >= 1
+
+
+def test_listar_candidatos_requiere_gestion_o_admin():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    token_candidato = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+    r = client.get("/api/v1/auth/candidatos", headers={"Authorization": f"Bearer {token_candidato}"})
+    assert r.status_code == 403
+
+
+def test_listar_candidatos_solo_devuelve_rol_candidato():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    token_admin = _crear_admin()
+    client.post(
+        "/api/v1/auth/usuarios-internos",
+        json={"nombre_completo": "Gestora Interna", "email": "gestora-interna@example.com", "password": "ClaveSegura123!", "rol": "gestor_humano"},
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+
+    r = client.get("/api/v1/auth/candidatos", headers={"Authorization": f"Bearer {token_admin}"})
+    assert r.status_code == 200
+    roles = {u["rol"] for u in r.json()}
+    assert roles == {"candidato"}  # nunca debe incluir gestor_humano ni admin
+    correos = {u["email"] for u in r.json()}
+    assert USUARIO_VALIDO["email"] in correos
+    assert "gestora-interna@example.com" not in correos
+
+
+def test_gestor_humano_si_puede_listar_candidatos():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    token_admin = _crear_admin()
+    r_crear = client.post(
+        "/api/v1/auth/usuarios-internos",
+        json={"nombre_completo": "Gestora Dos", "email": "gestora-dos@example.com", "password": "ClaveSegura123!", "rol": "gestor_humano"},
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    token_gestor = _token_de("gestora-dos@example.com", "ClaveSegura123!")
+
+    r = client.get("/api/v1/auth/candidatos", headers={"Authorization": f"Bearer {token_gestor}"})
+    assert r.status_code == 200
 
 
 def test_estadisticas_requiere_rol_admin():

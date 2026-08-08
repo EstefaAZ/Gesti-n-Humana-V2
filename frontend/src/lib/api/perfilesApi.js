@@ -66,3 +66,29 @@ export async function guardarPerfil(perfilCamel, token) {
   const data = await apiFetch(`${BASE}/me`, { method: "PUT", token, body });
   return _perfilACamel(data);
 }
+
+async function _descargarArchivo(url, nombreArchivo, token) {
+  const res = await apiFetch(url, { token, raw: true });
+  const blob = await res.blob();
+  const objUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objUrl;
+  a.download = nombreArchivo || "documento";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(objUrl);
+}
+
+export async function descargarMiDocumento(categoriaApi, indice, nombreArchivo, token) {
+  return _descargarArchivo(`${BASE}/me/documentos/${categoriaApi}/${indice}`, nombreArchivo, token);
+}
+
+export async function descargarDocumentoDeCandidato(usuarioId, categoriaApi, indice, nombreArchivo, token) {
+  return _descargarArchivo(`${BASE}/admin/${usuarioId}/documentos/${categoriaApi}/${indice}`, nombreArchivo, token);
+}
+
+export async function listarTodos(token) {
+  const data = await apiFetch(`${BASE}/admin/todos`, { token });
+  return data.map(_perfilACamel);
+}

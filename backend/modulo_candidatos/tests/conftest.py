@@ -53,8 +53,19 @@ def setup_db():
 VACANTE_ABIERTA = {
     "id": "vac-1",
     "cargo": "Analista de Gestión Humana",
+    "estado": "publicada",
     "esta_cerrada": False,
+    "aun_no_abre": False,
+    "fecha_apertura": None,
     "criterios": {"nivel_educativo_min": "Universitario", "graduado_requerido": True, "experiencia_min_anios": 2},
+}
+
+VACANTES_MOCK = {
+    "vac-1": VACANTE_ABIERTA,
+    "vac-2": {**VACANTE_ABIERTA, "id": "vac-2", "cargo": "Otra Vacante"},
+    "vac-cerrada": {**VACANTE_ABIERTA, "id": "vac-cerrada", "estado": "cerrada", "esta_cerrada": True},
+    "vac-cancelada": {**VACANTE_ABIERTA, "id": "vac-cancelada", "estado": "cancelada_desierta", "esta_cerrada": True},
+    "vac-no-abierta": {**VACANTE_ABIERTA, "id": "vac-no-abierta", "aun_no_abre": True, "fecha_apertura": "2099-01-01"},
 }
 
 
@@ -67,11 +78,7 @@ def mock_vacantes(monkeypatch):
     sí lo necesitan lo piden con `pytestmark = pytest.mark.usefixtures("mock_vacantes")`.
     """
     def fake_obtener_vacante(vacante_id, token=None):
-        if vacante_id == "vac-1":
-            return VACANTE_ABIERTA
-        if vacante_id == "vac-cerrada":
-            return {**VACANTE_ABIERTA, "id": "vac-cerrada", "esta_cerrada": True}
-        return None
+        return VACANTES_MOCK.get(vacante_id)
 
     monkeypatch.setattr(vacantes_client, "obtener_vacante", fake_obtener_vacante)
     yield
