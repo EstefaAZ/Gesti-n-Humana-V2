@@ -5,6 +5,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ListaVacantesPage from "./pages/ListaVacantesPage";
 import VacanteDetallePage from "./pages/VacanteDetallePage";
 import SolicitudPage from "./pages/SolicitudPage";
+import CompletarPerfilPage from "./pages/CompletarPerfilPage";
 import MisPostulacionesPage from "./pages/MisPostulacionesPage";
 import PerfilPage from "./pages/PerfilPage";
 import LoginPage from "./pages/LoginPage";
@@ -34,6 +35,7 @@ function AppShell() {
 
       {/* Todo lo demás exige sesión iniciada — nada se ve sin hacer login primero */}
       <Route path="/" element={<ProtectedRoute nivel="cualquiera"><ListaVacantesPage /></ProtectedRoute>} />
+      <Route path="/completar-perfil" element={<ProtectedRoute nivel="cualquiera"><CompletarPerfilPage /></ProtectedRoute>} />
       <Route path="/vacante/:id" element={<ProtectedRoute nivel="cualquiera"><VacanteDetallePage /></ProtectedRoute>} />
       <Route path="/postularme/:id" element={<ProtectedRoute nivel="cualquiera"><SolicitudPage /></ProtectedRoute>} />
       <Route path="/mis-postulaciones" element={<ProtectedRoute nivel="cualquiera"><MisPostulacionesPage /></ProtectedRoute>} />

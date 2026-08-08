@@ -163,7 +163,7 @@ export default function VacantesTab() {
         ) : (
           <table className="plain-table">
             <thead>
-              <tr><th>Vacante</th><th>Sede</th><th>Cierre</th><th>Postulaciones</th><th>Fecha publicación</th><th>Estado</th><th></th></tr>
+              <tr><th>Vacante</th><th>Fecha cierre</th><th>Postulaciones</th><th>Fecha publicación</th><th>Estado</th><th></th></tr>
             </thead>
             <tbody>
               {filtradas.map((v) => (
@@ -173,7 +173,6 @@ export default function VacantesTab() {
                     <br />{v.cargo}
                     {v.tieneDocumentoPdf && <span title="Tiene PDF adjunto" style={{ marginLeft: 6, fontSize: 12 }}>📄</span>}
                   </td>
-                  <td>{v.sede || "—"}</td>
                   <td>{v.fechaCierre || "—"} {v.horaCierre || ""}</td>
                   <td style={{ textAlign: "center", fontWeight: 700 }}>{conteo[v.id] || 0}</td>
                   <td>{v.fechaCreacion ? new Date(v.fechaCreacion).toLocaleDateString("es-CO") : "—"}</td>

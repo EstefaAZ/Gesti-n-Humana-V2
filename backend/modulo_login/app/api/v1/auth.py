@@ -14,7 +14,7 @@ from app.api.deps import obtener_usuario_actual, requerir_roles
 from app.models.usuario import Usuario, RolUsuario
 from app.schemas.usuario import (
     UsuarioRegistro, UsuarioLogin, UsuarioOut, Token, UsuarioCrearInterno,
-    CambiarPassword, ActualizarPerfil, CambiarRol,
+    CambiarPassword, ActualizarPerfil, EditarUsuario,
     SolicitarResetPassword, ConfirmarResetPassword, EstadisticasUsuarios, EventoAuditoriaOut,
 )
 from app.services import auth_service, auditoria_service
@@ -232,27 +232,35 @@ def estadisticas(
     return auth_service.obtener_estadisticas(db)
 
 
-@router.patch("/usuarios/{usuario_id}/rol", response_model=UsuarioOut)
-def cambiar_rol_de_usuario(
+@router.patch("/usuarios/{usuario_id}", response_model=UsuarioOut)
+def editar_usuario(
     usuario_id: str,
-    datos: CambiarRol,
+    datos: EditarUsuario,
     db: Session = Depends(get_db),
     admin_actual: Usuario = Depends(requerir_roles(RolUsuario.admin)),
 ):
-    """Cambia el rol de OTRO usuario. Solo un admin puede hacerlo."""
+    """Edita el nombre y/o el rol de OTRO usuario. Solo un admin puede hacerlo."""
     try:
-        actualizado = auth_service.cambiar_rol(db, admin_actual, usuario_id, datos.rol)
+        actualizado = auth_service.editar_usuario(db, usuario_id, datos)
     except auth_service.UsuarioNoEncontradoError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except auth_service.UltimoAdminError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
-    auditoria_service.registrar_evento(
-        db, tipo="rol_cambiado",
-        descripcion=f"{admin_actual.nombre_completo} cambió el rol de {actualizado.nombre_completo} a {actualizado.rol.value}.",
-        actor_id=admin_actual.id, actor_nombre=admin_actual.nombre_completo, actor_rol=admin_actual.rol.value,
-        entidad_tipo="usuario", entidad_id=actualizado.id,
-    )
+    cambios = []
+    if datos.nombre_completo is not None:
+        cambios.append(f'el nombre a "{actualizado.nombre_completo}"')
+    if datos.rol is not None:
+        cambios.append(f'el rol a "{actualizado.rol.value}"')
+    descripcion = f"{admin_actual.nombre_completo} editó a {actualizado.nombre_completo}: cambió {' y '.join(cambios)}." if cambios else ""
+
+    if descripcion:
+        auditoria_service.registrar_evento(
+            db, tipo="usuario_editado",
+            descripcion=descripcion,
+            actor_id=admin_actual.id, actor_nombre=admin_actual.nombre_completo, actor_rol=admin_actual.rol.value,
+            entidad_tipo="usuario", entidad_id=actualizado.id,
+        )
     return actualizado
 
 

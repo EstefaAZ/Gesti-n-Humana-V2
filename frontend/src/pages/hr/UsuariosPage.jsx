@@ -18,6 +18,9 @@ export default function UsuariosPage() {
   const [creando, setCreando] = useState(false);
 
   const [cambiandoRolId, setCambiandoRolId] = useState(null);
+  const [editandoNombreId, setEditandoNombreId] = useState(null);
+  const [nombreEnEdicion, setNombreEnEdicion] = useState("");
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
 
   async function cargar() {
     try {
@@ -50,12 +53,34 @@ export default function UsuariosPage() {
   async function handleCambiarRol(usuarioId, nuevoRol) {
     setCambiandoRolId(usuarioId);
     try {
-      await authApi.cambiarRol(usuarioId, nuevoRol, token);
+      await authApi.editarUsuario(usuarioId, { rol: nuevoRol }, token);
       await cargar();
     } catch (err) {
       alert(err instanceof ApiError ? err.detail : "No se pudo cambiar el rol.");
     } finally {
       setCambiandoRolId(null);
+    }
+  }
+
+  function iniciarEdicionNombre(u) {
+    setEditandoNombreId(u.id);
+    setNombreEnEdicion(u.nombreCompleto);
+  }
+
+  async function guardarNombre(usuarioId) {
+    if (nombreEnEdicion.trim().length < 3) {
+      alert("El nombre debe tener al menos 3 caracteres.");
+      return;
+    }
+    setGuardandoNombre(true);
+    try {
+      await authApi.editarUsuario(usuarioId, { nombreCompleto: nombreEnEdicion.trim() }, token);
+      setEditandoNombreId(null);
+      await cargar();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.detail : "No se pudo cambiar el nombre.");
+    } finally {
+      setGuardandoNombre(false);
     }
   }
 
@@ -118,7 +143,29 @@ export default function UsuariosPage() {
               <tbody>
                 {usuarios.map((u) => (
                   <tr key={u.id}>
-                    <td>{u.nombreCompleto}</td>
+                    <td>
+                      {editandoNombreId === u.id ? (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={nombreEnEdicion}
+                            onChange={(e) => setNombreEnEdicion(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && guardarNombre(u.id)}
+                            style={{ fontSize: 13, padding: "3px 6px", width: 160 }}
+                          />
+                          <button type="button" className="hr-link-btn" disabled={guardandoNombre} onClick={() => guardarNombre(u.id)}>✓</button>
+                          <button type="button" className="hr-link-btn" onClick={() => setEditandoNombreId(null)}>✕</button>
+                        </div>
+                      ) : (
+                        <span>
+                          {u.nombreCompleto}{" "}
+                          <button type="button" className="hr-link-btn" style={{ fontSize: 11 }} onClick={() => iniciarEdicionNombre(u)} title="Cambiar nombre">
+                            ✎
+                          </button>
+                        </span>
+                      )}
+                    </td>
                     <td>{u.email}</td>
                     <td>
                       <select

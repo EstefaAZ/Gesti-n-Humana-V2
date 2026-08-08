@@ -73,7 +73,8 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
       <h3 className="section-title" style={{ fontSize: 14, marginTop: 20 }}>Datos personales</h3>
       <p style={{ fontSize: 13 }}>
         Residencia: {dp.direccion}, {dp.municipio}, {dp.deptoResidencia}<br />
-        Profesión: {dp.profesion || "—"} · Estado civil: {dp.estadoCivil}
+        Profesión: {dp.profesion || "—"}<br />
+        Estado civil: {dp.estadoCivil}
       </p>
 
       <h3 className="section-title" style={{ fontSize: 14 }}>Estudios, cursos, certificaciones e idiomas</h3>

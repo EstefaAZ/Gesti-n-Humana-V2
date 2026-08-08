@@ -11,8 +11,9 @@ import pytest
 import jwt
 
 from app.core.config import settings
-from app.clients import vacantes_client
-from tests.conftest import client
+from tests.conftest import client, VACANTE_ABIERTA
+
+pytestmark = pytest.mark.usefixtures("mock_vacantes")
 
 def token_para(sub: str, rol: str = "candidato", nombre: str = "Candidato Uno") -> str:
     payload = {"sub": sub, "rol": rol, "email": f"{sub}@example.com", "nombre": nombre}
@@ -23,13 +24,6 @@ HEADERS_CANDIDATO = {"Authorization": f"Bearer {token_para('candidato-1')}"}
 HEADERS_OTRO_CANDIDATO = {"Authorization": f"Bearer {token_para('candidato-2')}"}
 HEADERS_GESTOR = {"Authorization": f"Bearer {token_para('gestor-1', rol='gestor_humano', nombre='Gestora')}"}
 HEADERS_ADMIN = {"Authorization": f"Bearer {token_para('admin-1', rol='admin', nombre='Admin Uno')}"}
-
-VACANTE_ABIERTA = {
-    "id": "vac-1",
-    "cargo": "Analista de Gestión Humana",
-    "esta_cerrada": False,
-    "criterios": {"nivel_educativo_min": "Universitario", "graduado_requerido": True, "experiencia_min_anios": 2},
-}
 
 DOCUMENTOS_VALIDOS = {
     "cedula": [{"nombre": "cedula.pdf", "contenido_base64": "JVBERi0xLjQ="}],
@@ -54,18 +48,6 @@ SOLICITUD_VALIDA = {
     "documentos_adjuntos": DOCUMENTOS_VALIDOS,
 }
 
-
-@pytest.fixture(autouse=True)
-def mock_vacantes(monkeypatch):
-    def fake_obtener_vacante(vacante_id, token=None):
-        if vacante_id == "vac-1":
-            return VACANTE_ABIERTA
-        if vacante_id == "vac-cerrada":
-            return {**VACANTE_ABIERTA, "id": "vac-cerrada", "esta_cerrada": True}
-        return None
-
-    monkeypatch.setattr(vacantes_client, "obtener_vacante", fake_obtener_vacante)
-    yield
 
 
 def test_health_check():

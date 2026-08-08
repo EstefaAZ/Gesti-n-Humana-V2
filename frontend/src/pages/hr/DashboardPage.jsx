@@ -66,17 +66,17 @@ export default function DashboardPage() {
 
   const ETIQUETA_ESTADO_VACANTE = {
     publicada: "Publicada",
-    en_proceso: "En proceso",
+    enProceso: "En proceso",
     cerrada: "Cerrada",
     borrador: "Borrador",
-    cancelada_desierta: "Cancelada/Desierta",
+    canceladaDesierta: "Cancelada/Desierta",
   };
   const COLOR_ESTADO_VACANTE = {
     publicada: "#2EA04A",
-    en_proceso: "#E8B93A",
+    enProceso: "#E8B93A",
     cerrada: "#C0574F",
     borrador: "#B7C4C2",
-    cancelada_desierta: "#4E8FD1",
+    canceladaDesierta: "#4E8FD1",
   };
   const datosDonut = Object.entries(vacantesStats.porEstado || {})
     .map(([estado, valor]) => ({ name: ETIQUETA_ESTADO_VACANTE[estado] || estado, estado, value: valor }))

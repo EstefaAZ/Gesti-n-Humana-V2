@@ -2,7 +2,7 @@ import Field from "../Field";
 import SelectConOtro from "../SelectConOtro";
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from "../../data/municipiosPorDepartamento";
 
-export default function HojaI({ datos, setDatos, errors }) {
+export default function HojaI({ datos, setDatos, errors, ocultarProceso = false }) {
   const set = (key) => (e) => setDatos({ [key]: e.target.value });
 
   return (
@@ -11,12 +11,16 @@ export default function HojaI({ datos, setDatos, errors }) {
       <p className="section-intro">Diligencie su información básica de contacto e identificación.</p>
 
       <div className="field-grid">
-        <Field label="Proceso de selección No.">
-          <input type="text" value={datos.proceso} onChange={set("proceso")} disabled={datos.urlLocked} />
-        </Field>
-        <Field label="Fecha de entrega">
-          <input type="date" value={datos.fechaEntrega} onChange={set("fechaEntrega")} disabled={datos.urlLocked} />
-        </Field>
+        {!ocultarProceso && (
+          <>
+            <Field label="Proceso de selección No.">
+              <input type="text" value={datos.proceso} onChange={set("proceso")} disabled={datos.urlLocked} />
+            </Field>
+            <Field label="Fecha de entrega">
+              <input type="date" value={datos.fechaEntrega} onChange={set("fechaEntrega")} disabled={datos.urlLocked} />
+            </Field>
+          </>
+        )}
 
         <Field label="Nombre completo *" span2 error={errors.nombreCompleto}>
           <input type="text" value={datos.nombreCompleto} onChange={set("nombreCompleto")} />

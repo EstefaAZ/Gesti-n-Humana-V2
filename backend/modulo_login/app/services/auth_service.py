@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import hash_password, verify_password, crear_access_token
 from app.models.usuario import Usuario, RolUsuario
-from app.schemas.usuario import UsuarioRegistro, UsuarioCrearInterno, ActualizarPerfil
+from app.schemas.usuario import UsuarioRegistro, UsuarioCrearInterno, ActualizarPerfil, EditarUsuario
 
 
 class EmailYaRegistradoError(Exception):
@@ -228,24 +228,28 @@ def obtener_estadisticas(db: Session) -> dict:
     return {"total": total, "por_rol": por_rol, "recientes": recientes}
 
 
-def cambiar_rol(db: Session, usuario_actual: Usuario, usuario_objetivo_id: str, nuevo_rol: RolUsuario) -> Usuario:
+def editar_usuario(db: Session, usuario_objetivo_id: str, datos: EditarUsuario) -> Usuario:
     """
-    Cambia el rol de OTRO usuario. Solo se debe llamar desde una ruta
-    protegida con requerir_roles(RolUsuario.admin). Si el usuario objetivo es
-    el último admin activo y se le quita ese rol, se rechaza — igual que al
+    Un admin edita el nombre y/o el rol de OTRO usuario. Solo se debe llamar
+    desde una ruta protegida con requerir_roles(RolUsuario.admin). Si se le
+    quita el rol admin al último admin activo, se rechaza — igual que al
     eliminar la cuenta, para no dejar el sistema sin ningún admin.
     """
     objetivo = db.query(Usuario).filter(Usuario.id == usuario_objetivo_id).first()
     if not objetivo:
         raise UsuarioNoEncontradoError(f"No existe un usuario con id {usuario_objetivo_id}.")
 
-    if objetivo.rol == RolUsuario.admin and nuevo_rol != RolUsuario.admin:
+    if datos.rol is not None and objetivo.rol == RolUsuario.admin and datos.rol != RolUsuario.admin:
         if _otros_admins_activos(db, objetivo.id) == 0:
             raise UltimoAdminError(
                 "No puedes quitarle el rol admin: es el único admin activo. Crea otro admin primero."
             )
 
-    objetivo.rol = nuevo_rol
+    if datos.nombre_completo is not None:
+        objetivo.nombre_completo = datos.nombre_completo
+    if datos.rol is not None:
+        objetivo.rol = datos.rol
+
     db.commit()
     db.refresh(objetivo)
     return objetivo

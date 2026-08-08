@@ -50,6 +50,21 @@ function _documentosASnake(lista) {
   return (lista || []).map((d) => ({ nombre: d.nombre, contenido_base64: d.contenidoBase64 }));
 }
 
+export async function inscribirme(vacanteId, documentosExtraCamel, token) {
+  const body = { vacante_id: vacanteId };
+  const tieneExtras = documentosExtraCamel && Object.values(documentosExtraCamel).some((lista) => lista?.length > 0);
+  if (tieneExtras) {
+    body.documentos_extra = {
+      cedula: _documentosASnake(documentosExtraCamel.cedula),
+      certificados_laborales: _documentosASnake(documentosExtraCamel.certificadosLaborales),
+      certificados_estudio: _documentosASnake(documentosExtraCamel.certificadosEstudio),
+      tarjeta_profesional: _documentosASnake(documentosExtraCamel.tarjetaProfesional),
+    };
+  }
+  const data = await apiFetch(`${BASE}/inscribirme`, { method: "POST", token, body });
+  return _solicitudACamel(data);
+}
+
 export async function crear(solicitudCamel, token) {
   const body = {
     vacante_id: solicitudCamel.vacanteId,

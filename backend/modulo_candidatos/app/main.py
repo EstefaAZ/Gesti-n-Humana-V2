@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings, validar_configuracion_produccion
 from app.core.database import Base, engine
 from app.api.v1.solicitudes import router as solicitudes_router
+from app.api.v1.perfiles import router as perfiles_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(solicitudes_router, prefix="/api/v1")
+app.include_router(perfiles_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Sistema"])

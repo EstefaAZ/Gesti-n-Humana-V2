@@ -1,6 +1,6 @@
 import { TIPO_REGISTRO_LABELS } from "../data/catalogos";
 
-export const STEPS = ["I", "II", "VI", "VII", "VIII", "DOCS"];
+export const STEPS = ["I", "II", "VI", "VII", "DOCS", "VIII"];
 
 let seq = 0;
 export function nextId(prefix) {

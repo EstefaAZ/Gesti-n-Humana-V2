@@ -473,12 +473,76 @@ def test_admin_puede_cambiar_el_rol_de_otro_usuario():
 
     token_admin = _crear_admin()
     r = client.patch(
-        f"/api/v1/auth/usuarios/{candidato_id}/rol",
+        f"/api/v1/auth/usuarios/{candidato_id}",
         json={"rol": "gestor_humano"},
         headers={"Authorization": f"Bearer {token_admin}"},
     )
     assert r.status_code == 200
     assert r.json()["rol"] == "gestor_humano"
+
+
+def test_admin_puede_cambiar_solo_el_nombre_sin_tocar_el_rol():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_registro = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_registro.json()["usuario"]["id"]
+
+    token_admin = _crear_admin()
+    r = client.patch(
+        f"/api/v1/auth/usuarios/{candidato_id}",
+        json={"nombre_completo": "Nombre Corregido"},
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["nombre_completo"] == "Nombre Corregido"
+    assert r.json()["rol"] == "candidato"  # no se tocó
+
+
+def test_admin_puede_cambiar_nombre_y_rol_a_la_vez():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_registro = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_registro.json()["usuario"]["id"]
+
+    token_admin = _crear_admin()
+    r = client.patch(
+        f"/api/v1/auth/usuarios/{candidato_id}",
+        json={"nombre_completo": "Nombre y Rol", "rol": "gestor_humano"},
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["nombre_completo"] == "Nombre y Rol"
+    assert r.json()["rol"] == "gestor_humano"
+
+
+def test_editar_usuario_rechaza_nombre_muy_corto():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_registro = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_registro.json()["usuario"]["id"]
+
+    token_admin = _crear_admin()
+    r = client.patch(
+        f"/api/v1/auth/usuarios/{candidato_id}",
+        json={"nombre_completo": "Al"},
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    assert r.status_code == 422
+
+
+def test_auditoria_describe_los_dos_cambios_cuando_se_editan_juntos():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_registro = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_registro.json()["usuario"]["id"]
+
+    token_admin = _crear_admin()
+    client.patch(
+        f"/api/v1/auth/usuarios/{candidato_id}",
+        json={"nombre_completo": "Editado Del Todo", "rol": "gestor_humano"},
+        headers={"Authorization": f"Bearer {token_admin}"},
+    )
+    r = client.get("/api/v1/auth/auditoria", headers={"Authorization": f"Bearer {token_admin}"})
+    evento = next(e for e in r.json() if e["tipo"] == "usuario_editado")
+    assert "nombre" in evento["descripcion"]
+    assert "rol" in evento["descripcion"]
+    assert "Editado Del Todo" in evento["descripcion"]
 
 
 def _decodificar(token):
@@ -578,7 +642,7 @@ def test_cambiar_rol_requiere_admin():
     token_candidato = r_login.json()["access_token"]
 
     r = client.patch(
-        f"/api/v1/auth/usuarios/{candidato_id}/rol",
+        f"/api/v1/auth/usuarios/{candidato_id}",
         json={"rol": "admin"},
         headers={"Authorization": f"Bearer {token_candidato}"},
     )
@@ -608,7 +672,7 @@ def test_no_se_puede_quitar_el_rol_al_unico_admin():
 
     token = _token_de("unico2@example.com", "ClaveAdmin123")
     r = client.patch(
-        f"/api/v1/auth/usuarios/{unico_id}/rol",
+        f"/api/v1/auth/usuarios/{unico_id}",
         json={"rol": "gestor_humano"},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -705,12 +769,12 @@ def test_auditoria_registra_cambio_de_rol():
     token_admin = _crear_admin()
 
     client.patch(
-        f"/api/v1/auth/usuarios/{candidato_id}/rol",
+        f"/api/v1/auth/usuarios/{candidato_id}",
         json={"rol": "gestor_humano"},
         headers={"Authorization": f"Bearer {token_admin}"},
     )
     r = client.get("/api/v1/auth/auditoria", headers={"Authorization": f"Bearer {token_admin}"})
-    eventos = [e for e in r.json() if e["tipo"] == "rol_cambiado"]
+    eventos = [e for e in r.json() if e["tipo"] == "usuario_editado"]
     assert len(eventos) == 1
     assert "gestor_humano" in eventos[0]["descripcion"]
 

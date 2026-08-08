@@ -112,7 +112,7 @@ export default function RegistroPage() {
         password: form.password,
         cedula: form.numeroDocumento.trim(),
       });
-      navigate("/", { replace: true });
+      navigate("/completar-perfil", { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "No se pudo completar el registro.");
     } finally {

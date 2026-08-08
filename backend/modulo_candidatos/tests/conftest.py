@@ -21,6 +21,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.clients import vacantes_client
 
 engine = create_engine(
     "sqlite:///:memory:",
@@ -47,3 +48,30 @@ def setup_db():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+
+VACANTE_ABIERTA = {
+    "id": "vac-1",
+    "cargo": "Analista de Gestión Humana",
+    "esta_cerrada": False,
+    "criterios": {"nivel_educativo_min": "Universitario", "graduado_requerido": True, "experiencia_min_anios": 2},
+}
+
+
+@pytest.fixture
+def mock_vacantes(monkeypatch):
+    """
+    Mock compartido — NO es autouse a propósito: test_vacantes_client.py
+    necesita el comportamiento REAL de obtener_vacante() (reintentos, manejo
+    de errores de red) y este mock lo taparía por completo. Los archivos que
+    sí lo necesitan lo piden con `pytestmark = pytest.mark.usefixtures("mock_vacantes")`.
+    """
+    def fake_obtener_vacante(vacante_id, token=None):
+        if vacante_id == "vac-1":
+            return VACANTE_ABIERTA
+        if vacante_id == "vac-cerrada":
+            return {**VACANTE_ABIERTA, "id": "vac-cerrada", "esta_cerrada": True}
+        return None
+
+    monkeypatch.setattr(vacantes_client, "obtener_vacante", fake_obtener_vacante)
+    yield

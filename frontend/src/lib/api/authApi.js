@@ -84,11 +84,14 @@ export async function crearUsuarioInterno({ nombreCompleto, email, password, rol
   return _usuarioACamel(usuario);
 }
 
-export async function cambiarRol(usuarioId, nuevoRol, token) {
-  const usuario = await apiFetch(`${BASE}/usuarios/${usuarioId}/rol`, {
+export async function editarUsuario(usuarioId, { nombreCompleto, rol } = {}, token) {
+  const body = {};
+  if (nombreCompleto !== undefined) body.nombre_completo = nombreCompleto;
+  if (rol !== undefined) body.rol = rol;
+  const usuario = await apiFetch(`${BASE}/usuarios/${usuarioId}`, {
     method: "PATCH",
     token,
-    body: { rol: nuevoRol },
+    body,
   });
   return _usuarioACamel(usuario);
 }

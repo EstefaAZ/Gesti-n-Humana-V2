@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.deps import obtener_usuario_actual, requerir_roles, UsuarioToken, oauth2_scheme
 from app.clients.vacantes_client import VacantesServiceError
-from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut
+from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
 from app.services import solicitud_service, retencion_service, auditoria_service
 from app.services.pdf_service import generar_pdf_solicitud
 
@@ -66,6 +66,43 @@ def crear_solicitud(
     auditoria_service.registrar_evento(
         db, tipo="solicitud_creada",
         descripcion=f"{nombre_candidato} envió una solicitud (radicado {solicitud.radicado}).",
+        actor_id=usuario.id, actor_nombre=nombre_candidato, actor_rol=usuario.rol,
+        entidad_tipo="solicitud", entidad_id=solicitud.radicado,
+    )
+    return solicitud
+
+
+@router.post("/inscribirme", response_model=SolicitudOut, status_code=status.HTTP_201_CREATED)
+def inscribirme_con_perfil(
+    datos: InscribirmeConPerfil,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles("candidato")),
+    token: str = Depends(oauth2_scheme),
+):
+    """Inscribirse con un clic — reutiliza el perfil ya guardado del candidato."""
+    try:
+        solicitud = solicitud_service.inscribirse_con_perfil(
+            db, usuario_id=usuario.id, vacante_id=datos.vacante_id, token=token,
+            documentos_extra=datos.documentos_extra,
+        )
+    except solicitud_service.PerfilIncompletoError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except solicitud_service.VacanteNoEncontradaError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except solicitud_service.VacanteCerradaError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except solicitud_service.YaPostuladoError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except VacantesServiceError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo verificar la vacante en este momento. Intenta de nuevo en unos minutos.",
+        )
+
+    nombre_candidato = (solicitud.datos_personales or {}).get("nombreCompleto") or usuario.id
+    auditoria_service.registrar_evento(
+        db, tipo="solicitud_creada",
+        descripcion=f"{nombre_candidato} se inscribió con su perfil guardado (radicado {solicitud.radicado}).",
         actor_id=usuario.id, actor_nombre=nombre_candidato, actor_rol=usuario.rol,
         entidad_tipo="solicitud", entidad_id=solicitud.radicado,
     )

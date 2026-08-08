@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
 import FolioNav from "../components/FolioNav";
 import HojaI from "../components/steps/HojaI";
@@ -8,89 +8,59 @@ import HojaVI from "../components/steps/HojaVI";
 import HojaVII from "../components/steps/HojaVII";
 import HojaVIII from "../components/steps/HojaVIII";
 import HojaDocumentos from "../components/steps/HojaDocumentos";
-import Confirmacion from "../components/steps/Confirmacion";
 import {
   STEPS, initialSolicitudState, nuevoRegistroII, nuevaExperiencia, nuevoFamiliar,
 } from "../lib/formState";
 import { useAuth } from "../context/AuthContext";
-import * as vacantesApi from "../lib/api/vacantesApi";
-import * as solicitudesApi from "../lib/api/solicitudesApi";
+import * as perfilesApi from "../lib/api/perfilesApi";
 import { ApiError } from "../lib/api/httpClient";
 
-export default function SolicitudPage() {
-  const { id: vacanteId } = useParams();
-  const { token } = useAuth();
-  const [vacante, setVacante] = useState(undefined); // undefined = cargando, null = no encontrada
-  const [errorCarga, setErrorCarga] = useState("");
+function _perfilAEstadoWizard(perfil) {
+  return {
+    stepIndex: 0,
+    urlLocked: false,
+    datosPersonales: { proceso: "", fechaEntrega: "", ...perfil.datosPersonales },
+    registrosII: perfil.registrosII || [],
+    experiencias: perfil.experiencia || [],
+    conflicto: perfil.conflicto?.tieneVinculo
+      ? perfil.conflicto
+      : { tieneVinculo: "no", familiares: [], tieneOtraInhabilidad: "no", descripcionInhabilidad: "", ...perfil.conflicto },
+    autorizacion: { acepta: perfil.autorizacion?.acepta ?? false, nombreCompleto: perfil.autorizacion?.nombreCompleto || "" },
+    documentos: {
+      cedula: perfil.documentosAdjuntos?.cedula || [],
+      certificadosLaborales: perfil.documentosAdjuntos?.certificadosLaborales || [],
+      certificadosEstudio: perfil.documentosAdjuntos?.certificadosEstudio || [],
+      tarjetaProfesional: perfil.documentosAdjuntos?.tarjetaProfesional || [],
+    },
+    errors: {},
+  };
+}
 
-  useEffect(() => {
-    vacantesApi
-      .obtenerPublica(vacanteId)
-      .then(setVacante)
-      .catch((e) => (e.status === 404 ? setVacante(null) : setErrorCarga("No se pudo cargar la vacante.")));
-  }, [vacanteId]);
+export default function CompletarPerfilPage() {
+  const { token, refrescarEstadoPerfil } = useAuth();
+  const navigate = useNavigate();
 
   const [state, setState] = useState(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [errors, setErrors] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState("");
-  const [enviado, setEnviado] = useState(false);
-  const [radicado, setRadicado] = useState(null);
+  const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
-    if (vacante) {
-      setState(
-        initialSolicitudState({ proceso: vacante.procesoNo, fechaEntrega: vacante.fechaCierre, locked: true })
-      );
-    }
-  }, [vacante]);
+    perfilesApi
+      .obtenerMiPerfil(token)
+      .then((perfil) => setState(_perfilAEstadoWizard(perfil)))
+      .catch(() => setState(initialSolicitudState()))
+      .finally(() => setCargando(false));
+  }, [token]);
 
-  const activeStep = enviado ? "confirmacion" : STEPS[stepIndex];
+  const activeStep = STEPS[stepIndex];
   const doneSteps = useMemo(() => STEPS.slice(0, stepIndex), [stepIndex]);
 
-  if (errorCarga) {
-    return (
-      <>
-        <DocHeader title="Error" />
-        <main className="page"><div className="card"><div className="notice notice--danger">{errorCarga}</div></div></main>
-      </>
-    );
-  }
+  if (cargando || !state) return null;
 
-  if (vacante === undefined || (vacante && !state)) return null;
-
-  if (!vacante) {
-    return (
-      <>
-        <DocHeader title="Vacante no encontrada" />
-        <main className="page">
-          <div className="card">
-            <div className="empty-state">No encontramos esta vacante. Puede que ya no esté disponible.</div>
-            <p className="text-center mt-24"><Link to="/" className="text-muted">← Ver todas las vacantes</Link></p>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  if (vacante.estaCerrada && !enviado) {
-    return (
-      <>
-        <DocHeader title={vacante.cargo} />
-        <main className="page">
-          <div className="card">
-            <div className="notice notice--danger">
-              Esta convocatoria cerró el {vacante.fechaCierre} a las {vacante.horaCierre}. Ya no se reciben inscripciones para este proceso.
-            </div>
-            <p className="text-center"><Link to="/" className="text-muted">← Ver todas las vacantes</Link></p>
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  // ---- Helpers de actualización de estado ----
+  // ---- Helpers de actualización de estado (idénticos a SolicitudPage) ----
   const setDatos = (patch) => setState((s) => ({ ...s, datosPersonales: { ...s.datosPersonales, ...patch } }));
   const setConflicto = (patch) => setState((s) => ({ ...s, conflicto: { ...s.conflicto, ...patch } }));
   const setAutorizacion = (patch) => setState((s) => ({ ...s, autorizacion: { ...s.autorizacion, ...patch } }));
@@ -125,7 +95,7 @@ export default function SolicitudPage() {
       conflicto: { ...s.conflicto, familiares: s.conflicto.familiares.map((f) => (f.id === id ? { ...f, ...patch } : f)) },
     }));
 
-  // ---- Validación ----
+  // ---- Validación (igual que SolicitudPage) ----
   function validarPasoActual() {
     const step = STEPS[stepIndex];
     const nuevosErrores = {};
@@ -152,14 +122,6 @@ export default function SolicitudPage() {
       }
     }
 
-    if (step === "VIII") {
-      if (!state.autorizacion.acepta) {
-        nuevosErrores.aceptaClausulas = "Debe aceptar las cláusulas.";
-      } else if (!state.autorizacion.nombreCompleto.trim()) {
-        nuevosErrores.nombreAutorizacion = "Este campo es obligatorio.";
-      }
-    }
-
     if (step === "DOCS") {
       const requeridos = {
         cedula: "Debes adjuntar tu cédula de ciudadanía.",
@@ -177,6 +139,14 @@ export default function SolicitudPage() {
       }
     }
 
+    if (step === "VIII") {
+      if (!state.autorizacion.acepta) {
+        nuevosErrores.aceptaClausulas = "Debe aceptar las cláusulas.";
+      } else if (!state.autorizacion.nombreCompleto.trim()) {
+        nuevosErrores.nombreAutorizacion = "Este campo es obligatorio.";
+      }
+    }
+
     setErrors(nuevosErrores);
     return Object.keys(nuevosErrores).length === 0;
   }
@@ -184,7 +154,7 @@ export default function SolicitudPage() {
   function onSiguiente() {
     if (!validarPasoActual()) return;
     if (STEPS[stepIndex] === "VIII") {
-      finalizarSolicitud();
+      finalizarPerfil();
       return;
     }
     setStepIndex((i) => i + 1);
@@ -196,13 +166,12 @@ export default function SolicitudPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function finalizarSolicitud() {
+  async function finalizarPerfil() {
     setErrorEnvio("");
     setEnviando(true);
     try {
-      const solicitud = await solicitudesApi.crear(
+      await perfilesApi.guardarPerfil(
         {
-          vacanteId: vacante.id,
           datosPersonales: state.datosPersonales,
           registrosII: state.registrosII,
           experiencia: state.experiencias,
@@ -212,13 +181,14 @@ export default function SolicitudPage() {
         },
         token
       );
-      setRadicado(solicitud.radicado);
-      setEnviado(true);
+      await refrescarEstadoPerfil();
+      navigate("/");
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 409 || e.status === 503)) {
-        setErrorEnvio(e.detail || "Ya existe una solicitud tuya para esta vacante, o la convocatoria ya cerró.");
+      if (e instanceof ApiError && e.status === 422 && typeof e.detail === "string" && e.detail.includes("Autorización")) {
+        setErrorEnvio(e.detail);
+        setStepIndex(STEPS.indexOf("VIII"));
       } else {
-        setErrorEnvio("No se pudo enviar la solicitud. Intenta de nuevo.");
+        setErrorEnvio("No se pudo guardar tu perfil. Intenta de nuevo.");
       }
     } finally {
       setEnviando(false);
@@ -227,20 +197,19 @@ export default function SolicitudPage() {
 
   return (
     <>
-      <DocHeader title={`Solicitud de Inscripción — ${vacante.cargo}`} />
+      <DocHeader title="Completa tu perfil" showCode={false} />
       <main className="page">
         <div className="card">
-          {!enviado && (
-            <div className="notice notice--info">
-              Proceso {vacante.procesoNo} — {vacante.cargo}. El proceso y la fecha de cierre quedan tomados de esta
-              convocatoria y no se pueden editar.
-            </div>
-          )}
+          <div className="notice notice--info">
+            Este formulario se llena <strong>una sola vez</strong>. Cuando termines, podrás inscribirte a cualquier
+            vacante con un solo clic — sin volver a llenarlo, solo adjuntando certificaciones extra si una vacante
+            en particular las requiere.
+          </div>
           {errorEnvio && <div className="notice notice--danger">{errorEnvio}</div>}
 
-          {!enviado && <FolioNav steps={STEPS} activeStep={activeStep} doneSteps={doneSteps} />}
+          <FolioNav steps={STEPS} activeStep={activeStep} doneSteps={doneSteps} />
 
-          {activeStep === "I" && <HojaI datos={{ ...state.datosPersonales, urlLocked: true }} setDatos={setDatos} errors={errors} />}
+          {activeStep === "I" && <HojaI datos={state.datosPersonales} setDatos={setDatos} errors={errors} ocultarProceso />}
           {activeStep === "II" && (
             <HojaII registros={state.registrosII} onAdd={addRegistro} onRemove={removeRegistro} onChange={changeRegistro} />
           )}
@@ -257,26 +226,21 @@ export default function SolicitudPage() {
               errors={errors}
             />
           )}
-          {activeStep === "VIII" && (
-            <HojaVIII autorizacion={state.autorizacion} setAutorizacion={setAutorizacion} errors={errors} />
-          )}
           {activeStep === "DOCS" && (
             <HojaDocumentos documentos={state.documentos} setDocumentos={setDocumentos} errors={errors} />
           )}
-          {activeStep === "confirmacion" && (
-            <Confirmacion radicado={radicado} onDescargarPdf={() => solicitudesApi.descargarPdf(radicado, token)} />
+          {activeStep === "VIII" && (
+            <HojaVIII autorizacion={state.autorizacion} setAutorizacion={setAutorizacion} errors={errors} />
           )}
 
-          {!enviado && (
-            <div className="wizard-actions">
-              <button type="button" className="btn btn-secondary" onClick={onAtras} style={{ visibility: stepIndex === 0 ? "hidden" : "visible" }}>
-                Atrás
-              </button>
-              <button type="button" className="btn btn-primary" onClick={onSiguiente} disabled={enviando}>
-                {enviando ? "Enviando…" : STEPS[stepIndex] === "VIII" ? "Enviar solicitud" : "Siguiente"}
-              </button>
-            </div>
-          )}
+          <div className="wizard-actions">
+            <button type="button" className="btn btn-secondary" onClick={onAtras} style={{ visibility: stepIndex === 0 ? "hidden" : "visible" }}>
+              Atrás
+            </button>
+            <button type="button" className="btn btn-primary" onClick={onSiguiente} disabled={enviando}>
+              {enviando ? "Guardando…" : STEPS[stepIndex] === "VIII" ? "Guardar perfil" : "Siguiente"}
+            </button>
+          </div>
         </div>
       </main>
     </>

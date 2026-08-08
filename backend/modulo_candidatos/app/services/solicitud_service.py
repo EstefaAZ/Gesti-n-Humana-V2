@@ -29,39 +29,47 @@ class SolicitudNoEncontradaError(Exception):
     pass
 
 
-def crear_solicitud(db: Session, datos: SolicitudCrear, usuario_id: str, token: Optional[str] = None) -> Solicitud:
-    vacante = vacantes_client.obtener_vacante(datos.vacante_id, token=token)
+class PerfilIncompletoError(Exception):
+    pass
+
+
+def _validar_vacante_disponible(db: Session, vacante_id: str, usuario_id: str, token: Optional[str]) -> dict:
+    vacante = vacantes_client.obtener_vacante(vacante_id, token=token)
     if not vacante:
-        raise VacanteNoEncontradaError(f"No existe una vacante con id {datos.vacante_id}.")
+        raise VacanteNoEncontradaError(f"No existe una vacante con id {vacante_id}.")
     if vacante.get("esta_cerrada"):
         raise VacanteCerradaError("Esta convocatoria ya cerró; no se aceptan más inscripciones.")
 
     ya_existe = (
         db.query(Solicitud)
-        .filter(Solicitud.vacante_id == datos.vacante_id, Solicitud.usuario_id == usuario_id)
+        .filter(Solicitud.vacante_id == vacante_id, Solicitud.usuario_id == usuario_id)
         .first()
     )
     if ya_existe:
         raise YaPostuladoError("Ya existe una solicitud tuya para esta vacante.")
+    return vacante
 
-    solicitud_dict = {
-        "datos_personales": datos.datos_personales,
-        "registros_ii": datos.registros_ii,
-        "experiencia": datos.experiencia,
-    }
-    evaluacion = evaluar_postulacion(solicitud_dict, vacante)
 
+def _guardar_solicitud(
+    db: Session, vacante: dict, vacante_id: str, usuario_id: str,
+    datos_personales: dict, registros_ii: list, experiencia: list, conflicto: dict,
+    autorizacion: dict, documentos_adjuntos: dict,
+) -> Solicitud:
+    evaluacion = evaluar_postulacion(
+        {"datos_personales": datos_personales, "registros_ii": registros_ii, "experiencia": experiencia},
+        vacante,
+    )
     ahora = datetime.now(timezone.utc).isoformat()
     solicitud = Solicitud(
         radicado=_generar_radicado(),
-        vacante_id=datos.vacante_id,
+        vacante_id=vacante_id,
         usuario_id=usuario_id,
-        datos_personales=datos.datos_personales,
-        registros_ii=datos.registros_ii,
-        experiencia=datos.experiencia,
-        conflicto=datos.conflicto,
-        autorizacion=datos.autorizacion,
-        documentos_adjuntos=datos.documentos_adjuntos.model_dump(),
+        datos_personales=datos_personales,
+        registros_ii=registros_ii,
+        experiencia=experiencia,
+        conflicto=conflicto,
+        autorizacion=autorizacion,
+        documentos_adjuntos=documentos_adjuntos,
         evaluacion=evaluacion,
         estado="Recibida",
         historial_estados=[{"estado": "Recibida", "fecha": ahora}],
@@ -70,6 +78,56 @@ def crear_solicitud(db: Session, datos: SolicitudCrear, usuario_id: str, token: 
     db.commit()
     db.refresh(solicitud)
     return solicitud
+
+
+def crear_solicitud(db: Session, datos: SolicitudCrear, usuario_id: str, token: Optional[str] = None) -> Solicitud:
+    vacante = _validar_vacante_disponible(db, datos.vacante_id, usuario_id, token)
+    return _guardar_solicitud(
+        db, vacante, datos.vacante_id, usuario_id,
+        datos.datos_personales, datos.registros_ii, datos.experiencia, datos.conflicto,
+        datos.autorizacion, datos.documentos_adjuntos.model_dump(),
+    )
+
+
+MAXIMOS_DOCUMENTOS = {"cedula": 1, "certificados_laborales": 10, "certificados_estudio": 10, "tarjeta_profesional": 3}
+
+
+def _combinar_documentos(documentos_perfil: dict, documentos_extra) -> dict:
+    """Documentos del perfil + los que el candidato adjunte extra para ESTA vacante en particular,
+    respetando los mismos máximos por categoría."""
+    combinados = {cat: list(documentos_perfil.get(cat, [])) for cat in MAXIMOS_DOCUMENTOS}
+    if documentos_extra:
+        extra_dict = documentos_extra.model_dump()
+        for categoria, maximo in MAXIMOS_DOCUMENTOS.items():
+            espacio = maximo - len(combinados[categoria])
+            if espacio > 0:
+                combinados[categoria].extend(extra_dict.get(categoria, [])[:espacio])
+    return combinados
+
+
+def inscribirse_con_perfil(
+    db: Session, usuario_id: str, vacante_id: str, token: Optional[str] = None, documentos_extra=None,
+) -> Solicitud:
+    """
+    Inscribirse con un clic: reutiliza el perfil ya guardado del candidato en
+    vez de pedirle llenar el formulario de nuevo. `documentos_extra` son
+    certificaciones adicionales SOLO para esta vacante (no se guardan en el
+    perfil, solo en esta solicitud puntual).
+    """
+    from app.services import perfil_candidato_service
+
+    perfil = perfil_candidato_service.obtener_perfil(db, usuario_id)
+    if not perfil or not perfil.completado:
+        raise PerfilIncompletoError("Debes completar tu perfil antes de poder inscribirte a una vacante.")
+
+    vacante = _validar_vacante_disponible(db, vacante_id, usuario_id, token)
+    documentos_combinados = _combinar_documentos(perfil.documentos_adjuntos or {}, documentos_extra)
+
+    return _guardar_solicitud(
+        db, vacante, vacante_id, usuario_id,
+        perfil.datos_personales, perfil.registros_ii, perfil.experiencia, perfil.conflicto,
+        perfil.autorizacion, documentos_combinados,
+    )
 
 
 def listar_por_usuario(db: Session, usuario_id: str) -> list[Solicitud]:

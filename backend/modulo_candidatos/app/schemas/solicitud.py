@@ -36,6 +36,24 @@ class DocumentoAdjunto(BaseModel):
         return v
 
 
+class DocumentosExtra(BaseModel):
+    """
+    Igual que DocumentosAdjuntos pero SIN exigir mínimo por categoría — son
+    certificaciones adicionales, opcionales, solo para una vacante puntual
+    (se usan en /solicitudes/inscribirme, no reemplazan el perfil guardado).
+    """
+    cedula: list[DocumentoAdjunto] = Field(default_factory=list, max_length=1)
+    certificados_laborales: list[DocumentoAdjunto] = Field(default_factory=list, max_length=10)
+    certificados_estudio: list[DocumentoAdjunto] = Field(default_factory=list, max_length=10)
+    tarjeta_profesional: list[DocumentoAdjunto] = Field(default_factory=list, max_length=3)
+
+
+class InscribirmeConPerfil(BaseModel):
+    """Inscribirse con un clic reutilizando el perfil ya guardado."""
+    vacante_id: str
+    documentos_extra: Optional[DocumentosExtra] = None
+
+
 class DocumentosAdjuntos(BaseModel):
     """
     Documentos obligatorios de la inscripción — sin esto, no se puede enviar

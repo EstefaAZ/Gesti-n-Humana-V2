@@ -132,9 +132,15 @@ class ActualizarPerfil(BaseModel):
     email: Optional[EmailStr] = None
 
 
-class CambiarRol(BaseModel):
-    """Solo un admin puede cambiar el rol de otro usuario (ver ruta protegida)."""
-    rol: RolUsuario
+class EditarUsuario(BaseModel):
+    """
+    Un admin edita cualquier dato administrable de OTRO usuario. Ambos campos
+    son opcionales — se actualiza solo lo que venga. Reemplaza al antiguo
+    CambiarRol (que solo aceptaba rol) para no tener dos endpoints casi
+    idénticos en la página de Usuarios.
+    """
+    nombre_completo: Optional[str] = Field(default=None, min_length=3, max_length=200)
+    rol: Optional[RolUsuario] = None
 
 
 class EstadisticasUsuarios(BaseModel):
