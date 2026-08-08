@@ -215,8 +215,7 @@ export default function VacanteDetallePage() {
           <div className="wizard-actions" style={{ justifyContent: "flex-end" }}>
             {miPostulacion ? (
               <div className="notice notice--info" style={{ margin: 0 }}>
-                Ya te inscribiste a esta vacante (radicado <strong>{miPostulacion.radicado}</strong>).{" "}
-                <Link to="/mis-postulaciones">Ver mis postulaciones →</Link>
+                Ya te inscribiste a esta vacante (tú radicado es: <strong>{miPostulacion.radicado}</strong>).{" "}
               </div>
             ) : vacante.estaCerrada ? (
               <div className="notice notice--danger" style={{ margin: 0 }}>
