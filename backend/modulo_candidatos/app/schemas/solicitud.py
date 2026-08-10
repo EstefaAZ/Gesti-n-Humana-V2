@@ -97,9 +97,21 @@ class DocumentosAdjuntosOut(BaseModel):
     tarjeta_profesional: list[DocumentoAdjuntoMeta] = Field(default_factory=list)
 
 
+class DetalleCategoriaEvaluacion(BaseModel):
+    cumple: Optional[bool] = None  # None = esta vacante no tiene ese criterio configurado
+    motivo: Optional[str] = None
+
+
+class DetalleEvaluacion(BaseModel):
+    estudios: DetalleCategoriaEvaluacion = DetalleCategoriaEvaluacion()
+    conocimientos: DetalleCategoriaEvaluacion = DetalleCategoriaEvaluacion()
+    experiencia: DetalleCategoriaEvaluacion = DetalleCategoriaEvaluacion()
+
+
 class EvaluacionOut(BaseModel):
     cumple: bool
     motivos: list[str] = []
+    detalle: DetalleEvaluacion = DetalleEvaluacion()
 
 
 class SolicitudCrear(BaseModel):

@@ -7,6 +7,7 @@ import VacanteDetallePage from "./pages/VacanteDetallePage";
 import SolicitudPage from "./pages/SolicitudPage";
 import CompletarPerfilPage from "./pages/CompletarPerfilPage";
 import DocumentosPage from "./pages/DocumentosPage";
+import NotificacionesPage from "./pages/NotificacionesPage";
 import MisPostulacionesPage from "./pages/MisPostulacionesPage";
 import PerfilPage from "./pages/PerfilPage";
 import LoginPage from "./pages/LoginPage";
@@ -17,6 +18,7 @@ import PoliticaDatosPage from "./pages/PoliticaDatosPage";
 import TerminosCondicionesPage from "./pages/TerminosCondicionesPage";
 import GestionHumanaPage from "./pages/hr/GestionHumanaPage";
 import CandidatosPage from "./pages/hr/CandidatosPage";
+import ReportesPage from "./pages/hr/ReportesPage";
 import DashboardPage from "./pages/hr/DashboardPage";
 import UsuariosPage from "./pages/hr/UsuariosPage";
 import AuditoriaPage from "./pages/hr/AuditoriaPage";
@@ -39,12 +41,14 @@ function AppShell() {
       <Route path="/" element={<ProtectedRoute nivel="cualquiera"><ListaVacantesPage /></ProtectedRoute>} />
       <Route path="/completar-perfil" element={<ProtectedRoute nivel="cualquiera"><CompletarPerfilPage /></ProtectedRoute>} />
       <Route path="/documentos" element={<ProtectedRoute nivel="cualquiera"><DocumentosPage /></ProtectedRoute>} />
+      <Route path="/notificaciones" element={<ProtectedRoute nivel="cualquiera"><NotificacionesPage /></ProtectedRoute>} />
       <Route path="/vacante/:id" element={<ProtectedRoute nivel="cualquiera"><VacanteDetallePage /></ProtectedRoute>} />
       <Route path="/postularme/:id" element={<ProtectedRoute nivel="cualquiera"><SolicitudPage /></ProtectedRoute>} />
       <Route path="/mis-postulaciones" element={<ProtectedRoute nivel="cualquiera"><MisPostulacionesPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute nivel="cualquiera"><PerfilPage /></ProtectedRoute>} />
       <Route path="/gestion-humana" element={<ProtectedRoute nivel="gestion"><GestionHumanaPage /></ProtectedRoute>} />
       <Route path="/candidatos" element={<ProtectedRoute nivel="gestion"><CandidatosPage /></ProtectedRoute>} />
+      <Route path="/reportes" element={<ProtectedRoute nivel="gestion"><ReportesPage /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute nivel="admin"><DashboardPage /></ProtectedRoute>} />
       <Route path="/usuarios" element={<ProtectedRoute nivel="admin"><UsuariosPage /></ProtectedRoute>} />
       <Route path="/auditoria" element={<ProtectedRoute nivel="admin"><AuditoriaPage /></ProtectedRoute>} />

@@ -42,11 +42,25 @@ def _total_experiencia_anios(experiencia: list[dict[str, Any]]) -> float:
 
 
 def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> dict:
+    """
+    Evaluación automática — SOLO INFORMATIVA (ver nota del módulo). Además del
+    resultado general (cumple/motivos, para el badge del panel), devuelve un
+    desglose por categoría (detalle.estudios/conocimientos/experiencia) — lo
+    usa el reporte GTH-FOR-03 → hoja Traspaso_a_FOR-04, que las separa así.
+    `cumple: None` en una categoría significa "esta vacante no tiene ese
+    criterio configurado", no que el candidato haya fallado en algo.
+    """
     motivos: list[str] = []
     criterios = (vacante or {}).get("criterios") or {}
     dp = solicitud.get("datos_personales") or solicitud.get("datosPersonales") or {}
     registros = solicitud.get("registros_ii") or solicitud.get("registrosII") or []
     experiencia = solicitud.get("experiencia") or []
+
+    detalle = {
+        "estudios": {"cumple": None, "motivo": None},
+        "conocimientos": {"cumple": None, "motivo": None},
+        "experiencia": {"cumple": None, "motivo": None},
+    }
 
     nivel_min = criterios.get("nivel_educativo_min")
     if nivel_min:
@@ -60,7 +74,19 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
                     max_nivel = nivel
         if max_nivel < NIVEL_EDUCATIVO_ORDEN.get(nivel_min, 0):
             sufijo = " con graduación confirmada" if graduado_requerido else ""
-            motivos.append(f'No registra nivel educativo "{nivel_min}"{sufijo}.')
+            motivo = f'No registra nivel educativo "{nivel_min}"{sufijo}.'
+            motivos.append(motivo)
+            detalle["estudios"] = {"cumple": False, "motivo": motivo}
+        else:
+            detalle["estudios"] = {"cumple": True, "motivo": None}
+
+    def _marcar_conocimientos(cumple: bool, motivo: str):
+        actual = detalle["conocimientos"]
+        # Si ya había un "no cumple" registrado, uno que sí cumple no lo revierte —
+        # basta con que UN criterio de conocimientos falle para marcar la categoría en NO.
+        if actual["cumple"] is False:
+            return
+        detalle["conocimientos"] = {"cumple": cumple, "motivo": None if cumple else motivo}
 
     profesion_kw = criterios.get("profesion_keyword")
     if profesion_kw:
@@ -69,13 +95,20 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
             r.get("tipo") == "estudio" and kw in (r.get("titulo") or "").lower() for r in registros
         ) or kw in (dp.get("profesion") or "").lower()
         if not match:
-            motivos.append(f'Ningún título/profesión registrada incluye "{profesion_kw}".')
+            motivo = f'Ningún título/profesión registrada incluye "{profesion_kw}".'
+            motivos.append(motivo)
+        _marcar_conocimientos(match, motivo if not match else "")
 
     exp_min = criterios.get("experiencia_min_anios")
     if exp_min:
         total = _total_experiencia_anios(experiencia)
-        if total < float(exp_min):
-            motivos.append(f"Registra {total:.1f} años de experiencia; se requieren mínimo {exp_min}.")
+        cumple_exp = total >= float(exp_min)
+        if not cumple_exp:
+            motivo = f"Registra {total:.1f} años de experiencia; se requieren mínimo {exp_min}."
+            motivos.append(motivo)
+            detalle["experiencia"] = {"cumple": False, "motivo": motivo}
+        else:
+            detalle["experiencia"] = {"cumple": True, "motivo": None}
 
     idioma_req = criterios.get("idioma_requerido")
     if idioma_req:
@@ -84,8 +117,11 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         nivel_min_idioma = NIVEL_IDIOMA_ORDEN.get(criterios.get("idioma_nivel_min", ""), 0)
         habilidad = criterios.get("idioma_habilidad", "habla")
         nivel_cand = NIVEL_IDIOMA_ORDEN.get(match.get(habilidad, ""), -1) if match else -1
-        if nivel_cand < nivel_min_idioma:
-            motivos.append(f'No cumple el nivel de {idioma_req} requerido ({habilidad}: {criterios.get("idioma_nivel_min")}).')
+        cumple_idioma = nivel_cand >= nivel_min_idioma
+        motivo = f'No cumple el nivel de {idioma_req} requerido ({habilidad}: {criterios.get("idioma_nivel_min")}).'
+        if not cumple_idioma:
+            motivos.append(motivo)
+        _marcar_conocimientos(cumple_idioma, motivo)
 
     certificaciones_kw = criterios.get("certificaciones_keywords") or []
     for cert_kw in certificaciones_kw:
@@ -100,7 +136,10 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
                 return kw in (r.get("titulo") or "").lower()
             return False
 
-        if not any(_coincide(r) for r in registros):
-            motivos.append(f'No se encontró certificación/curso relacionado con "{cert_kw}".')
+        tiene_cert = any(_coincide(r) for r in registros)
+        motivo = f'No se encontró certificación/curso relacionado con "{cert_kw}".'
+        if not tiene_cert:
+            motivos.append(motivo)
+        _marcar_conocimientos(tiene_cert, motivo)
 
-    return {"cumple": len(motivos) == 0, "motivos": motivos}
+    return {"cumple": len(motivos) == 0, "motivos": motivos, "detalle": detalle}

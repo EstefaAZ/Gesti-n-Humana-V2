@@ -137,6 +137,19 @@ export async function conteoPorVacante(token) {
   return apiFetch(`${BASE}/admin/conteo-por-vacante`, { token });
 }
 
+export async function descargarReporte(vacanteId, nombreArchivo, token) {
+  const res = await apiFetch(`${BASE}/admin/reporte/${vacanteId}`, { token, raw: true });
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombreArchivo || "reporte.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export async function descargarDocumentoAdjunto(radicado, categoriaApi, indice, nombreArchivo, token) {
   const res = await apiFetch(`${BASE}/${radicado}/documentos/${categoriaApi}/${indice}`, { token, raw: true });
   const blob = await res.blob();

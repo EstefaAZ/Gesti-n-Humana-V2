@@ -11,6 +11,7 @@ from app.clients import vacantes_client
 from app.models.solicitud import Solicitud, _generar_radicado
 from app.schemas.solicitud import SolicitudCrear
 from app.services.evaluacion_service import evaluar_postulacion
+from app.services import email_service, notificacion_service
 
 
 class VacanteNoEncontradaError(Exception):
@@ -109,6 +110,27 @@ def _guardar_solicitud(
     db.add(solicitud)
     db.commit()
     db.refresh(solicitud)
+
+    nombre = datos_personales.get("nombreCompleto") or "Candidato"
+    cargo = vacante.get("cargo") or "la vacante"
+    correo = datos_personales.get("correo")
+
+    notificacion_service.crear_notificacion_candidato(
+        db, usuario_id, tipo="solicitud_creada",
+        titulo="Recibimos tu inscripción",
+        mensaje=f'Tu inscripción a "{cargo}" fue recibida (radicado {solicitud.radicado}).',
+        entidad_tipo="solicitud", entidad_id=solicitud.radicado,
+    )
+    if correo:
+        email_service.enviar_correo_solicitud_recibida(correo, nombre, cargo, solicitud.radicado)
+
+    notificacion_service.crear_notificacion_gestion(
+        db, tipo="nueva_postulacion",
+        titulo="Nueva postulación recibida",
+        mensaje=f'{nombre} se postuló a "{cargo}" (radicado {solicitud.radicado}).',
+        entidad_tipo="solicitud", entidad_id=solicitud.radicado,
+    )
+
     return solicitud
 
 

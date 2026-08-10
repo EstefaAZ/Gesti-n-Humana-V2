@@ -37,7 +37,7 @@ function itemsPara(rol) {
       { to: "/mis-postulaciones", label: "Mis postulaciones", icon: IconFolder },
       { to: "/perfil", label: "Mi perfil", icon: IconUser },
       { to: "/documentos", label: "Documentos", icon: IconFolder },
-      { label: "Notificaciones", icon: IconBell, proximamente: true },
+      { to: "/notificaciones", label: "Notificaciones", icon: IconBell },
       { label: "Configuración", icon: IconSettings, proximamente: true },
     ];
   }
@@ -49,7 +49,7 @@ function itemsPara(rol) {
     { to: "/candidatos", label: "Candidatos", icon: IconUsers },
     { label: "Entrevistas", icon: IconCalendar, proximamente: true },
     { label: "Comunicación", icon: IconChat, proximamente: true },
-    { label: "Reportes", icon: IconChart, proximamente: true },
+    { to: "/reportes", label: "Reportes", icon: IconChart },
   ];
 
   if (rol === "admin") {
@@ -62,7 +62,10 @@ function itemsPara(rol) {
     );
   }
 
-  base.push({ to: "/perfil", label: "Mi perfil", icon: IconUser });
+  base.push(
+    { to: "/notificaciones", label: "Notificaciones", icon: IconBell },
+    { to: "/perfil", label: "Mi perfil", icon: IconUser },
+  );
   return base;
 }
 

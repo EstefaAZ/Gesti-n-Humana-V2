@@ -191,7 +191,7 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
           Opcional. Si lo subes, el candidato podra verlo.
         </p>
         {v.tieneDocumentoPdf && !pdfFile && (
-          <p style={{ fontSize: 13 }}>📄 Ya hay un PDF subido para esta vacante. Elige otro archivo abajo si quieres reemplazarlo.</p>
+          <p style={{ fontSize: 13 }}>📄 Ya hay un PDF para esta vacante. Elige otro archivo abajo si quieres reemplazarlo.</p>
         )}
         <input
           type="file"

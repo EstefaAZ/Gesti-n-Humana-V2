@@ -14,6 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.config import settings, validar_configuracion_produccion
 from app.core.database import Base, engine
 from app.api.v1.auth import router as auth_router, limiter
+from app.api.v1.notificaciones import router as notificaciones_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,6 +58,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(notificaciones_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["Sistema"])

@@ -382,6 +382,119 @@ def test_auditoria_registra_desactivacion_de_otro_por_admin():
     assert USUARIO_VALIDO["nombre_completo"] in eventos[0]["descripcion"]
 
 
+# ---------------------------------------------------------------
+# Notificaciones (campanita) — cuenta desactivada/reactivada
+# ---------------------------------------------------------------
+
+def test_notificaciones_vacias_al_principio():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    token = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+    r = client.get("/api/v1/notificaciones/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    assert r.json() == []
+
+    r_conteo = client.get("/api/v1/notificaciones/me/conteo", headers={"Authorization": f"Bearer {token}"})
+    assert r_conteo.json() == {"no_leidas": 0}
+
+
+def test_reactivar_genera_notificacion_para_el_candidato():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+
+    token_admin = _crear_admin()
+    client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_admin}"})
+
+    token_de_nuevo = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+    r = client.get("/api/v1/notificaciones/me", headers={"Authorization": f"Bearer {token_de_nuevo}"})
+    tipos = [n["tipo"] for n in r.json()]
+    assert "cuenta_desactivada" in tipos
+    assert "cuenta_reactivada" in tipos
+
+
+def test_marcar_notificacion_como_leida():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+
+    token_admin = _crear_admin()
+    client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_admin}"})
+
+    token_de_nuevo = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+    notif_id = client.get("/api/v1/notificaciones/me", headers={"Authorization": f"Bearer {token_de_nuevo}"}).json()[0]["id"]
+
+    r_marcar = client.patch(f"/api/v1/notificaciones/{notif_id}/leida", headers={"Authorization": f"Bearer {token_de_nuevo}"})
+    assert r_marcar.status_code == 200
+    assert r_marcar.json()["leida"] is True
+
+
+def test_no_se_puede_marcar_leida_una_notificacion_de_otro_usuario():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+
+    token_admin = _crear_admin()
+    client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_admin}"})
+    token_de_nuevo = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+    notif_id = client.get("/api/v1/notificaciones/me", headers={"Authorization": f"Bearer {token_de_nuevo}"}).json()[0]["id"]
+
+    client.post("/api/v1/auth/registro", json={**USUARIO_VALIDO, "email": "otro-notif@example.com", "cedula": "999888777"})
+    token_otro = _token_de("otro-notif@example.com", USUARIO_VALIDO["password"])
+    r = client.patch(f"/api/v1/notificaciones/{notif_id}/leida", headers={"Authorization": f"Bearer {token_otro}"})
+    assert r.status_code == 404
+
+
+def test_marcar_todas_leidas():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    candidato_id = r_login.json()["usuario"]["id"]
+    token_candidato = r_login.json()["access_token"]
+    client.patch("/api/v1/auth/me/desactivar", headers={"Authorization": f"Bearer {token_candidato}"})
+
+    token_admin = _crear_admin()
+    client.patch(f"/api/v1/auth/usuarios/{candidato_id}/activar", headers={"Authorization": f"Bearer {token_admin}"})
+    token_de_nuevo = _token_de(USUARIO_VALIDO["email"], USUARIO_VALIDO["password"])
+
+    r_conteo_antes = client.get("/api/v1/notificaciones/me/conteo", headers={"Authorization": f"Bearer {token_de_nuevo}"})
+    assert r_conteo_antes.json()["no_leidas"] == 2
+
+    client.post("/api/v1/notificaciones/me/marcar-todas-leidas", headers={"Authorization": f"Bearer {token_de_nuevo}"})
+    r_conteo_despues = client.get("/api/v1/notificaciones/me/conteo", headers={"Authorization": f"Bearer {token_de_nuevo}"})
+    assert r_conteo_despues.json()["no_leidas"] == 0
+
+
+# ---------------------------------------------------------------
+# Correo (modo desarrollo: sin SMTP configurado, solo se registra en el log)
+# ---------------------------------------------------------------
+
+def test_olvide_password_intenta_enviar_correo_sin_fallar(monkeypatch):
+    from app.services import email_service
+
+    llamadas = []
+    monkeypatch.setattr(
+        email_service, "enviar_correo_reset_password",
+        lambda destinatario, nombre, enlace: llamadas.append((destinatario, nombre, enlace)) or True,
+    )
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r = client.post("/api/v1/auth/olvide-password", json={"email": USUARIO_VALIDO["email"]})
+    assert r.status_code == 200
+    assert len(llamadas) == 1
+    assert llamadas[0][0] == USUARIO_VALIDO["email"]
+
+
+def test_email_service_en_modo_desarrollo_no_falla_sin_smtp_configurado():
+    from app.services.email_service import enviar_correo
+
+    resultado = enviar_correo("prueba@example.com", "Asunto de prueba", "<p>Cuerpo</p>", "Cuerpo texto plano")
+    assert resultado is True
+
+
 def test_reactivar_requiere_rol_admin():
     client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
     r_login = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})

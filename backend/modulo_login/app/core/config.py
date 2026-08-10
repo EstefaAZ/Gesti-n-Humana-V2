@@ -23,6 +23,17 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR: int = 60 * 24 * 30  # 30 días — cuando el usuario marca "Recordarme"
     RESET_PASSWORD_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # Correo (SMTP) — si SMTP_HOST queda vacío, los correos NO se envían de
+    # verdad: se registran en el log del servidor (modo desarrollo), útil para
+    # probar el flujo completo sin credenciales reales.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "no-responder@aguasnacionalesepm.com"
+    SMTP_USE_TLS: bool = True
+    FRONTEND_URL: str = "http://localhost:5173"  # para armar enlaces dentro de los correos
+
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:5173"
 

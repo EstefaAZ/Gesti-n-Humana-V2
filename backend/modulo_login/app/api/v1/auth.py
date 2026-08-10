@@ -17,7 +17,7 @@ from app.schemas.usuario import (
     CambiarPassword, ActualizarPerfil, EditarUsuario,
     SolicitarResetPassword, ConfirmarResetPassword, EstadisticasUsuarios, EventoAuditoriaOut,
 )
-from app.services import auth_service, auditoria_service
+from app.services import auth_service, auditoria_service, email_service, notificacion_service
 
 router = APIRouter(prefix="/auth", tags=["Autenticación"])
 limiter = Limiter(key_func=get_remote_address)
@@ -94,19 +94,17 @@ def olvide_password(request: Request, datos: SolicitarResetPassword, db: Session
     Solicitar restablecimiento de contraseña. Responde con el MISMO mensaje
     exista o no una cuenta con ese correo, para no revelar qué correos están
     registrados.
-
-    ⚠️ Todavía no hay envío de correos real (eso vive en el futuro módulo de
-    Notificaciones). Mientras tanto, en ENVIRONMENT=development esta ruta
-    devuelve el enlace directamente en la respuesta para poder probar el
-    flujo completo. En producción ese campo simplemente no viaja — hay que
-    conectar un envío de correo real antes de lanzar esto a producción.
     """
     usuario, token = auth_service.solicitar_reset_password(db, datos.email)
+
+    if usuario:
+        enlace = f"{settings.FRONTEND_URL}/restablecer-password?token={token}"
+        email_service.enviar_correo_reset_password(usuario.email, usuario.nombre_completo, enlace)
 
     respuesta = {"mensaje": "Si el correo está registrado, se enviará un enlace para restablecer la contraseña."}
     if settings.ENVIRONMENT != "production" and usuario:
         respuesta["token_dev"] = token
-        respuesta["aviso_dev"] = "Este campo solo aparece en desarrollo — en producción se envía por correo."
+        respuesta["aviso_dev"] = "Este campo solo aparece en desarrollo — en producción solo se envía por correo."
     return respuesta
 
 
@@ -165,6 +163,12 @@ def desactivar_cuenta_propia(
         actor_id=id_previo, actor_nombre=nombre_previo, actor_rol=rol_previo,
         entidad_tipo="usuario", entidad_id=id_previo,
     )
+    notificacion_service.crear_notificacion(
+        db, id_previo, tipo="cuenta_desactivada",
+        titulo="Desactivaste tu cuenta",
+        mensaje="Desactivaste tu propia cuenta. Un administrador puede reactivarla si la necesitas de vuelta.",
+    )
+    email_service.enviar_correo_cuenta_desactivada(usuario.email, nombre_previo)
 
 
 @router.patch("/usuarios/{usuario_id}/activar", response_model=UsuarioOut)
@@ -185,6 +189,12 @@ def reactivar_cuenta(
         actor_id=admin_actual.id, actor_nombre=admin_actual.nombre_completo, actor_rol=admin_actual.rol.value,
         entidad_tipo="usuario", entidad_id=reactivada.id,
     )
+    notificacion_service.crear_notificacion(
+        db, reactivada.id, tipo="cuenta_reactivada",
+        titulo="Tu cuenta fue reactivada",
+        mensaje=f"{admin_actual.nombre_completo} reactivó tu cuenta. Ya puedes iniciar sesión normalmente.",
+    )
+    email_service.enviar_correo_cuenta_reactivada(reactivada.email, reactivada.nombre_completo)
     return reactivada
 
 
@@ -208,6 +218,12 @@ def desactivar_cuenta_de_otro(
         actor_id=admin_actual.id, actor_nombre=admin_actual.nombre_completo, actor_rol=admin_actual.rol.value,
         entidad_tipo="usuario", entidad_id=desactivada.id,
     )
+    notificacion_service.crear_notificacion(
+        db, desactivada.id, tipo="cuenta_desactivada",
+        titulo="Tu cuenta fue desactivada",
+        mensaje=f"{admin_actual.nombre_completo} desactivó tu cuenta. Contacta a un administrador si crees que es un error.",
+    )
+    email_service.enviar_correo_cuenta_desactivada(desactivada.email, desactivada.nombre_completo)
     return desactivada
 
 

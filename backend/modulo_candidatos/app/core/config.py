@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     # ⚠️ VALOR DE PARTIDA — Legal/Gestión Humana debe confirmarlo antes de producción.
     RETENCION_MESES_NO_SELECCIONADOS: int = 6
 
+    # Correo (SMTP) — igual que en modulo_login: si SMTP_HOST queda vacío, los
+    # correos se registran en el log en vez de enviarse (modo desarrollo).
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "no-responder@aguasnacionalesepm.com"
+    SMTP_USE_TLS: bool = True
+    FRONTEND_URL: str = "http://localhost:5173"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

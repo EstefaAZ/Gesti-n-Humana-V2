@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.api.deps import obtener_usuario_actual, requerir_roles, UsuarioToken, oauth2_scheme
+from app.clients import vacantes_client
 from app.clients.vacantes_client import VacantesServiceError
 from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
-from app.services import solicitud_service, retencion_service, auditoria_service
+from app.services import solicitud_service, retencion_service, auditoria_service, email_service, notificacion_service, reporte_service
 from app.services.pdf_service import generar_pdf_solicitud
 
 router = APIRouter(prefix="/solicitudes", tags=["Solicitudes"])
@@ -128,6 +129,29 @@ def postulaciones_de_vacante(
     return solicitud_service.listar_por_vacante(db, vacante_id)
 
 
+@router.get("/admin/reporte/{vacante_id}")
+def descargar_reporte_vacante(
+    vacante_id: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+    token: str = Depends(oauth2_scheme),
+):
+    """Reporte GTH-FOR-03 (Base de Aspirantes) de una vacante, en Excel."""
+    vacante = vacantes_client.obtener_vacante(vacante_id, token=token)
+    if not vacante:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe una vacante con ese id.")
+
+    solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    contenido = reporte_service.generar_reporte_vacante(vacante, solicitudes)
+
+    nombre_archivo = f"GTH-FOR-03_{vacante.get('proceso_no', vacante_id)}.xlsx".replace("/", "-")
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+    )
+
+
 @router.get("/{radicado}", response_model=SolicitudOut)
 def obtener_solicitud(
     radicado: str,
@@ -147,6 +171,7 @@ def cambiar_estado(
     datos: CambiarEstado,
     db: Session = Depends(get_db),
     usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+    token: str = Depends(oauth2_scheme),
 ):
     anterior = solicitud_service.obtener_por_radicado(db, radicado)
     estado_previo = anterior.estado if anterior else None
@@ -161,6 +186,22 @@ def cambiar_estado(
         actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
         entidad_tipo="solicitud", entidad_id=radicado,
     )
+
+    dp = actualizada.datos_personales or {}
+    nombre = dp.get("nombreCompleto") or "Candidato"
+    correo = dp.get("correo")
+    vacante = vacantes_client.obtener_vacante(actualizada.vacante_id, token=token)
+    cargo = (vacante or {}).get("cargo") or "tu proceso de selección"
+
+    notificacion_service.crear_notificacion_candidato(
+        db, actualizada.usuario_id, tipo="estado_cambiado",
+        titulo="Actualización de tu postulación",
+        mensaje=f'Tu postulación a "{cargo}" (radicado {radicado}) cambió a "{datos.estado}".',
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    if correo:
+        email_service.enviar_correo_cambio_estado(correo, nombre, cargo, radicado, datos.estado)
+
     return actualizada
 
 
