@@ -1,4 +1,4 @@
-# Solicitud de Inscripción a Proceso de Selección — Aguas Nacionales EPM
+# Solicitud de Inscripción a Proceso de Selección
 
 Frontend en **React + Vite**, conectado a 3 microservicios backend (FastAPI):
 **Login**, **Vacantes** y **Candidatos**. Ver el repositorio `recruitment-platform`
