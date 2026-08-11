@@ -26,6 +26,24 @@ function calcularFuerza(password) {
   return { score, label: password.length ? etiquetas[idx] : "", nivel: niveles[idx] };
 }
 
+const CRITERIOS_PASSWORD = [
+  { label: "Mínimo 8 caracteres", test: (p) => p.length >= 8 },
+  { label: "Una mayúscula", test: (p) => /[A-Z]/.test(p) },
+  { label: "Una minúscula", test: (p) => /[a-z]/.test(p) },
+  { label: "Un número", test: (p) => /[0-9]/.test(p) },
+  { label: "Un carácter especial", test: (p) => /[^A-Za-z0-9]/.test(p) },
+];
+
+// Padding usado para igualar la altura con los inputs normales del formulario
+// (Nombre completo, Correo electrónico). Ajusta este valor si tu CSS base usa otro.
+const PASSWORD_INPUT_STYLE = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 44px 10px 14px",
+  fontSize: "14px",
+  lineHeight: "1.4",
+};
+
 function IconPersona() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -92,11 +110,27 @@ function IconPapelera() {
   );
 }
 
+function IconCheckMini() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function IconCirculoVacio() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  );
+}
+
 function CampoPassword({ id, label, value, onChange, visible, onToggle, autoComplete, minLength }) {
   return (
     <div className="field" style={{ marginBottom: 14 }}>
       <label htmlFor={id}>{label}</label>
-      <div className="password-input">
+      <div className="password-input" style={{ width: "100%", boxSizing: "border-box", position: "relative" }}>
         <input
           id={id}
           type={visible ? "text" : "password"}
@@ -105,6 +139,7 @@ function CampoPassword({ id, label, value, onChange, visible, onToggle, autoComp
           autoComplete={autoComplete}
           value={value}
           onChange={onChange}
+          style={PASSWORD_INPUT_STYLE}
         />
         <button
           type="button"
@@ -159,6 +194,7 @@ export default function PerfilPage() {
   const [guardandoPassword, setGuardandoPassword] = useState(false);
 
   const fuerza = calcularFuerza(passwordNueva);
+  const criteriosCumplidos = CRITERIOS_PASSWORD.map((c) => c.test(passwordNueva));
 
   async function onCambiarPassword(e) {
     e.preventDefault();
@@ -313,7 +349,7 @@ export default function PerfilPage() {
 
             <div className="field" style={{ marginBottom: passwordNueva ? 4 : 14 }}>
               <label htmlFor="passwordNueva">Nueva contraseña</label>
-              <div className="password-input">
+              <div className="password-input" style={{ width: "100%", boxSizing: "border-box", position: "relative" }}>
                 <input
                   id="passwordNueva"
                   type={verNueva ? "text" : "password"}
@@ -322,6 +358,7 @@ export default function PerfilPage() {
                   autoComplete="new-password"
                   value={passwordNueva}
                   onChange={(e) => setPasswordNueva(e.target.value)}
+                  style={PASSWORD_INPUT_STYLE}
                 />
                 <button
                   type="button"
@@ -348,10 +385,33 @@ export default function PerfilPage() {
               </div>
             )}
 
-            <p className="hint" style={{ display: "flex", gap: 6, alignItems: "flex-start", margin: "10px 0 20px" }}>
-              <span style={{ flexShrink: 0, marginTop: 2 }}><IconCandado /></span>
-              Mínimo 8 caracteres, con al menos una mayúscula, una minúscula, un número y un carácter especial.
-            </p>
+            {passwordNueva && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  columnGap: 20,
+                  rowGap: 6,
+                  margin: "10px 0 20px",
+                }}
+              >
+                {CRITERIOS_PASSWORD.map((c, i) => (
+                  <div
+                    key={c.label}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 13,
+                      color: criteriosCumplidos[i] ? "var(--color-primary)" : "var(--color-text-muted)",
+                    }}
+                  >
+                    {criteriosCumplidos[i] ? <IconCheckMini /> : <IconCirculoVacio />}
+                    {c.label}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <CampoPassword
               id="passwordConfirmar"

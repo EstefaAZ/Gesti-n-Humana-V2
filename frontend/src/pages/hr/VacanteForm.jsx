@@ -167,7 +167,7 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
         </div>
 
         <div className="field">
-          <label>Certificaciones requeridas (palabra clave) — hasta {MAX_CERTIFICACIONES}, opcional</label>
+          <label>Certificaciones requeridas (palabra clave) hasta {MAX_CERTIFICACIONES}, opcional</label>
           {certificaciones.length === 0 && (
             <p className="text-muted" style={{ fontSize: 12.5, margin: "4px 0" }}>Ninguna certificación requerida todavía.</p>
           )}

@@ -216,7 +216,6 @@ export default function VacanteDetallePage() {
             {miPostulacion ? (
               <div className="notice notice--info" style={{ margin: 0 }}>
                 Ya te inscribiste a esta vacante (radicado <strong>{miPostulacion.radicado}</strong>).{" "}
-                <Link to="/mis-postulaciones">Ver mis postulaciones →</Link>
               </div>
             ) : vacante.estaCerrada ? (
               <div className="notice notice--danger" style={{ margin: 0 }}>

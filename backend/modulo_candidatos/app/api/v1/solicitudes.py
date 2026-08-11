@@ -207,6 +207,35 @@ def cambiar_estado(
     return actualizada
 
 
+@router.patch("/{radicado}/retirar", response_model=SolicitudOut)
+def retirar_mi_postulacion(
+    radicado: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """El candidato se retira de un proceso — se conserva todo, solo cambia el estado a "Retirada"."""
+    try:
+        actualizada = solicitud_service.retirar_solicitud_propia(db, radicado, usuario.id)
+    except solicitud_service.SolicitudNoEncontradaError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except solicitud_service.PermisoDenegadoError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+    auditoria_service.registrar_evento(
+        db, tipo="solicitud_retirada",
+        descripcion=f"{usuario.nombre or usuario.id} se retiró de la postulación {radicado}.",
+        actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    notificacion_service.crear_notificacion_gestion(
+        db, tipo="postulacion_retirada",
+        titulo="Un candidato se retiró de un proceso",
+        mensaje=f'{usuario.nombre or "Un candidato"} se retiró de la postulación {radicado} ("{actualizada.vacante_cargo or "vacante"}").',
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    return actualizada
+
+
 @router.get("/{radicado}/pdf")
 def descargar_pdf(
     radicado: str,

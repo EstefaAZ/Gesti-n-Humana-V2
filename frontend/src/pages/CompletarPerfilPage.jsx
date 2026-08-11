@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
 import FolioNav from "../components/FolioNav";
@@ -46,6 +46,8 @@ export default function CompletarPerfilPage() {
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState("");
   const [cargando, setCargando] = useState(true);
+  const [guardandoBorrador, setGuardandoBorrador] = useState(false);
+  const [ultimoGuardado, setUltimoGuardado] = useState(null);
 
   useEffect(() => {
     perfilesApi
@@ -54,6 +56,44 @@ export default function CompletarPerfilPage() {
       .catch(() => setState(initialSolicitudState()))
       .finally(() => setCargando(false));
   }, [token]);
+
+  // Guardado automático mientras el candidato avanza — así, si cierra el
+  // navegador, se ausenta o se le cierra la sesión a mitad de camino, retoma
+  // exactamente donde se quedó en vez de tener que llenar todo de nuevo.
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  async function guardarBorrador(estadoAGuardar) {
+    if (!estadoAGuardar) return;
+    setGuardandoBorrador(true);
+    try {
+      await perfilesApi.guardarBorrador(
+        {
+          datosPersonales: estadoAGuardar.datosPersonales,
+          registrosII: estadoAGuardar.registrosII,
+          experiencia: estadoAGuardar.experiencias,
+          conflicto: estadoAGuardar.conflicto,
+          autorizacion: estadoAGuardar.autorizacion,
+          documentosAdjuntos: estadoAGuardar.documentos,
+        },
+        token
+      );
+      setUltimoGuardado(new Date());
+    } catch {
+      // El autoguardado nunca debe interrumpir al candidato si falla — solo se reintenta en el siguiente paso.
+    } finally {
+      setGuardandoBorrador(false);
+    }
+  }
+
+  useEffect(() => {
+    if (cargando) return;
+    const intervalo = setInterval(() => guardarBorrador(stateRef.current), 30000);
+    return () => clearInterval(intervalo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargando]);
 
   const activeStep = STEPS[stepIndex];
   const doneSteps = useMemo(() => STEPS.slice(0, stepIndex), [stepIndex]);
@@ -157,11 +197,13 @@ export default function CompletarPerfilPage() {
       finalizarPerfil();
       return;
     }
+    guardarBorrador(state);
     setStepIndex((i) => i + 1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function onAtras() {
+    guardarBorrador(state);
     setStepIndex((i) => Math.max(0, i - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -201,9 +243,10 @@ export default function CompletarPerfilPage() {
       <main className="page">
         <div className="card">
           <div className="notice notice--info">
-            Este formulario se llena <strong>una sola vez</strong>. Cuando termines, podrás inscribirte a cualquier
-            vacante con un solo clic sin volver a llenarlo, solo adjuntando certificaciones extra si una vacante
-            en particular las requiere.
+            Este formulario se llena <strong>una sola vez</strong>. Tu progreso se guarda automáticamente mientras
+            avanzas — si te cierran, te tienes que ausentar o cierras el navegador, puedes volver más tarde y
+            retomar exactamente donde quedaste. Cuando termines, podrás inscribirte a cualquier vacante con un solo
+            clic sin volver a llenarlo, solo adjuntando certificaciones extra si una vacante en particular las requiere.
           </div>
           {errorEnvio && <div className="notice notice--danger">{errorEnvio}</div>}
 
@@ -237,6 +280,9 @@ export default function CompletarPerfilPage() {
             <button type="button" className="btn btn-secondary" onClick={onAtras} style={{ visibility: stepIndex === 0 ? "hidden" : "visible" }}>
               Atrás
             </button>
+            <span className="text-muted" style={{ fontSize: 12, alignSelf: "center" }}>
+              {guardandoBorrador ? "Guardando…" : ultimoGuardado ? `Guardado ${ultimoGuardado.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}` : ""}
+            </span>
             <button type="button" className="btn btn-primary" onClick={onSiguiente} disabled={enviando}>
               {enviando ? "Guardando…" : STEPS[stepIndex] === "VIII" ? "Guardar perfil" : "Siguiente"}
             </button>

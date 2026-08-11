@@ -374,3 +374,82 @@ def test_retirar_postulacion_genera_notificacion_para_gestion():
     r = client.get("/api/v1/notificaciones/me", headers=HEADERS_GESTOR)
     tipos = [n["tipo"] for n in r.json()]
     assert "postulacion_retirada" in tipos
+
+
+# ---------------------------------------------------------------
+# Borrador (guardado automático mientras avanza el wizard)
+# ---------------------------------------------------------------
+
+def test_guardar_borrador_vacio_no_falla():
+    r = client.put("/api/v1/perfiles/me/borrador", json={}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()["completado"] is False
+
+
+def test_borrador_guarda_datos_parciales_sin_exigir_nada():
+    r = client.put(
+        "/api/v1/perfiles/me/borrador",
+        json={"datos_personales": {"nombreCompleto": "Candidato Uno", "cedula": "123"}},
+        headers=HEADERS_CANDIDATO,
+    )
+    assert r.status_code == 200
+    assert r.json()["datos_personales"]["cedula"] == "123"
+    assert r.json()["completado"] is False
+
+
+def test_borrador_no_exige_documentos_ni_autorizacion():
+    r = client.put(
+        "/api/v1/perfiles/me/borrador",
+        json={"registros_ii": [{"tipo": "estudio", "nivelEducativo": "Universitario"}]},
+        headers=HEADERS_CANDIDATO,
+    )
+    assert r.status_code == 200
+
+
+def test_borrador_no_exige_que_el_nombre_de_autorizacion_coincida():
+    # A diferencia de guardar_perfil, el borrador NO valida el nombre — el
+    # candidato puede ir armando la Hoja I sin haber llegado a Autorización.
+    r = client.put(
+        "/api/v1/perfiles/me/borrador",
+        json={"autorizacion": {"nombreCompleto": "Cualquier Cosa Sin Validar"}},
+        headers=HEADERS_CANDIDATO,
+    )
+    assert r.status_code == 200
+
+
+def test_el_estado_del_perfil_sigue_incompleto_despues_de_un_borrador():
+    client.put("/api/v1/perfiles/me/borrador", json={"datos_personales": {"nombreCompleto": "X"}}, headers=HEADERS_CANDIDATO)
+    r = client.get("/api/v1/perfiles/me/estado", headers=HEADERS_CANDIDATO)
+    assert r.json() == {"existe": True, "completado": False}
+
+
+def test_borrador_se_puede_seguir_editando_y_retomar_donde_quedo():
+    client.put("/api/v1/perfiles/me/borrador", json={"datos_personales": {"nombreCompleto": "Ana"}}, headers=HEADERS_CANDIDATO)
+    client.put("/api/v1/perfiles/me/borrador", json={
+        "datos_personales": {"nombreCompleto": "Ana"},
+        "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Técnico"}],
+    }, headers=HEADERS_CANDIDATO)
+
+    r = client.get("/api/v1/perfiles/me", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()["datos_personales"]["nombreCompleto"] == "Ana"
+    assert len(r.json()["registros_ii"]) == 1
+
+
+def test_guardar_borrador_sobre_un_perfil_ya_completado_no_lo_desmarca():
+    # El candidato ya había terminado su perfil hace tiempo. Ahora vuelve a
+    # editarlo (ej. agregar una experiencia nueva) — mientras escribe, el
+    # guardado automático de fondo NO debe sacarlo del sitio.
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r_estado_antes = client.get("/api/v1/perfiles/me/estado", headers=HEADERS_CANDIDATO)
+    assert r_estado_antes.json()["completado"] is True
+
+    client.put("/api/v1/perfiles/me/borrador", json={"datos_personales": {"nombreCompleto": "Candidato Uno", "telefonoNuevo": "300"}}, headers=HEADERS_CANDIDATO)
+
+    r_estado_despues = client.get("/api/v1/perfiles/me/estado", headers=HEADERS_CANDIDATO)
+    assert r_estado_despues.json()["completado"] is True  # sigue completo, el borrador no lo tocó
+
+
+def test_borrador_requiere_rol_candidato():
+    r = client.put("/api/v1/perfiles/me/borrador", json={}, headers=HEADERS_GESTOR)
+    assert r.status_code == 403

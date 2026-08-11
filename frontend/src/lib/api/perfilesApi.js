@@ -67,6 +67,29 @@ export async function guardarPerfil(perfilCamel, token) {
   return _perfilACamel(data);
 }
 
+export async function guardarBorrador(perfilCamel, token) {
+  // Guardado automático mientras el candidato avanza — sin exigir nada
+  // completo, puede ir a medias en cualquier campo.
+  const body = {
+    datos_personales: perfilCamel.datosPersonales || {},
+    registros_ii: perfilCamel.registrosII || [],
+    experiencia: perfilCamel.experiencia || [],
+    conflicto: perfilCamel.conflicto || {},
+    documentos_adjuntos: {
+      cedula: _documentosASnake(perfilCamel.documentosAdjuntos?.cedula),
+      certificados_laborales: _documentosASnake(perfilCamel.documentosAdjuntos?.certificadosLaborales),
+      certificados_estudio: _documentosASnake(perfilCamel.documentosAdjuntos?.certificadosEstudio),
+      tarjeta_profesional: _documentosASnake(perfilCamel.documentosAdjuntos?.tarjetaProfesional),
+    },
+    autorizacion: {
+      acepta: perfilCamel.autorizacion?.acepta || false,
+      nombre_completo: perfilCamel.autorizacion?.nombreCompleto || "",
+    },
+  };
+  const data = await apiFetch(`${BASE}/me/borrador`, { method: "PUT", token, body });
+  return _perfilACamel(data);
+}
+
 async function _descargarArchivo(url, nombreArchivo, token) {
   const res = await apiFetch(url, { token, raw: true });
   const blob = await res.blob();
