@@ -23,6 +23,8 @@ def _solicitud_a_dict(solicitud) -> dict:
     return {
         "radicado": solicitud.radicado,
         "vacante_id": solicitud.vacante_id,
+        "vacante_cargo": solicitud.vacante_cargo,
+        "vacante_proceso_no": solicitud.vacante_proceso_no,
         "usuario_id": solicitud.usuario_id,
         "datos_personales": solicitud.datos_personales,
         "registros_ii": solicitud.registros_ii,

@@ -1,180 +1,73 @@
 # ==============================================================
 # modulo_candidatos / app/services/reporte_service.py
-# Genera el reporte GTH-FOR-03 (Base de Aspirantes) para una vacante,
-# partiendo de la plantilla real en app/resources/ — así se conservan
-# fórmulas, validaciones de listas desplegables y todo el formato
-# original, sin tener que recrearlo desde cero.
+# Genera el reporte GTH-FOR-04 (Resultados Cumplimiento de Requisitos) para
+# una vacante, partiendo de la plantilla real en app/resources/ — así se
+# conservan las 2 hojas, las celdas combinadas y todo el formato original,
+# sin recrearlo desde cero.
 #
-# LÍMITE CONOCIDO: nuestro formulario de inscripción no captura por
-# separado Apellidos/Nombres (solo el nombre completo junto), Género,
-# Teléfono de oficina, "N° de años aprobados" cuando no se graduó, ni
-# "Principales funciones" de cada experiencia (eso solo queda dentro del
-# PDF de certificado laboral adjunto, no como texto). Esas columnas del
-# reporte quedan en blanco a propósito — no es un error, es que el dato
-# nunca se le pidió al candidato.
+# Reemplaza al reporte GTH-FOR-03 que se usaba antes (decisión explícita:
+# GTH-FOR-04 es ahora el único reporte descargable por vacante).
 # ==============================================================
 
 import io
 import os
-from copy import copy
-from datetime import date
 
 import openpyxl
 
-RUTA_PLANTILLA = os.path.join(os.path.dirname(__file__), "..", "resources", "GTH-FOR-03_Base_Aspirantes.xlsx")
+RUTA_PLANTILLA = os.path.join(os.path.dirname(__file__), "..", "resources", "GTH-FOR-04_Resultados_Cumplimiento_de_Requisitos.xlsx")
 
-MAX_FILAS_ASPIRANTES = 62  # filas 7 a 68, ya vienen con fórmulas/validaciones en la plantilla
-MAX_FILAS_TRASPASO = 61    # filas 7 a 67 (la 68 es la fila de "TOTAL")
+# Hoja "Aspirantes": filas 13 a 58 (46 aspirantes máximo), ya con formato listo.
+FILA_INICIO_ASPIRANTES = 13
+MAX_FILAS_ASPIRANTES = 46
 
-ORDEN_NIVEL_EDUCATIVO = [
-    "Secundarios", "Técnico", "Tecnólogo", "Universitario",
-    "Postgrado", "Postgrado - Especialización", "Postgrado - Maestría", "Postgrado - Doctorado", "Otro",
-]
-
-
-def _si_no(valor) -> str:
-    if valor == "si":
-        return "SI"
-    if valor == "no":
-        return "NO"
-    return ""
+# Hoja "Resultados_reclutamiento": filas 16 a 29 (14 aspirantes máximo).
+FILA_INICIO_RECLUTAMIENTO = 16
+MAX_FILAS_RECLUTAMIENTO = 14
 
 
-def _fecha(valor):
-    """Convierte 'YYYY-MM-DD' o 'YYYY-MM' (string) a date real, para que Excel la trate como fecha de verdad."""
-    if not valor:
-        return None
-    try:
-        partes = str(valor).split("-")
-        if len(partes) == 3:
-            return date(int(partes[0]), int(partes[1]), int(partes[2]))
-        if len(partes) == 2:
-            return date(int(partes[0]), int(partes[1]), 1)
-    except (ValueError, TypeError):
-        return None
-    return None
+def _describir_estudios(criterios: dict) -> str:
+    nivel = criterios.get("nivel_educativo_min")
+    if not nivel:
+        return "Sin requisito específico configurado."
+    graduado = criterios.get("graduado_requerido", True)
+    texto = f"{nivel}" + (" (graduado)" if graduado else "")
+    kw = criterios.get("profesion_keyword")
+    if kw:
+        texto += f'. Profesión/título relacionado con "{kw}".'
+    return texto
 
 
-def _mejor_estudio(registros_ii: list) -> dict | None:
-    """El registro tipo=estudio de nivel más alto (para "Nivel educativo más alto")."""
-    estudios = [r for r in registros_ii if r.get("tipo") == "estudio"]
-    if not estudios:
-        return None
-
-    def _rango(r):
-        nivel = r.get("nivelEducativo") or ""
-        try:
-            return ORDEN_NIVEL_EDUCATIVO.index(nivel)
-        except ValueError:
-            return -1
-
-    return max(estudios, key=_rango)
+def _describir_experiencia(criterios: dict) -> str:
+    anios = criterios.get("experiencia_min_anios")
+    if not anios:
+        return "Sin requisito específico configurado."
+    return f"Mínimo {anios} año(s)."
 
 
-def _fila_aspirante(solicitud, vacante_info: dict) -> dict:
-    """Arma {columna: valor} para UNA fila de la hoja 'Aspirantes', a partir de una Solicitud."""
-    dp = solicitud.datos_personales or {}
-    registros = solicitud.registros_ii or []
-    experiencias = solicitud.experiencia or []
-    conflicto = solicitud.conflicto or {}
-    familiares = conflicto.get("familiares") or []
-
-    fila = {
-        "A": dp.get("cedula"),
-        "C": dp.get("nombreCompleto"),  # "B" (Apellidos) queda vacío — ver nota del módulo
-        "F": _fecha(dp.get("fechaNacimiento")),
-        "G": dp.get("ciudadNacimiento"),
-        "H": dp.get("deptoNacimiento"),
-        "I": dp.get("paisNacimiento"),
-        "J": dp.get("estadoCivil"),
-        "K": dp.get("numHijos"),
-        "L": _si_no(dp.get("licencia")),
-        "M": dp.get("licenciaClase"),
-        "N": _si_no(dp.get("tieneVehiculo")),
-        "O": dp.get("tarjetaProfesional"),
-        "P": dp.get("profesion"),
-        "Q": dp.get("direccion"),
-        "R": dp.get("municipio"),
-        "S": dp.get("deptoResidencia"),
-        "T": dp.get("telResidencia"),
-        "V": dp.get("celular"),
-        "W": dp.get("correo"),
-        "BQ": vacante_info.get("proceso_no"),
-        "BR": _fecha(str(solicitud.fecha_solicitud.date())) if solicitud.fecha_solicitud else None,
-    }
-
-    estudio = _mejor_estudio(registros)
-    if estudio:
-        fila.update({
-            "X": estudio.get("nivelEducativo"),
-            "Y": estudio.get("titulo"),
-            "Z": estudio.get("establecimiento"),
-            "AA": estudio.get("ciudad"),
-            "AB": _si_no(estudio.get("graduado")),
-            "AC": _fecha(estudio.get("terminacion")),
-        })
-
-    cursos_o_certs = [r for r in registros if r.get("tipo") in ("educacionTrabajo", "certificacion")][:2]
-    columnas_curso = [("AE", "AF", "AG"), ("AH", "AI", "AJ")]
-    for (col_nombre, col_horas, col_institucion), reg in zip(columnas_curso, cursos_o_certs):
-        if reg.get("tipo") == "educacionTrabajo":
-            fila[col_nombre] = reg.get("nombreEvento")
-            fila[col_horas] = reg.get("numHoras")
-            fila[col_institucion] = reg.get("establecimiento")
-        else:  # certificacion
-            fila[col_nombre] = reg.get("nombreNorma")
-            fila[col_institucion] = reg.get("enteCertificador")
-
-    idiomas = [r for r in registros if r.get("tipo") == "idioma"]
-    if idiomas:
-        idioma = idiomas[0]
-        fila.update({"AK": idioma.get("idioma"), "AL": idioma.get("habla"), "AM": idioma.get("lee"), "AN": idioma.get("escribe")})
-
-    columnas_experiencia = [
-        ("AO", "AP", "AQ", "AR", "AS", "AU"),
-        ("AW", "AX", "AY", "AZ", "BA", "BC"),
-        ("BE", "BF", "BG", "BH", "BI", "BK"),
-    ]
-    for (c_empresa, c_cargo, c_tipo, c_inicio, c_fin, c_dedicacion), exp in zip(columnas_experiencia, experiencias[:3]):
-        fecha_fin = exp.get("fechaTerminacion")
-        if exp.get("actual") and not fecha_fin:
-            fecha_fin = date.today().isoformat()  # para que la fórmula de "tiempo laborado" calcule algo real
-        fila.update({
-            c_empresa: exp.get("empresa"),
-            c_cargo: exp.get("cargo"),
-            c_tipo: exp.get("tipoEmpresa"),
-            c_inicio: _fecha(exp.get("fechaInicio")),
-            c_fin: _fecha(fecha_fin),
-            c_dedicacion: exp.get("dedicacion"),
-        })
-
-    fila["BM"] = _si_no(conflicto.get("tieneVinculo"))
-    if familiares:
-        f = familiares[0]
-        fila.update({"BN": f.get("parentesco"), "BO": f.get("nombreEmpleado"), "BP": f.get("cargo")})
-
-    return fila
+def _describir_conocimientos(criterios: dict) -> str:
+    partes = []
+    idioma = criterios.get("idioma_requerido")
+    if idioma:
+        partes.append(f'{idioma} — nivel mínimo {criterios.get("idioma_nivel_min", "")} ({criterios.get("idioma_habilidad", "habla")})')
+    certs = criterios.get("certificaciones_keywords") or []
+    if certs:
+        partes.append("Certificaciones/cursos relacionados con: " + ", ".join(certs))
+    return "; ".join(partes) if partes else "Sin requisito específico configurado."
 
 
-def _fila_traspaso(solicitud) -> dict:
-    """
-    Arma {columna: 'X'} para la hoja 'Traspaso_a_FOR-04', a partir de la
-    evaluación automática ya calculada (evaluar_postulacion). Solo se marca
-    una categoría cuando la vacante SÍ tenía ese criterio configurado — si
-    no, se deja en blanco para que Gestión Humana la revise a mano, tal
-    como diseñó la plantilla original. La columna "Decisión" (Admitido/
-    Rechazado) NUNCA se marca automáticamente — es una decisión humana.
-    """
+def _marcas_evaluacion(solicitud) -> dict:
+    """{columna: 'X'} a partir de evaluar_postulacion().detalle — solo se marca
+    cuando la vacante SÍ tenía ese criterio configurado."""
     detalle = ((getattr(solicitud, "evaluacion", None) or {}).get("detalle")) or {}
-    fila = {}
     mapa = {"estudios": ("C", "D"), "conocimientos": ("E", "F"), "experiencia": ("G", "H")}
+    marcas = {}
     for categoria, (col_si, col_no) in mapa.items():
         cumple = (detalle.get(categoria) or {}).get("cumple")
         if cumple is True:
-            fila[col_si] = "X"
+            marcas[col_si] = "X"
         elif cumple is False:
-            fila[col_no] = "X"
-    return fila
+            marcas[col_no] = "X"
+    return marcas
 
 
 def _escribir_fila(ws, fila_num: int, datos: dict):
@@ -186,42 +79,56 @@ def _escribir_fila(ws, fila_num: int, datos: dict):
 
 def generar_reporte_vacante(vacante_info: dict, solicitudes: list) -> bytes:
     """
-    vacante_info: {"proceso_no": str, "cargo": str}
-    solicitudes: lista de objetos Solicitud (modelo SQLAlchemy), en el orden que se quiera mostrar.
-    Devuelve los bytes del .xlsx listo para descargar.
+    vacante_info: dict con proceso_no, cargo, salario, fecha_apertura, fecha_cierre, criterios.
+    solicitudes: lista de objetos Solicitud (modelo SQLAlchemy).
+    Devuelve los bytes del .xlsx (GTH-FOR-04) listo para descargar.
     """
     wb = openpyxl.load_workbook(RUTA_PLANTILLA)
-    ws = wb["Aspirantes"]
-
-    proceso_no = vacante_info.get("proceso_no") or "—"
+    criterios = vacante_info.get("criterios") or {}
     cargo = vacante_info.get("cargo") or "—"
-    ws["A3"] = (
-        f"Proceso de Selección No.: {proceso_no}   |   Cargo: {cargo}   |   "
-        "Esta base reemplaza el diligenciamiento manual del formato GTH-FOR-03. "
-        "Cada fila corresponde a UN aspirante. No modifique encabezados ni el orden de las columnas."
-    )
+    proceso_no = vacante_info.get("proceso_no") or "—"
+    fecha_apertura = vacante_info.get("fecha_apertura") or "—"
+    fecha_cierre = vacante_info.get("fecha_cierre") or "—"
+    salario = vacante_info.get("salario") or "—"
+    desc_estudios = _describir_estudios(criterios)
+    desc_experiencia = _describir_experiencia(criterios)
+    desc_conocimientos = _describir_conocimientos(criterios)
 
-    # La fila 7 de la plantilla trae datos de EJEMPLO fijos (no fórmulas) —
-    # hay que borrarlos de verdad antes de escribir el primer aspirante real,
-    # si no, se mezclan con los datos nuevos (ej. el apellido de ejemplo queda
-    # pegado al nombre real). Las fórmulas (D7, AT7, BB7, BJ7) si se conservan.
-    estilo_normal = ws["A8"]._style
-    for col in range(1, 75):
-        celda = ws.cell(row=7, column=col)
-        es_formula = isinstance(celda.value, str) and celda.value.startswith("=")
-        if not es_formula:
-            celda.value = None
-        celda._style = copy(estilo_normal)
+    ws1 = wb["Aspirantes"]
+    # A1 en la plantilla original trae una fórmula rota (#VALUE!) — no es algo
+    # que este generador introduce, ya venía así en el archivo fuente. Se limpia
+    # para que el reporte no salga con ese error de fórmula.
+    ws1["A1"] = None
+    ws1["D4"] = cargo
+    ws1["D5"] = proceso_no
+    ws1["D6"] = fecha_apertura
+    ws1["D7"] = fecha_cierre
+    ws1["D8"] = desc_estudios
+    ws1["D9"] = desc_experiencia
+    ws1["D10"] = desc_conocimientos
 
-    solicitudes_a_mostrar = solicitudes[:MAX_FILAS_ASPIRANTES]
-    for i, solicitud in enumerate(solicitudes_a_mostrar):
-        fila_num = 7 + i
-        _escribir_fila(ws, fila_num, _fila_aspirante(solicitud, vacante_info))
+    for i, solicitud in enumerate(solicitudes[:MAX_FILAS_ASPIRANTES]):
+        fila_num = FILA_INICIO_ASPIRANTES + i
+        dp = solicitud.datos_personales or {}
+        fila = {"A": dp.get("cedula"), "B": dp.get("nombreCompleto"), "L": dp.get("correo"), "M": dp.get("celular")}
+        fila.update(_marcas_evaluacion(solicitud))
+        _escribir_fila(ws1, fila_num, fila)
 
-    ws_traspaso = wb["Traspaso_a_FOR-04"]
-    for i, solicitud in enumerate(solicitudes_a_mostrar[:MAX_FILAS_TRASPASO]):
-        fila_num = 7 + i
-        _escribir_fila(ws_traspaso, fila_num, _fila_traspaso(solicitud))
+    ws2 = wb["Resultados_reclutamiento"]
+    ws2["D5"] = f"PROCESO DE SELECCIÓN Nº: {proceso_no}"
+    ws2["A6"] = f"CARGO: {cargo}"
+    ws2["A7"] = f"SALARIO BASICO: {salario}"
+    ws2["A8"] = f"FECHA APERTURA: {fecha_apertura}"
+    ws2["A9"] = f"FECHA CIERRE: {fecha_cierre}"
+    ws2["A10"] = f"ESTUDIOS: {desc_estudios}"
+    ws2["A11"] = f"EXPERIENCIA: {desc_experiencia}"
+
+    for i, solicitud in enumerate(solicitudes[:MAX_FILAS_RECLUTAMIENTO]):
+        fila_num = FILA_INICIO_RECLUTAMIENTO + i
+        dp = solicitud.datos_personales or {}
+        fila = {"A": dp.get("cedula"), "B": dp.get("nombreCompleto")}
+        fila.update(_marcas_evaluacion(solicitud))
+        _escribir_fila(ws2, fila_num, fila)
 
     buffer = io.BytesIO()
     wb.save(buffer)

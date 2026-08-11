@@ -96,6 +96,8 @@ def _guardar_solicitud(
     solicitud = Solicitud(
         radicado=_generar_radicado(),
         vacante_id=vacante_id,
+        vacante_cargo=vacante.get("cargo"),
+        vacante_proceso_no=vacante.get("proceso_no"),
         usuario_id=usuario_id,
         datos_personales=datos_personales,
         registros_ii=registros_ii,
@@ -258,6 +260,29 @@ def actualizar_estado(db: Session, radicado: str, nuevo_estado: str) -> Solicitu
     db.commit()
     db.refresh(solicitud)
     return solicitud
+
+
+class PermisoDenegadoError(Exception):
+    pass
+
+
+def retirar_solicitud_propia(db: Session, radicado: str, usuario_id: str) -> Solicitud:
+    """
+    El candidato se retira de un proceso de selección — a diferencia del
+    derecho de supresión (retencion_service.eliminar_solicitud_propia), esto
+    NO borra nada: conserva todos los datos, solo marca el estado como
+    "Retirada" para que Gestión Humana sepa que ya no sigue en el proceso
+    (por ejemplo, si más adelante se descarga el reporte de esa vacante,
+    esta persona sigue apareciendo, con su estado real).
+    """
+    solicitud = _obtener_o_falla(db, radicado)
+    if solicitud.usuario_id != usuario_id:
+        raise PermisoDenegadoError("Solo puedes retirar tus propias postulaciones.")
+    if solicitud.estado == "Aceptada":
+        raise PermisoDenegadoError("Esta postulación ya fue aceptada; contacta a Gestión Humana si necesitas retirarte.")
+    if solicitud.estado == "Retirada":
+        return solicitud  # ya estaba retirada, no hay nada que hacer
+    return actualizar_estado(db, radicado, "Retirada")
 
 
 def conteo_por_vacante(db: Session) -> dict[str, int]:

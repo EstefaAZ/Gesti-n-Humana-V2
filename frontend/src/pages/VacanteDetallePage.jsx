@@ -215,7 +215,8 @@ export default function VacanteDetallePage() {
           <div className="wizard-actions" style={{ justifyContent: "flex-end" }}>
             {miPostulacion ? (
               <div className="notice notice--info" style={{ margin: 0 }}>
-                Ya te inscribiste a esta vacante (tú radicado es: <strong>{miPostulacion.radicado}</strong>).{" "}
+                Ya te inscribiste a esta vacante (radicado <strong>{miPostulacion.radicado}</strong>).{" "}
+                <Link to="/mis-postulaciones">Ver mis postulaciones →</Link>
               </div>
             ) : vacante.estaCerrada ? (
               <div className="notice notice--danger" style={{ margin: 0 }}>
@@ -225,12 +226,8 @@ export default function VacanteDetallePage() {
               <div className="notice notice--info" style={{ margin: 0 }}>
                 Esta convocatoria abre el <strong>{vacante.fechaApertura}</strong>. Vuelve ese día para poder inscribirte.
               </div>
-            ) : usuario?.rol === "gestor_humano" || usuario?.rol === "admin" ? (
-              <div className="notice notice--info" style={{ margin: 0 }}>
-                Tu cuenta tiene rol de {usuario.rol === "admin" ? "Administrador" : "Gestión Humana"} — no puedes postularte a vacantes.
-                Administra esta convocatoria desde el panel de Gestión Humana.
-              </div>
-            ) : !mostrarConfirmacion ? (
+            ) : usuario?.rol === "gestor_humano" || usuario?.rol === "admin" ? null
+            : !mostrarConfirmacion ? (
               <button type="button" className="btn btn-primary" onClick={abrirConfirmacion}>Inscribirme</button>
             ) : null}
           </div>

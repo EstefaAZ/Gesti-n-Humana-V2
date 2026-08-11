@@ -29,11 +29,9 @@ const IconChevron = ({ open }) => (
 );
 
 function itemsPara(rol) {
-  const comunes = [{ to: "/", label: "Vacantes", icon: IconBriefcase }];
-
   if (rol === "candidato") {
     return [
-      ...comunes,
+      { to: "/", label: "Vacantes", icon: IconBriefcase },
       { to: "/mis-postulaciones", label: "Mis postulaciones", icon: IconFolder },
       { to: "/perfil", label: "Mi perfil", icon: IconUser },
       { to: "/documentos", label: "Documentos", icon: IconFolder },
@@ -44,11 +42,7 @@ function itemsPara(rol) {
 
   // gestor_humano y admin comparten la base operativa
   const base = [
-    ...comunes,
-    { to: "/gestion-humana", label: "Gestión Humana", icon: IconUsers },
-    { to: "/candidatos", label: "Candidatos", icon: IconUsers },
-    { label: "Entrevistas", icon: IconCalendar, proximamente: true },
-    { label: "Comunicación", icon: IconChat, proximamente: true },
+    { to: "/gestion-humana", label: "Procesos de Selección", icon: IconUsers },
     { to: "/reportes", label: "Reportes", icon: IconChart },
   ];
 

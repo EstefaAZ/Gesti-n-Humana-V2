@@ -4,6 +4,21 @@ import { useAuth } from "../../context/AuthContext";
 import * as vacantesApi from "../../lib/api/vacantesApi";
 import * as solicitudesApi from "../../lib/api/solicitudesApi";
 
+const ETIQUETA_ESTADO = {
+  borrador: "Borrador",
+  publicada: "Publicada",
+  en_proceso: "En proceso",
+  cerrada: "Cerrada",
+  cancelada_desierta: "Cancelada/Desierta",
+};
+const CLASE_ESTADO = {
+  borrador: "vac-status-pill--oculta",
+  publicada: "vac-status-pill--activa",
+  en_proceso: "vac-status-pill--en-proceso",
+  cerrada: "vac-status-pill--cerrada",
+  cancelada_desierta: "vac-status-pill--cancelada",
+};
+
 export default function ReportesPage() {
   const { token } = useAuth();
   const [vacantes, setVacantes] = useState(null);
@@ -24,7 +39,7 @@ export default function ReportesPage() {
   async function descargar(v) {
     setDescargandoId(v.id);
     try {
-      await solicitudesApi.descargarReporte(v.id, `GTH-FOR-03_${v.procesoNo}.xlsx`, token);
+      await solicitudesApi.descargarReporte(v.id, `GTH-FOR-04_${v.procesoNo}.xlsx`, token);
     } catch {
       alert("No se pudo descargar el reporte. Intenta de nuevo.");
     } finally {
@@ -69,7 +84,7 @@ export default function ReportesPage() {
                       <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>{v.procesoNo}</span>
                       <br />{v.cargo}
                     </td>
-                    <td>{v.estado}</td>
+                    <td><span className={`vac-status-pill ${CLASE_ESTADO[v.estado] || ""}`}>{ETIQUETA_ESTADO[v.estado] || v.estado}</span></td>
                     <td style={{ textAlign: "center", fontWeight: 700 }}>{conteo[v.id] || 0}</td>
                     <td>
                       <button
@@ -79,7 +94,7 @@ export default function ReportesPage() {
                         onClick={() => descargar(v)}
                         title={!(conteo[v.id] > 0) ? "Todavía no hay postulaciones para esta vacante" : ""}
                       >
-                        {descargandoId === v.id ? "Descargando…" : "📊 Descargar reporte"}
+                        {descargandoId === v.id ? "Descargando…" : "Descargar reporte"}
                       </button>
                     </td>
                   </tr>

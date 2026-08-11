@@ -1,46 +1,29 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
-import EvaluacionBadge from "../components/EvaluacionBadge";
 import EstadoPostulacionBadge from "../components/EstadoPostulacionBadge";
 import { useAuth } from "../context/AuthContext";
 import * as solicitudesApi from "../lib/api/solicitudesApi";
-import * as vacantesApi from "../lib/api/vacantesApi";
 
 export default function MisPostulacionesPage() {
   const { token } = useAuth();
   const [postulaciones, setPostulaciones] = useState(null);
-  const [vacantesPorId, setVacantesPorId] = useState({});
   const [error, setError] = useState("");
 
   useEffect(() => {
-    (async () => {
-      try {
-        const lista = await solicitudesApi.misSolicitudes(token);
-        setPostulaciones(lista);
-        const entradas = await Promise.all(
-          lista.map(async (p) => {
-            try {
-              return [p.vacanteId, await vacantesApi.obtenerPublica(p.vacanteId)];
-            } catch {
-              return [p.vacanteId, null];
-            }
-          })
-        );
-        setVacantesPorId(Object.fromEntries(entradas));
-      } catch {
-        setError("No se pudieron cargar tus postulaciones.");
-      }
-    })();
+    solicitudesApi
+      .misSolicitudes(token)
+      .then(setPostulaciones)
+      .catch(() => setError("No se pudieron cargar tus postulaciones."));
   }, [token]);
 
-  async function eliminarPostulacion(radicado) {
-    if (!window.confirm("¿Eliminar por completo esta postulación? Esta acción no se puede deshacer.")) return;
+  async function retirarPostulacion(radicado) {
+    if (!window.confirm("¿Retirarte de este proceso de selección? Tus datos se conservan, solo queda marcado que ya no sigues en el proceso.")) return;
     try {
-      await solicitudesApi.eliminar(radicado, token);
-      setPostulaciones((prev) => prev.filter((p) => p.radicado !== radicado));
-    } catch {
-      alert("No se pudo eliminar la postulación. Si ya fue aceptada, contacta a Gestión Humana.");
+      const actualizada = await solicitudesApi.retirar(radicado, token);
+      setPostulaciones((prev) => prev.map((p) => (p.radicado === radicado ? actualizada : p)));
+    } catch (e) {
+      alert(e.detail || "No se pudo retirar la postulación.");
     }
   }
 
@@ -60,23 +43,26 @@ export default function MisPostulacionesPage() {
           {postulaciones && postulaciones.length > 0 && (
             <table className="plain-table">
               <thead>
-                <tr><th>Vacante</th><th>Radicado</th><th>Estado</th><th>Evaluación</th><th></th></tr>
+                <tr><th>Vacante</th><th>Radicado</th><th>Estado</th><th></th></tr>
               </thead>
               <tbody>
                 {postulaciones.map((p) => (
                   <tr key={p.radicado}>
-                    <td>{vacantesPorId[p.vacanteId]?.cargo || p.vacanteId}</td>
+                    <td>{p.vacanteCargo || p.vacanteId}</td>
                     <td className="mono" style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{p.radicado}</td>
                     <td><EstadoPostulacionBadge estado={p.estado} /></td>
-                    <td><EvaluacionBadge evaluacion={p.evaluacion} mostrarMotivos={false} /></td>
                     <td>
                       <button className="hr-link-btn" onClick={() => solicitudesApi.descargarPdf(p.radicado, token)}>
                         Descargar PDF
                       </button>
-                      {" · "}
-                      <button className="hr-link-btn hr-link-btn--danger" onClick={() => eliminarPostulacion(p.radicado)}>
-                        Eliminar
-                      </button>
+                      {p.estado !== "Retirada" && p.estado !== "Aceptada" && (
+                        <>
+                          {" · "}
+                          <button className="hr-link-btn hr-link-btn--danger" onClick={() => retirarPostulacion(p.radicado)}>
+                            Retirar postulación
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

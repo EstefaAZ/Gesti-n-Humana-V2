@@ -105,6 +105,27 @@ def test_inscribirme_con_perfil_completado_funciona():
     assert r.json()["documentos_adjuntos"]["cedula"][0]["nombre"] == "cedula.pdf"
 
 
+def test_inscribirme_guarda_el_nombre_de_la_vacante_en_la_solicitud():
+    # VACANTE_ABIERTA (mock) tiene cargo="Analista de Gestión Humana"
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r.json()["vacante_cargo"] == "Analista de Gestión Humana"
+
+
+def test_el_nombre_de_la_vacante_sigue_disponible_aunque_la_vacante_cambie_de_estado(monkeypatch):
+    from app.clients import vacantes_client as vc
+
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+
+    # Simula que la vacante ya no es visible para candidatos (pasó a "en_proceso").
+    monkeypatch.setattr(vc, "obtener_vacante", lambda vacante_id, token=None: None)
+
+    r = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()[0]["vacante_cargo"] == "Analista de Gestión Humana"  # sigue viéndose, sin depender de Vacantes
+
+
 def test_inscribirme_no_dejar_postularse_dos_veces_a_la_misma_vacante():
     client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
     client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
@@ -299,3 +320,57 @@ def test_candidato_no_puede_descargar_documentos_de_otro_por_admin():
     client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
     r = client.get("/api/v1/perfiles/admin/candidato-1/documentos/cedula/0", headers=HEADERS_CANDIDATO)
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------
+# Retirar postulación (no borra nada, solo cambia el estado)
+# ---------------------------------------------------------------
+
+def test_retirar_postulacion_no_borra_nada_solo_cambia_el_estado():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r_crear = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    radicado = r_crear.json()["radicado"]
+
+    r = client.patch(f"/api/v1/solicitudes/{radicado}/retirar", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()["estado"] == "Retirada"
+    assert r.json()["datos_personales"]["nombreCompleto"] == "Candidato Uno"
+
+    r_get = client.get(f"/api/v1/solicitudes/{radicado}", headers=HEADERS_GESTOR)
+    assert r_get.status_code == 200
+    assert r_get.json()["estado"] == "Retirada"
+
+
+def test_no_se_puede_retirar_la_postulacion_de_otro_candidato():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r_crear = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    radicado = r_crear.json()["radicado"]
+
+    r = client.patch(f"/api/v1/solicitudes/{radicado}/retirar", headers=HEADERS_OTRO_CANDIDATO)
+    assert r.status_code == 403
+
+
+def test_no_se_puede_retirar_una_postulacion_ya_aceptada():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r_crear = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    radicado = r_crear.json()["radicado"]
+    client.patch(f"/api/v1/solicitudes/{radicado}/estado", json={"estado": "Aceptada"}, headers=HEADERS_GESTOR)
+
+    r = client.patch(f"/api/v1/solicitudes/{radicado}/retirar", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 403
+
+
+def test_retirar_postulacion_inexistente_da_404():
+    r = client.patch("/api/v1/solicitudes/SOL-NOEXISTE/retirar", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 404
+
+
+def test_retirar_postulacion_genera_notificacion_para_gestion():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r_crear = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    radicado = r_crear.json()["radicado"]
+    client.patch(f"/api/v1/solicitudes/{radicado}/retirar", headers=HEADERS_CANDIDATO)
+
+    r = client.get("/api/v1/notificaciones/me", headers=HEADERS_GESTOR)
+    tipos = [n["tipo"] for n in r.json()]
+    assert "postulacion_retirada" in tipos

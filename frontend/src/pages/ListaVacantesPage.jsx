@@ -80,7 +80,7 @@ export default function ListaVacantesPage() {
                   <div className="vac-card__cargo">{v.cargo}</div>
                   {v.descripcion && <p className="text-muted" style={{ fontSize: 13, margin: "4px 0 0" }}>{v.descripcion}</p>}
                   <div className="vac-card__meta">
-                    <span><b>Sede:</b> {v.sede || "—"}</span>
+                    
                     <span><b>Plazas:</b> {v.plazas || "—"}</span>
                     <span><b>Cierra:</b> {v.fechaCierre || "—"} {v.horaCierre || ""}</span>
                   </div>
@@ -108,9 +108,7 @@ export default function ListaVacantesPage() {
           </div>
         )}
 
-        <p className="text-center mt-24">
-          <Link to="/mis-postulaciones" className="text-muted">Mis postulaciones</Link>
-        </p>
+        
       </main>
     </>
   );

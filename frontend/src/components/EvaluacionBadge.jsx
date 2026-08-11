@@ -5,7 +5,7 @@ export default function EvaluacionBadge({ evaluacion, mostrarMotivos = true }) {
   return (
     <div>
       <span className={`eval-badge ${cumple ? "eval-badge--ok" : "eval-badge--warn"}`}>
-        {cumple ? "✓ Cumple criterios" : `⚠ No cumple (${motivos.length})`}
+        {cumple ? "Cumple criterios" : `No cumple (${motivos.length})`}
       </span>
       {mostrarMotivos && !cumple && motivos.length > 0 && (
         <ul className="eval-motivos">

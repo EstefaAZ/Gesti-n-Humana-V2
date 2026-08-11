@@ -5,6 +5,7 @@ const CLASE_POR_ESTADO = {
   "Entrevista programada": "estado-badge--entrevista",
   "Rechazada": "estado-badge--rechazada",
   "Aceptada": "estado-badge--aceptada",
+  "Retirada": "estado-badge--retirada",
 };
 
 export default function EstadoPostulacionBadge({ estado }) {

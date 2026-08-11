@@ -202,7 +202,7 @@ export default function CompletarPerfilPage() {
         <div className="card">
           <div className="notice notice--info">
             Este formulario se llena <strong>una sola vez</strong>. Cuando termines, podrás inscribirte a cualquier
-            vacante con un solo clic — sin volver a llenarlo, solo adjuntando certificaciones extra si una vacante
+            vacante con un solo clic sin volver a llenarlo, solo adjuntando certificaciones extra si una vacante
             en particular las requiere.
           </div>
           {errorEnvio && <div className="notice notice--danger">{errorEnvio}</div>}

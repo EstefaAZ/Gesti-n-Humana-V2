@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import VacanteForm from "./VacanteForm";
+import VacanteDetalleGestion from "./VacanteDetalleGestion";
 import AccionesMenu from "../../components/AccionesMenu";
 import { useAuth } from "../../context/AuthContext";
 import * as vacantesApi from "../../lib/api/vacantesApi";
@@ -27,8 +28,9 @@ export default function VacantesTab() {
   const { token } = useAuth();
   const [vacantes, setVacantes] = useState([]);
   const [conteo, setConteo] = useState({});
-  const [modo, setModo] = useState("lista"); // 'lista' | 'form'
+  const [modo, setModo] = useState("lista"); // 'lista' | 'form' | 'detalle'
   const [vacanteEnEdicion, setVacanteEnEdicion] = useState(null);
+  const [vacanteDetalleId, setVacanteDetalleId] = useState(null);
   const [enlaceCopiadoId, setEnlaceCopiadoId] = useState(null);
   const [editandoEstadoId, setEditandoEstadoId] = useState(null);
   const [error, setError] = useState("");
@@ -63,6 +65,11 @@ export default function VacantesTab() {
     setModo("form");
   }
 
+  function verDetalles(v) {
+    setVacanteDetalleId(v.id);
+    setModo("detalle");
+  }
+
   async function guardar(v, pdfFile) {
     let guardada;
     if (v._editando) {
@@ -78,7 +85,7 @@ export default function VacantesTab() {
       }
     }
     await recargar();
-    setModo("lista");
+    setModo(vacanteDetalleId ? "detalle" : "lista");
   }
 
   async function cambiarEstado(v, nuevoEstado) {
@@ -90,6 +97,10 @@ export default function VacantesTab() {
   async function eliminar(id) {
     if (!window.confirm("¿Eliminar esta vacante? Las postulaciones ya recibidas se conservan.")) return;
     await vacantesApi.eliminar(id, token);
+    if (vacanteDetalleId === id) {
+      setVacanteDetalleId(null);
+      setModo("lista");
+    }
     await recargar();
   }
 
@@ -104,8 +115,42 @@ export default function VacantesTab() {
     setTimeout(() => setEnlaceCopiadoId(null), 2000);
   }
 
+  async function descargarReporte(v) {
+    try {
+      await solicitudesApi.descargarReporte(v.id, `GTH-FOR-04_${v.procesoNo}.xlsx`, token);
+    } catch {
+      alert("No se pudo descargar el reporte. Intenta de nuevo.");
+    }
+  }
+
   if (modo === "form") {
-    return <VacanteForm vacanteInicial={vacanteEnEdicion} onGuardar={guardar} onCancelar={() => setModo("lista")} />;
+    return (
+      <VacanteForm
+        vacanteInicial={vacanteEnEdicion}
+        onGuardar={guardar}
+        onCancelar={() => setModo(vacanteDetalleId ? "detalle" : "lista")}
+      />
+    );
+  }
+
+  if (modo === "detalle") {
+    const vacante = vacantes.find((v) => v.id === vacanteDetalleId);
+    if (!vacante) {
+      return <div className="empty-state">No se encontró la vacante.</div>;
+    }
+    return (
+      <VacanteDetalleGestion
+        vacante={vacante}
+        conteo={conteo}
+        onVolver={() => { setVacanteDetalleId(null); setModo("lista"); }}
+        onCambiarEstado={cambiarEstado}
+        onEditar={editar}
+        onCopiarEnlace={copiarEnlace}
+        onDescargarReporte={descargarReporte}
+        onEliminar={eliminar}
+        enlaceCopiado={enlaceCopiadoId}
+      />
+    );
   }
 
   const conteosPorEstado = ESTADOS.reduce((acc, e) => {
@@ -144,10 +189,10 @@ export default function VacantesTab() {
         <div className="hr-table-actions" style={{ marginBottom: 16 }}>
           <input
             type="text"
-            placeholder="Buscar vacante…"
+            placeholder="Buscar por cargo o Proceso de Selección No.…"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            style={{ maxWidth: 280 }}
+            style={{ maxWidth: 320 }}
           />
           {filtroEstado !== "todas" && (
             <button type="button" className="hr-link-btn" onClick={() => setFiltroEstado("todas")}>
@@ -170,9 +215,13 @@ export default function VacantesTab() {
                 <tr key={v.id}>
                   <td>
                     <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>{v.procesoNo}</span>
-                    <br />{v.cargo}
+                    <br />
+                    <button type="button" className="hr-link-btn" style={{ fontSize: 14, fontWeight: 600, padding: 0 }} onClick={() => verDetalles(v)}>
+                      {v.cargo}
+                    </button>
                     {v.tieneDocumentoPdf && <span title="Tiene PDF adjunto" style={{ marginLeft: 6, fontSize: 12 }}>📄</span>}
                   </td>
+                  
                   <td>{v.fechaCierre || "—"} {v.horaCierre || ""}</td>
                   <td style={{ textAlign: "center", fontWeight: 700 }}>{conteo[v.id] || 0}</td>
                   <td>{v.fechaCreacion ? new Date(v.fechaCreacion).toLocaleDateString("es-CO") : "—"}</td>
@@ -196,6 +245,7 @@ export default function VacantesTab() {
                   <td>
                     <AccionesMenu
                       acciones={[
+                        { etiqueta: "Ver detalles", onClick: () => verDetalles(v) },
                         { etiqueta: "Cambiar estado", onClick: () => setEditandoEstadoId(v.id) },
                         { etiqueta: "Editar", onClick: () => editar(v) },
                         { etiqueta: enlaceCopiadoId === v.id ? "¡Copiado!" : "Copiar enlace", onClick: () => copiarEnlace(v) },

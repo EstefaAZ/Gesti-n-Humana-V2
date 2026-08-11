@@ -23,6 +23,8 @@ function _solicitudACamel(s) {
   return {
     radicado: s.radicado,
     vacanteId: s.vacante_id,
+    vacanteCargo: s.vacante_cargo,
+    vacanteProcesoNo: s.vacante_proceso_no,
     usuarioId: s.usuario_id,
     datosPersonales: s.datos_personales,
     registrosII: s.registros_ii,
@@ -106,6 +108,11 @@ export async function cambiarEstado(radicado, estado, token) {
 
 export async function eliminar(radicado, token) {
   await apiFetch(`${BASE}/${radicado}`, { method: "DELETE", token });
+}
+
+export async function retirar(radicado, token) {
+  const data = await apiFetch(`${BASE}/${radicado}/retirar`, { method: "PATCH", token });
+  return _solicitudACamel(data);
 }
 
 export async function descargarPdf(radicado, token) {

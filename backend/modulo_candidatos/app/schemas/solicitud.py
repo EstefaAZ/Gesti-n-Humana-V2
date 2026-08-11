@@ -131,6 +131,8 @@ class CambiarEstado(BaseModel):
 class SolicitudOut(BaseModel):
     radicado: str
     vacante_id: str
+    vacante_cargo: Optional[str] = None
+    vacante_proceso_no: Optional[str] = None
     usuario_id: str
     datos_personales: dict[str, Any]
     registros_ii: list[dict[str, Any]]

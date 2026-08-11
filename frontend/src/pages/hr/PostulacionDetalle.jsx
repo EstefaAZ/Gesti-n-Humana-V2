@@ -50,7 +50,7 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
         </div>
       </div>
 
-      <p className="text-muted">Radicado: <strong>{solicitud.radicado}</strong> · Cédula: {dp.cedula} · Correo: {dp.correo} · Celular: {dp.celular}</p>
+      <p className="text-muted">Radicado: <strong>{solicitud.radicado}</strong></p>
 
       <EvaluacionBadge evaluacion={solicitud.evaluacion} />
 
@@ -72,8 +72,12 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
 
       <h3 className="section-title" style={{ fontSize: 14, marginTop: 20 }}>Datos personales</h3>
       <p style={{ fontSize: 13 }}>
+        Cédula: {dp.cedula}<br />
+        Correo: {dp.correo}<br />
+        Celular: {dp.celular}<br />
         Residencia: {dp.direccion}, {dp.municipio}, {dp.deptoResidencia}<br />
-        Profesión: {dp.profesion || "—"} · Estado civil: {dp.estadoCivil}
+        Profesión: {dp.profesion || "—"}<br />
+        Estado civil: {dp.estadoCivil}
       </p>
 
       <h3 className="section-title" style={{ fontSize: 14 }}>Estudios, cursos, certificaciones e idiomas</h3>
@@ -123,7 +127,7 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
       <h3 className="section-title" style={{ fontSize: 14 }}>Autorización</h3>
       {solicitud.autorizacion?.acepta ? (
         <p style={{ fontSize: 13 }}>
-          ✓ Autorización de tratamiento de datos <strong>concedida</strong> por {solicitud.autorizacion?.nombreCompleto || "el candidato"}
+          Autorización de tratamiento de datos <strong>concedida</strong> por {solicitud.autorizacion?.nombreCompleto || "el candidato"}
           {" — "}{new Date(solicitud.fechaSolicitud).toLocaleString("es-CO")}
         </p>
       ) : (

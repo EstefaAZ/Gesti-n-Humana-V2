@@ -277,6 +277,7 @@ table.plain-table td { padding: 4px 8px 4px 0; vertical-align: top; }
 .estado-badge--entrevista { background: #F0E6FA; color: #6B3FA0; }
 .estado-badge--rechazada { background: var(--color-danger-tint); color: var(--color-danger); }
 .estado-badge--aceptada { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.estado-badge--retirada { background: var(--color-surface-sunken); color: var(--color-text-muted); }
 
 .eval-motivos { font-size: 11.5px; color: var(--color-text-muted); margin: 6px 0 0; padding-left: 16px; }
 .eval-motivos li { margin-bottom: 2px; }

@@ -4,14 +4,12 @@ import DocHeader from "../components/DocHeader";
 import { useAuth } from "../context/AuthContext";
 import * as perfilesApi from "../lib/api/perfilesApi";
 import * as solicitudesApi from "../lib/api/solicitudesApi";
-import * as vacantesApi from "../lib/api/vacantesApi";
 import { CATEGORIAS_DOCUMENTOS } from "../lib/api/solicitudesApi";
 
 export default function DocumentosPage() {
   const { token } = useAuth();
   const [perfil, setPerfil] = useState(undefined); // undefined = cargando, null = sin perfil
   const [postulaciones, setPostulaciones] = useState([]);
-  const [vacantesPorId, setVacantesPorId] = useState({});
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -19,19 +17,7 @@ export default function DocumentosPage() {
 
     solicitudesApi
       .misSolicitudes(token)
-      .then(async (lista) => {
-        setPostulaciones(lista);
-        const entradas = await Promise.all(
-          lista.map(async (p) => {
-            try {
-              return [p.vacanteId, await vacantesApi.obtenerPublica(p.vacanteId)];
-            } catch {
-              return [p.vacanteId, null];
-            }
-          })
-        );
-        setVacantesPorId(Object.fromEntries(entradas));
-      })
+      .then(setPostulaciones)
       .catch(() => setError("No se pudieron cargar tus postulaciones."));
   }, [token]);
 
@@ -92,7 +78,7 @@ export default function DocumentosPage() {
             {postulaciones.map((p) => (
               <div key={p.radicado} style={{ borderTop: "1px solid var(--color-border)", paddingTop: 14, marginTop: 14 }}>
                 <p style={{ fontSize: 13.5, fontWeight: 600, margin: "0 0 8px" }}>
-                  {vacantesPorId[p.vacanteId]?.cargo || p.vacanteId} <span className="text-muted" style={{ fontWeight: 400 }}>({p.radicado})</span>
+                  {p.vacanteCargo || p.vacanteId} <span className="text-muted" style={{ fontWeight: 400 }}>({p.radicado})</span>
                 </p>
                 {CATEGORIAS_DOCUMENTOS.map((cat) => {
                   const archivos = p.documentosAdjuntos?.[cat.clave] || [];

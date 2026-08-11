@@ -23,6 +23,13 @@ class Solicitud(Base):
     radicado = Column(String(20), primary_key=True, default=_generar_radicado)
 
     vacante_id = Column(String(36), nullable=False, index=True)
+    # Nombre/proceso de la vacante EN EL MOMENTO de inscribirse — se guarda
+    # aquí (no se consulta en vivo) porque el candidato debe poder ver su
+    # historial de postulaciones aunque la vacante después cambie de estado
+    # (ej. pase a "en_proceso" o "cancelada_desierta", que ya no son visibles
+    # para candidatos en el endpoint público de Vacantes).
+    vacante_cargo = Column(String(200), nullable=True)
+    vacante_proceso_no = Column(String(50), nullable=True)
     usuario_id = Column(String(36), nullable=False, index=True)
 
     datos_personales = Column(JSON, nullable=False)

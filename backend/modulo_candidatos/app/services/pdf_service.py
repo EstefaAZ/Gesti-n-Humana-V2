@@ -5,11 +5,15 @@
 # campos en recuadro), ahora generado en el backend.
 # ==============================================================
 
+import os
 from io import BytesIO
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
+
+RUTA_LOGO = os.path.join(os.path.dirname(__file__), "..", "resources", "logo-aguas-nacionales.png")
 
 MARGIN_X = 15 * mm
 RIGHT_X = 195 * mm
@@ -67,16 +71,24 @@ class PdfBuilder:
         c.line(x2, bottom_y, x2, top_y)
         c.line(x3, bottom_y, x3, top_y)
 
-        # Celda logo (placeholder — reemplazar por el logo real)
+        # Celda logo — imagen real del logo, centrada y con su proporción
         logo_cx = x1 + COL_LOGO_W / 2
-        c.setFont("Helvetica", 7.5)
-        c.setFillColorRGB(*TEXT_MUTED)
-        c.drawCentredString(logo_cx, top_y - 8 * mm, "aguas")
-        c.setFont("Helvetica-Bold", 11.5)
-        c.setFillColorRGB(*GREEN_800)
-        c.drawCentredString(logo_cx, top_y - 14 * mm, "nacionales")
-        c.setFillColorRGB(*GREEN_500)
-        c.circle(logo_cx + 15 * mm, top_y - 10.5 * mm, 1.1 * mm, fill=1, stroke=0)
+        logo_cy = (top_y + bottom_y) / 2
+        try:
+            logo = ImageReader(RUTA_LOGO)
+            iw, ih = logo.getSize()
+            draw_w = 28 * mm
+            draw_h = draw_w * ih / iw
+            if draw_h > HEADER_H - 4 * mm:
+                draw_h = HEADER_H - 4 * mm
+                draw_w = draw_h * iw / ih
+            c.drawImage(
+                logo, logo_cx - draw_w / 2, logo_cy - draw_h / 2, width=draw_w, height=draw_h,
+                mask="auto", preserveAspectRatio=True,
+            )
+        except Exception:
+            # Si por algún motivo el logo no está disponible, no se cae el PDF — se deja la celda en blanco.
+            pass
 
         # Celda título
         c.setFont("Helvetica-BoldOblique", 11.5)
@@ -127,7 +139,7 @@ class PdfBuilder:
         c.setFillColorRGB(*TEXT_MUTED)
         c.drawString(x, self.y, label.upper())
 
-        box_y = self.y - BOX_H
+        box_y = self.y - LABEL_H - BOX_H
         c.setFillColorRGB(1, 1, 1)
         c.setStrokeColorRGB(*BORDER)
         c.setLineWidth(0.25 * mm)
@@ -164,7 +176,7 @@ class PdfBuilder:
         self.ensure_space(LABEL_H + 14 * mm)
         c.setFillColorRGB(*TEXT_MUTED)
         c.drawString(MARGIN_X, self.y, label.upper())
-        box_y = self.y - 1.5 * mm
+        box_y = self.y - LABEL_H
 
         from reportlab.pdfbase.pdfmetrics import stringWidth
         palabras = (texto or "—").split(" ")
@@ -202,8 +214,11 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
     pdf = PdfBuilder()
     dp = solicitud.get("datos_personales") or {}
 
+    proceso_no = solicitud.get("vacante_proceso_no") or dp.get("proceso") or "—"
+    fecha_entrega = dp.get("fechaEntrega") or str(solicitud.get("fecha_solicitud") or "")[:10] or "—"
+
     pdf.section_title("I", "DATOS PERSONALES Y FAMILIARES")
-    pdf.field_row([("Proceso de selección No.", dp.get("proceso")), ("Fecha de entrega", dp.get("fechaEntrega"))])
+    pdf.field_row([("Proceso de selección No.", proceso_no), ("Fecha de entrega", fecha_entrega)])
     pdf.field("Nombre completo", dp.get("nombreCompleto"))
     pdf.field_row([("Cédula No.", dp.get("cedula")), ("De (expedición)", dp.get("cedulaDe"))])
     pdf.field_row([
@@ -302,7 +317,7 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
     c.drawString(MARGIN_X, pdf.y, f"Radicado: {solicitud.get('radicado', '')}")
     c.setFont("Helvetica", 8.5)
     c.setFillColorRGB(*TEXT_MUTED)
-    fecha_txt = str(solicitud.get("fecha_solicitud") or "")
+    fecha_txt = str(solicitud.get("fecha_solicitud") or "").replace("T", " ")[:16]
     c.drawString(MARGIN_X, pdf.y - 5 * mm, f"Fecha de solicitud: {fecha_txt}")
 
     return pdf.finalizar()
