@@ -1,0 +1,6 @@
+/* Los estilos globales viven en ./tokens.css y ./global.css (copiados tal cual del frontend React). */
+
+/* Los componentes de Angular agregan su propio elemento contenedor (<app-...>).
+   Con display: contents ese contenedor no participa en el layout, así que las
+   grillas, flex y selectores de global.css se comportan igual que en React. */
+app-root { display: contents; }
