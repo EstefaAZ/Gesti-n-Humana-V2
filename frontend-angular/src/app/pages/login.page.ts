@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { NgStyle } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../core/auth.service';
 import { ApiError } from '../lib/api/httpClient';
@@ -9,24 +10,10 @@ import { authStyles } from './auth/auth-styles';
 
 @Component({
   selector: 'app-login-page',
-  imports: [NgStyle, RouterLink, Icon, Autofocus],
+  imports: [NgStyle, FormsModule, RouterLink, Icon, Autofocus],
   host: { style: 'display: contents' },
   template: `
     <main class="auth-split">
-      <!-- Columna izquierda — foto PROVISIONAL de la web de la empresa, a la espera de la que defina el área de Diseño -->
-      <div class="auth-split__photo">
-        <img src="assets/login-foto-provisional.jpg" alt="Instalaciones de Aguas Nacionales EPM" />
-        <div class="auth-split__photo-overlay"></div>
-        <div class="auth-split__photo-logo">
-          <img src="assets/logo-aguas-nacionales.png" alt="Aguas Nacionales EPM" />
-        </div>
-        <div class="auth-split__photo-caption">
-          <h2>Transformamos vidas y entornos para un futuro sostenible</h2>
-          <p>En Aguas Nacionales EPM creemos en el talento que inspira, que transforma y que construye un mejor país.</p>
-        </div>
-        <span class="auth-split__photo-tag">Foto provisional</span>
-      </div>
-
       <!-- Columna derecha — formulario -->
       <div class="auth-split__form">
         <div class="auth-split__form-inner">
@@ -39,12 +26,13 @@ import { authStyles } from './auth/auth-styles';
           <p [ngStyle]="s.subheading">Accede para ver las convocatorias abiertas y gestionar tus postulaciones.</p>
 
           @if (error()) {
-            <div [ngStyle]="s.error" role="alert">{{ error() }}</div>
+            <div id="login-error" [ngStyle]="s.error" role="alert">{{ error() }}</div>
           }
           @if (restablecida) {
             <div [ngStyle]="s.success" role="status">Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión.</div>
           }
 
+          <form (ngSubmit)="handleLogin()">
           <div [ngStyle]="s.field">
             <label for="login-email" [ngStyle]="s.label">Correo electrónico</label>
             <div [ngStyle]="s.inputWrap">
@@ -61,8 +49,8 @@ import { authStyles } from './auth/auth-styles';
                 (input)="email.set($any($event.target).value)"
                 (focus)="focused.set('email')"
                 (blur)="focused.set(null)"
-                (keydown)="onKeyDown($event)"
                 autocomplete="username"
+                [attr.aria-describedby]="error() ? 'login-error' : null"
               />
             </div>
           </div>
@@ -81,8 +69,8 @@ import { authStyles } from './auth/auth-styles';
                 (input)="password.set($any($event.target).value)"
                 (focus)="focused.set('password')"
                 (blur)="focused.set(null)"
-                (keydown)="onKeyDown($event)"
                 autocomplete="current-password"
+                [attr.aria-describedby]="error() ? 'login-error' : null"
               />
               <button
                 type="button"
@@ -105,8 +93,8 @@ import { authStyles } from './auth/auth-styles';
           </div>
 
           <button
+            type="submit"
             [ngStyle]="m(s.button, btnHover() && !cargando() ? s.buttonHover : null, cargando() ? s.buttonDisabled : null)"
-            (click)="handleLogin()"
             (mouseenter)="btnHover.set(true)"
             (mouseleave)="btnHover.set(false)"
             [disabled]="cargando()"
@@ -116,6 +104,7 @@ import { authStyles } from './auth/auth-styles';
               <app-icon name="arrow" [size]="17" [strokeWidth]="2" />
             }
           </button>
+          </form>
 
           <div [ngStyle]="s.dividerOr">
             <span [ngStyle]="s.dividerOrLine"></span>
@@ -134,6 +123,21 @@ import { authStyles } from './auth/auth-styles';
 
           <p [ngStyle]="s.footer">Aguas Nacionales EPM · Gestión Humana</p>
         </div>
+      </div>
+
+      <!-- Columna izquierda — foto PROVISIONAL de la web de la empresa, a la espera de la que defina el área de Diseño.
+           Va después del formulario en el DOM para que su <h2> no quede antes del <h1>; "order: -1" la mantiene a la izquierda. -->
+      <div class="auth-split__photo" style="order: -1">
+        <img src="assets/login-foto-provisional.jpg" alt="Instalaciones de Aguas Nacionales EPM" />
+        <div class="auth-split__photo-overlay"></div>
+        <div class="auth-split__photo-logo">
+          <img src="assets/logo-aguas-nacionales.png" alt="Aguas Nacionales EPM" />
+        </div>
+        <div class="auth-split__photo-caption">
+          <h2>Transformamos vidas y entornos para un futuro sostenible</h2>
+          <p>En Aguas Nacionales EPM creemos en el talento que inspira, que transforma y que construye un mejor país.</p>
+        </div>
+        <span class="auth-split__photo-tag">Foto provisional</span>
       </div>
     </main>
   `,
@@ -176,9 +180,5 @@ export class LoginPage {
     } finally {
       this.cargando.set(false);
     }
-  }
-
-  protected onKeyDown(e: KeyboardEvent): void {
-    if (e.key === 'Enter') this.handleLogin();
   }
 }
