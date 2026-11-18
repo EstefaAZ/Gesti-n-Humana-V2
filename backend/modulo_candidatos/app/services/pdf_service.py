@@ -8,6 +8,7 @@
 
 import os
 import re
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from reportlab.lib.pagesizes import A4
@@ -91,6 +92,26 @@ def _fecha(v, con_hora=False):
     if con_hora and hora:
         texto += f" {hora}:{minuto}"
     return texto
+
+
+# Colombia está en UTC-5 todo el año (sin horario de verano). Desfase fijo para
+# no depender de la base de zonas horarias (tzdata), que no siempre está en Windows.
+HORA_COLOMBIA = timezone(timedelta(hours=-5))
+
+
+def _a_hora_colombia(v):
+    """La base guarda fecha_solicitud en UTC (SQLite la devuelve sin zona horaria).
+    Devuelve el datetime en hora de Colombia, o None si no se puede interpretar."""
+    if not v:
+        return None
+    if not isinstance(v, datetime):
+        try:
+            v = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if v.tzinfo is None:
+        v = v.replace(tzinfo=timezone.utc)
+    return v.astimezone(HORA_COLOMBIA)
 
 
 def _envolver(texto, fuente, tam, ancho, max_lineas=None):
@@ -470,8 +491,9 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
     nombre = dp.get("nombreCompleto") or "Aspirante"
     cedula = dp.get("cedula")
     proceso_no = solicitud.get("vacante_proceso_no") or dp.get("proceso") or "—"
-    fecha_entrega = dp.get("fechaEntrega") or str(solicitud.get("fecha_solicitud") or "")[:10] or "—"
-    fecha_solicitud = _fecha(str(solicitud.get("fecha_solicitud") or ""), con_hora=True) or "—"
+    recibida = _a_hora_colombia(solicitud.get("fecha_solicitud"))
+    fecha_entrega = dp.get("fechaEntrega") or (recibida.strftime("%Y-%m-%d") if recibida else "—")
+    fecha_solicitud = recibida.strftime("%d/%m/%Y %H:%M") if recibida else "—"
 
     pie = " · ".join(x for x in [f"Radicado {radicado}", nombre, f"C.C. {cedula}" if cedula else ""] if x)
     pdf = PdfBuilder(texto_pie=pie)

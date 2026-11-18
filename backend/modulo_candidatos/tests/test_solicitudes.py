@@ -354,3 +354,11 @@ def test_solicitud_out_no_expone_el_contenido_base64_solo_el_nombre():
     data = r.json()
     assert data["documentos_adjuntos"]["cedula"][0]["nombre"] == "cedula.pdf"
     assert "contenido_base64" not in data["documentos_adjuntos"]["cedula"][0]
+
+
+def test_fecha_solicitud_sale_en_utc_con_zona_horaria():
+    # SQLite devuelve la fecha sin zona; la API debe marcarla como UTC ("Z") para
+    # que el navegador no la tome como hora local (5 horas corrida en Colombia).
+    r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 201
+    assert r.json()["fecha_solicitud"].endswith("Z")

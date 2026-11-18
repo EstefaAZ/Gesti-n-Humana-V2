@@ -3,12 +3,12 @@
 # Esquemas Pydantic — validación de entrada/salida
 # ==============================================================
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.usuario import RolUsuario
+from app.schemas.tipos import FechaUTC
 
 
 def _validar_politica_password(v: str) -> str:
@@ -104,7 +104,7 @@ class UsuarioOut(BaseModel):
     rol: RolUsuario
     cedula: Optional[str] = None
     activo: bool
-    fecha_creacion: Optional[datetime] = None
+    fecha_creacion: Optional[FechaUTC] = None
     tiene_foto: bool = False
 
     model_config = {"from_attributes": True}
@@ -164,6 +164,6 @@ class EventoAuditoriaOut(BaseModel):
     actor_rol: Optional[str] = None
     entidad_tipo: Optional[str] = None
     entidad_id: Optional[str] = None
-    fecha: Optional[datetime] = None
+    fecha: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}

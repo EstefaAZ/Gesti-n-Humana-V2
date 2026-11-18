@@ -3,10 +3,11 @@
 # Esquemas Pydantic — validación de entrada/salida
 # ==============================================================
 
-from datetime import date, datetime
+from datetime import date
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
+from app.schemas.tipos import FechaUTC
 
 EstadoVacante = Literal["borrador", "publicada", "en_proceso", "cerrada", "cancelada_desierta"]
 
@@ -89,7 +90,7 @@ class VacanteOut(VacanteBase):
     aun_no_abre: bool = False
     tiene_documento_pdf: bool = False
     creada_por_nombre: Optional[str] = None
-    fecha_creacion: Optional[datetime] = None
+    fecha_creacion: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
 
@@ -112,6 +113,6 @@ class EventoAuditoriaOut(BaseModel):
     actor_rol: Optional[str] = None
     entidad_tipo: Optional[str] = None
     entidad_id: Optional[str] = None
-    fecha: Optional[datetime] = None
+    fecha: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}

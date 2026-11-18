@@ -3,7 +3,6 @@
 # Esquemas Pydantic — perfil del candidato (se llena una vez al registrarse)
 # ==============================================================
 
-from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -13,6 +12,7 @@ from app.schemas.solicitud import (
     ETIQUETAS_DOCUMENTOS,
     DocumentosAdjuntosOut,
 )
+from app.schemas.tipos import FechaUTC
 
 
 class AutorizacionPerfil(BaseModel):
@@ -103,8 +103,8 @@ class PerfilCandidatoOut(BaseModel):
     documentos_adjuntos: DocumentosAdjuntosOut = Field(default_factory=DocumentosAdjuntosOut)
     autorizacion: dict[str, Any]
     completado: bool
-    fecha_creacion: Optional[datetime] = None
-    fecha_actualizacion: Optional[datetime] = None
+    fecha_creacion: Optional[FechaUTC] = None
+    fecha_actualizacion: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
 

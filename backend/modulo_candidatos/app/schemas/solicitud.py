@@ -8,10 +8,10 @@
 # enviar. Aquí solo se exige lo mínimo para poder evaluar y generar el PDF.
 # ==============================================================
 
-from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from app.schemas.tipos import FechaUTC
 
 MAX_TAMANO_ARCHIVO_BYTES = 5 * 1024 * 1024  # 5 MB por archivo
 
@@ -144,7 +144,7 @@ class SolicitudOut(BaseModel):
     estado: str
     historial_estados: list[dict[str, Any]]
     anonimizada: bool = False
-    fecha_solicitud: Optional[datetime] = None
+    fecha_solicitud: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
 
@@ -159,7 +159,7 @@ class SolicitudResumen(BaseModel):
     celular: Optional[str] = None
     estado: str
     evaluacion: Optional[EvaluacionOut] = None
-    fecha_solicitud: Optional[datetime] = None
+    fecha_solicitud: Optional[FechaUTC] = None
 
 
 class PuntoMes(BaseModel):
@@ -172,7 +172,7 @@ class SolicitudActividadReciente(BaseModel):
     vacante_id: str
     nombre_completo: Optional[str] = None
     estado: str
-    fecha_solicitud: Optional[datetime] = None
+    fecha_solicitud: Optional[FechaUTC] = None
 
 
 class EstadisticasSolicitudes(BaseModel):
@@ -190,6 +190,6 @@ class EventoAuditoriaOut(BaseModel):
     actor_rol: Optional[str] = None
     entidad_tipo: Optional[str] = None
     entidad_id: Optional[str] = None
-    fecha: Optional[datetime] = None
+    fecha: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
