@@ -14,6 +14,8 @@ import os
 
 import openpyxl
 
+from app.services import evaluacion_service
+
 RUTA_PLANTILLA = os.path.join(os.path.dirname(__file__), "..", "resources", "GTH-FOR-04_Resultados_Cumplimiento_de_Requisitos.xlsx")
 
 # Hoja "Aspirantes": filas 13 a 58 (46 aspirantes máximo), ya con formato listo.
@@ -30,7 +32,7 @@ def _describir_estudios(criterios: dict) -> str:
     if not nivel:
         return "Sin requisito específico configurado."
     graduado = criterios.get("graduado_requerido", True)
-    texto = f"{nivel}" + (" (graduado)" if graduado else "")
+    texto = f"{nivel} o superior" + (" (graduado)" if graduado else "")
     kw = criterios.get("profesion_keyword")
     if kw:
         texto += f'. Profesión/título relacionado con "{kw}".'
@@ -48,7 +50,8 @@ def _describir_conocimientos(criterios: dict) -> str:
     partes = []
     idioma = criterios.get("idioma_requerido")
     if idioma:
-        partes.append(f'{idioma} — nivel mínimo {criterios.get("idioma_nivel_min", "")} ({criterios.get("idioma_habilidad", "habla")})')
+        nivel = evaluacion_service.nivel_idioma_normalizado(criterios.get("idioma_nivel_min"))
+        partes.append(f"{idioma} — nivel de dominio {nivel} o superior" if nivel else f"{idioma}")
     certs = criterios.get("certificaciones_keywords") or []
     if certs:
         partes.append("Certificaciones/cursos relacionados con: " + ", ".join(certs))

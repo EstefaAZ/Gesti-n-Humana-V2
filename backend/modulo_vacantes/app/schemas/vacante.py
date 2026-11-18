@@ -10,21 +10,38 @@ from pydantic import BaseModel, Field, field_validator
 
 EstadoVacante = Literal["borrador", "publicada", "en_proceso", "cerrada", "cancelada_desierta"]
 
+# Escala única de dominio del idioma (equivalencias MCER: A1–A2 / B1 / B2–C1 / C2).
+NIVELES_IDIOMA = ("Básico", "Intermedio", "Avanzado", "Experto")
+
+# Escala anterior, por habilidad. Solo para poder LEER vacantes creadas antes
+# del cambio: se traducen al vuelo y al guardar quedan ya con la escala nueva.
+NIVEL_IDIOMA_ANTERIOR = {"Regular": "Básico", "Bien": "Intermedio", "Muy bien": "Avanzado"}
+
 
 class CriteriosEvaluacion(BaseModel):
     """
     Criterios de evaluación automática — SOLO INFORMATIVOS.
     Nunca deben usarse para bloquear el envío de una solicitud; el módulo
     Candidatos los usa únicamente para calcular una etiqueta orientativa.
+
+    Todos los criterios son MÍNIMOS: superarlos también cumple. `idioma_habilidad`
+    (habla/lee/escribe) desapareció con la escala nueva; si un cliente antiguo la
+    envía, Pydantic la ignora y no rompe nada.
     """
     nivel_educativo_min: str = ""
     graduado_requerido: bool = True
     profesion_keyword: str = ""
     experiencia_min_anios: Optional[float] = None
     idioma_requerido: str = ""
-    idioma_habilidad: str = "habla"  # habla | lee | escribe
-    idioma_nivel_min: str = "Regular"  # Regular | Bien | Muy bien
+    idioma_nivel_min: str = NIVELES_IDIOMA[0]  # Básico | Intermedio | Avanzado | Experto
     certificaciones_keywords: list[str] = Field(default_factory=list)
+
+    @field_validator("idioma_nivel_min")
+    @classmethod
+    def normalizar_nivel_idioma(cls, v: str) -> str:
+        v = (v or "").strip()
+        v = NIVEL_IDIOMA_ANTERIOR.get(v, v)
+        return v if v in NIVELES_IDIOMA else NIVELES_IDIOMA[0]
 
     @field_validator("certificaciones_keywords")
     @classmethod

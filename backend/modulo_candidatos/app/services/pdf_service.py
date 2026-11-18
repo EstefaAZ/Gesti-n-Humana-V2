@@ -13,6 +13,8 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
+from app.services import evaluacion_service
+
 RUTA_LOGO = os.path.join(os.path.dirname(__file__), "..", "resources", "logo-aguas-nacionales.png")
 
 MARGIN_X = 15 * mm
@@ -34,10 +36,21 @@ COL_LOGO_W = 40 * mm
 COL_CODE_W = 45 * mm
 COL_TITLE_W = USABLE_W - COL_LOGO_W - COL_CODE_W
 
-LABEL_H = 4 * mm
-BOX_H = 7.2 * mm
+LABEL_H = 3.6 * mm
+BOX_H = 5.6 * mm
 COL_GAP = 4 * mm
 ROW_GAP = 3 * mm
+
+# Etiqueta legible por tipo de Registro II — espejo de TIPO_REGISTRO_LABELS en
+# frontend/src/data/catalogos.js. Se resuelve por `tipo` (no por `tipoLabel`,
+# que el cliente puede omitir) para que el PDF quede legible sin importar el
+# origen de los datos (wizard, script de datos de prueba, registros antiguos).
+TIPO_REGISTRO_LABELS = {
+    "estudio": "Estudio formal",
+    "educacionTrabajo": "Educación para el trabajo y el desarrollo humano",
+    "certificacion": "Certificaciones y matrículas",
+    "idioma": "Idioma",
+}
 
 
 def _sino(v) -> str:
@@ -105,10 +118,6 @@ class PdfBuilder:
         c.drawCentredString(codigo_cx, top_y - 17 * mm, "Fecha: 03/08/2023")
 
         self.y = bottom_y - 8 * mm
-
-    def start_new_page(self):
-        self.c.showPage()
-        self._draw_header()
 
     def section_title(self, numeral, texto):
         self.ensure_space(14 * mm)
@@ -238,19 +247,20 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
         ("¿Tiene vehículo?", _sino(dp.get("tieneVehiculo"))),
     ])
 
-    pdf.start_new_page()
     pdf.section_title("II", "ESTUDIOS, CURSOS, CERTIFICACIONES E IDIOMAS")
     registros = solicitud.get("registros_ii") or []
     if not registros:
         pdf.legend("El aspirante no registró estudios, cursos, certificaciones ni idiomas.")
     else:
         for i, r in enumerate(registros):
-            pdf.subtitle(f"Registro {i + 1} — {r.get('tipoLabel', r.get('tipo', ''))}")
             tipo = r.get("tipo")
+            etiqueta_tipo = TIPO_REGISTRO_LABELS.get(tipo) or r.get("tipoLabel") or tipo or ""
+            pdf.subtitle(f"Registro {i + 1} — {etiqueta_tipo}")
             if tipo == "estudio":
                 pdf.field_row([("Nivel educativo", r.get("nivelEducativo")), ("¿Graduado?", _sino(r.get("graduado")))])
                 pdf.field("Título", r.get("titulo"))
-                pdf.field_row([("Establecimiento", r.get("establecimiento")), ("Ciudad", r.get("ciudad"))])
+                pdf.field("Establecimiento", r.get("establecimiento"))
+                pdf.field_row([("Departamento", r.get("departamento")), ("Ciudad", r.get("ciudad"))])
                 pdf.field_row([("Inicio", r.get("inicio")), ("Terminación", r.get("terminacion"))])
             elif tipo == "educacionTrabajo":
                 pdf.field("Nombre del evento", r.get("nombreEvento"))
@@ -262,10 +272,11 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
                 pdf.field("Ente certificador", r.get("enteCertificador"))
             elif tipo == "idioma":
                 pdf.field_row([("Idioma", r.get("idioma")), ("Establecimiento", r.get("establecimiento")), ("Fecha", r.get("fecha"))])
-                pdf.field_row([("Lo habla", r.get("habla")), ("Lo lee", r.get("lee")), ("Lo escribe", r.get("escribe"))])
+                # Los registros anteriores al cambio de escala traen una valoración por
+                # habilidad; nivel_idioma_de_registro() los resuelve al nivel equivalente.
+                pdf.field("Nivel de dominio", evaluacion_service.nivel_idioma_de_registro(r))
             pdf.gap(2)
 
-    pdf.start_new_page()
     pdf.section_title("VI", "EXPERIENCIA LABORAL")
     experiencia = solicitud.get("experiencia") or []
     if not experiencia:
@@ -274,7 +285,9 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
         for i, e in enumerate(experiencia):
             pdf.subtitle(f"Experiencia {i + 1}")
             pdf.field("Nombre de la empresa", e.get("empresa"))
-            pdf.field_row([("Ciudad", e.get("ciudad")), ("Departamento", e.get("departamento")), ("País", e.get("pais"))])
+            # Mismo orden que en el formulario: País primero (define si Departamento/Ciudad
+            # vienen de la lista DIVIPOLA o se escribieron libres — ver ExperienciaCard.jsx).
+            pdf.field_row([("País", e.get("pais")), ("Departamento/Estado", e.get("departamento")), ("Ciudad", e.get("ciudad"))])
             pdf.field_row([("Tipo de empresa", e.get("tipoEmpresa")), ("Proceso en el cual laboró", e.get("proceso"))])
             pdf.field_row([("Jefe inmediato", e.get("jefeInmediato")), ("Teléfono empresa", e.get("telEmpresa"))])
             pdf.field("Cargo desempeñado", e.get("cargo"))
@@ -284,7 +297,6 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
             pdf.field("Motivo de retiro", e.get("motivoRetiro"))
             pdf.gap(2)
 
-    pdf.start_new_page()
     pdf.section_title("VII", "DECLARACIÓN CONFLICTO DE INTERÉS")
     conf = solicitud.get("conflicto") or {}
     pdf.field("¿Tiene vínculo con empleados o directivos de Aguas Nacionales EPM?", _sino(conf.get("tieneVinculo")))
@@ -295,7 +307,6 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
     if conf.get("tieneOtraInhabilidad") == "si" and conf.get("descripcionInhabilidad"):
         pdf.paragraph_box("Descripción de la situación", conf.get("descripcionInhabilidad"))
 
-    pdf.start_new_page()
     pdf.section_title("VIII", "AUTORIZACIÓN DEL ASPIRANTE")
     pdf.paragraph_box(
         "Declaración",

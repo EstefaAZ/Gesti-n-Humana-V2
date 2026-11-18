@@ -5,13 +5,155 @@
 # Nunca bloquea el envío de una solicitud; únicamente le da a Gestión Humana
 # una etiqueta ("Cumple" / "No cumple") con los motivos, para priorizar la
 # revisión. La decisión final siempre la toma una persona.
+#
+# Todos los criterios de la vacante se leen como MÍNIMOS: superar el nivel
+# pedido (educativo o de idioma) también cumple. Nunca se comparan por igualdad.
 # ==============================================================
 
-from datetime import date, datetime
+import re
+import unicodedata
+from datetime import datetime
 from typing import Any
 
+# Jerarquías: todo criterio de la vacante es un MÍNIMO, así que la comparación
+# siempre es "ordinal del candidato >= ordinal exigido". Un Universitario cumple
+# un requisito de Técnico; un nivel Experto cumple uno de Intermedio.
 NIVEL_EDUCATIVO_ORDEN = {"": 0, "Secundarios": 1, "Técnico": 2, "Tecnólogo": 3, "Universitario": 4, "Postgrado": 5}
-NIVEL_IDIOMA_ORDEN = {"": 0, "Regular": 1, "Bien": 2, "Muy bien": 3}
+NIVEL_IDIOMA_ORDEN = {"": 0, "Básico": 1, "Intermedio": 2, "Avanzado": 3, "Experto": 4}
+
+# Sinónimos frecuentes que el aspirante puede haber escrito (o que quedaron en
+# datos importados). Sin esto caerían al ordinal 0 y se descartarían por error.
+# Las claves van sin tildes y en minúscula: la búsqueda normaliza antes.
+NIVEL_EDUCATIVO_SINONIMOS = {
+    "bachiller": "Secundarios", "bachillerato": "Secundarios", "secundaria": "Secundarios",
+    "media": "Secundarios", "tecnica": "Técnico", "tecnologia": "Tecnólogo",
+    "pregrado": "Universitario", "profesional": "Universitario", "universitaria": "Universitario",
+    "especializacion": "Postgrado", "maestria": "Postgrado", "magister": "Postgrado",
+    "doctorado": "Postgrado", "phd": "Postgrado", "posgrado": "Postgrado",
+}
+
+# Escala de idioma anterior (una valoración por habilidad: "Lo habla / Lo lee /
+# Lo escribe"). Se conserva SOLO para leer registros y vacantes ya guardados.
+NIVEL_IDIOMA_ANTERIOR = {"Regular": "Básico", "Bien": "Intermedio", "Muy bien": "Avanzado"}
+HABILIDADES_IDIOMA_ANTERIORES = ("habla", "lee", "escribe")
+
+
+def _clave(texto) -> str:
+    """minúsculas y sin tildes — para que "Tecnico", "Técnico" y "TÉCNICO" sean lo mismo."""
+    sin_tildes = unicodedata.normalize("NFD", (texto or "").strip())
+    return "".join(c for c in sin_tildes if unicodedata.category(c) != "Mn").lower()
+
+
+def _buscar_canonico(valor, opciones: dict) -> str:
+    """Devuelve la clave oficial de `opciones` que corresponde a `valor`, o ""."""
+    clave = _clave(valor)
+    return next((oficial for oficial in opciones if _clave(oficial) == clave), "")
+
+
+# Terminaciones de género/número más comunes en español. Se prueban de la más
+# larga a la más corta para no cortar de más (p. ej. "ia" antes que "a").
+_SUFIJOS_VARIABLES = ("es", "as", "os", "ia", "a", "o", "e", "s")
+
+
+def _raiz(palabra) -> str:
+    """
+    Raíz aproximada de una palabra: quita la terminación de género/número más
+    común para que "ingeniero", "ingeniera" e "ingenieria" compartan la misma
+    raíz ("ingenier"). No es un stemmer completo — alcanza para keywords
+    cortos de profesión/título, que es todo lo que necesita este matching.
+    """
+    clave = _clave(palabra)
+    for sufijo in _SUFIJOS_VARIABLES:
+        if clave.endswith(sufijo) and len(clave) - len(sufijo) >= 4:
+            return clave[: -len(sufijo)]
+    return clave
+
+
+def _tokens(texto) -> list[str]:
+    """Palabras de `texto` separando por espacio, guion o guion bajo — así
+    "Power-BI" y "Power_BI" se tokenizan igual que "Power BI"."""
+    return [t for t in re.split(r"[\s\-_]+", _clave(texto)) if t]
+
+
+def _coincide_por_ventaneo(texto_tokens, kw_tokens) -> bool:
+    """
+    True si alguna secuencia de tokens consecutivos de `texto_tokens`, unida
+    sin separador, es EXACTAMENTE igual al keyword unido sin separador. Así
+    "Power BI" (keyword) reconoce "PowerBI" o "Power-BI" (texto) sin importar
+    de qué lado falta el espacio.
+
+    Usa igualdad exacta de la ventana completa, no un substring dentro de un
+    texto compactado entero — eso es lo que evita falsos positivos por
+    coincidencias accidentales en el borde de dos palabras no relacionadas
+    (y, en el mismo espíritu, por qué "ISO 9001" nunca confunde con "ISO
+    14001": los dígitos siguen siendo parte de la comparación exacta).
+    """
+    kw_compacto = "".join(kw_tokens)
+    if not kw_compacto:
+        return False
+    for i in range(len(texto_tokens)):
+        acumulado = ""
+        for j in range(i, len(texto_tokens)):
+            acumulado += texto_tokens[j]
+            if acumulado == kw_compacto:
+                return True
+            if len(acumulado) > len(kw_compacto):
+                break
+    return False
+
+
+def _texto_incluye_keyword(texto, keyword) -> bool:
+    """
+    True si `keyword` aparece en `texto`, tolerante a tildes/mayúsculas, a
+    variaciones de género/número ("ingeniero"/"ingeniera" vs. un criterio
+    escrito como "ingenieria"), y a que el espacio entre palabras de un
+    keyword compuesto se haya escrito distinto ("Power BI" / "PowerBI" /
+    "Power-BI"). Primero intenta substring exacto (así siguen funcionando
+    keywords de varias palabras con el mismo espaciado, p. ej. "analista
+    financiero"); si no aparece, intenta por ventaneo de tokens compactados;
+    si tampoco, compara palabra por palabra por raíz.
+    """
+    texto_norm = _clave(texto)
+    kw_norm = _clave(keyword)
+    if not kw_norm:
+        return False
+    if kw_norm in texto_norm:
+        return True
+    if _coincide_por_ventaneo(_tokens(texto), _tokens(keyword)):
+        return True
+    raiz_kw = _raiz(kw_norm)
+    return any(_raiz(palabra) == raiz_kw for palabra in texto_norm.split())
+
+
+def _nivel_educativo_ordinal(valor) -> int:
+    """Ordinal del nivel educativo, tolerante a sinónimos, mayúsculas y tildes."""
+    oficial = _buscar_canonico(valor, NIVEL_EDUCATIVO_ORDEN)
+    if oficial:
+        return NIVEL_EDUCATIVO_ORDEN[oficial]
+    sinonimo = NIVEL_EDUCATIVO_SINONIMOS.get(_clave(valor))
+    return NIVEL_EDUCATIVO_ORDEN.get(sinonimo, 0)
+
+
+def nivel_idioma_normalizado(valor) -> str:
+    """Traduce un nivel de la escala anterior a la actual; deja pasar los ya válidos."""
+    anterior = _buscar_canonico(valor, NIVEL_IDIOMA_ANTERIOR)
+    if anterior:
+        return NIVEL_IDIOMA_ANTERIOR[anterior]
+    return _buscar_canonico(valor, NIVEL_IDIOMA_ORDEN)
+
+
+def nivel_idioma_de_registro(registro: dict[str, Any]) -> str:
+    """
+    Nivel de dominio de un registro de idioma del Registro II. Usa el campo
+    nuevo (`nivel`) y, si el registro es anterior al cambio de escala, toma la
+    mejor de las tres habilidades — es la lectura más justa para el aspirante,
+    que no eligió la migración.
+    """
+    nivel = nivel_idioma_normalizado(registro.get("nivel"))
+    if nivel:
+        return nivel
+    anteriores = [nivel_idioma_normalizado(registro.get(h)) for h in HABILIDADES_IDIOMA_ANTERIORES]
+    return max(anteriores, key=lambda n: NIVEL_IDIOMA_ORDEN.get(n, 0), default="")
 
 
 def _parsear_fecha(valor) -> datetime | None:
@@ -34,11 +176,61 @@ def _anios_entre_fechas(inicio_str, fin_str) -> float:
 
 
 def _total_experiencia_anios(experiencia: list[dict[str, Any]]) -> float:
-    total = 0.0
+    """
+    Años de experiencia = tiempo real transcurrido, no la suma nominal de cada
+    registro. Dos experiencias que se solapan (empleos simultáneos, o un error
+    de digitación en las fechas) se fusionan en un solo intervalo antes de
+    sumar — así no se cuenta dos veces el mismo período.
+    """
+    intervalos = []
     for e in experiencia:
+        inicio = _parsear_fecha(e.get("fechaInicio"))
+        if inicio is None:
+            continue
         fin = None if e.get("actual") else e.get("fechaTerminacion")
-        total += _anios_entre_fechas(e.get("fechaInicio"), fin)
-    return total
+        fin = _parsear_fecha(fin) or datetime.now()
+        if fin < inicio:
+            continue
+        intervalos.append((inicio, fin))
+
+    if not intervalos:
+        return 0.0
+
+    intervalos.sort(key=lambda par: par[0])
+    total_dias = 0
+    cur_inicio, cur_fin = intervalos[0]
+    for inicio, fin in intervalos[1:]:
+        if inicio <= cur_fin:
+            cur_fin = max(cur_fin, fin)
+        else:
+            total_dias += (cur_fin - cur_inicio).days
+            cur_inicio, cur_fin = inicio, fin
+    total_dias += (cur_fin - cur_inicio).days
+
+    return total_dias / 365.25
+
+
+def _formatear_anios_a_texto(valor: float) -> str:
+    """
+    Convierte años decimales a texto natural en español: "11 meses", "1 año",
+    "2 años", "1 año y 4 meses". Trunca a meses completos (no redondea hacia
+    arriba) — así el mensaje nunca muestra, para un candidato que NO cumple,
+    un valor que visualmente parece alcanzar el mínimo exigido (ej. 1.958
+    años nunca se ve como "2 años" cuando en realidad no llega a 2).
+    """
+    total_meses = int(valor * 12 + 1e-9)  # +epsilon: absorbe ruido de coma flotante, no redondea meses reales
+    anios, meses = divmod(total_meses, 12)
+
+    def _pluralizar(cantidad, singular, plural):
+        return f"{cantidad} {singular if cantidad == 1 else plural}"
+
+    if anios == 0 and meses == 0:
+        return "0 meses"
+    if anios == 0:
+        return _pluralizar(meses, "mes", "meses")
+    if meses == 0:
+        return _pluralizar(anios, "año", "años")
+    return f"{_pluralizar(anios, 'año', 'años')} y {_pluralizar(meses, 'mes', 'meses')}"
 
 
 def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> dict:
@@ -69,12 +261,12 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         for r in registros:
             if r.get("tipo") == "estudio":
                 graduado_ok = (not graduado_requerido) or r.get("graduado") == "si"
-                nivel = NIVEL_EDUCATIVO_ORDEN.get(r.get("nivelEducativo", ""), 0)
+                nivel = _nivel_educativo_ordinal(r.get("nivelEducativo"))
                 if graduado_ok and nivel > max_nivel:
                     max_nivel = nivel
-        if max_nivel < NIVEL_EDUCATIVO_ORDEN.get(nivel_min, 0):
+        if max_nivel < _nivel_educativo_ordinal(nivel_min):
             sufijo = " con graduación confirmada" if graduado_requerido else ""
-            motivo = f'No registra nivel educativo "{nivel_min}"{sufijo}.'
+            motivo = f'No registra nivel educativo "{nivel_min}" o superior{sufijo}.'
             motivos.append(motivo)
             detalle["estudios"] = {"cumple": False, "motivo": motivo}
         else:
@@ -90,10 +282,9 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
 
     profesion_kw = criterios.get("profesion_keyword")
     if profesion_kw:
-        kw = profesion_kw.lower()
         match = any(
-            r.get("tipo") == "estudio" and kw in (r.get("titulo") or "").lower() for r in registros
-        ) or kw in (dp.get("profesion") or "").lower()
+            r.get("tipo") == "estudio" and _texto_incluye_keyword(r.get("titulo"), profesion_kw) for r in registros
+        ) or _texto_incluye_keyword(dp.get("profesion"), profesion_kw)
         if not match:
             motivo = f'Ningún título/profesión registrada incluye "{profesion_kw}".'
             motivos.append(motivo)
@@ -104,7 +295,10 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         total = _total_experiencia_anios(experiencia)
         cumple_exp = total >= float(exp_min)
         if not cumple_exp:
-            motivo = f"Registra {total:.1f} años de experiencia; se requieren mínimo {exp_min}."
+            motivo = (
+                f"Registra {_formatear_anios_a_texto(total)} de experiencia; "
+                f"se requieren mínimo {_formatear_anios_a_texto(float(exp_min))}."
+            )
             motivos.append(motivo)
             detalle["experiencia"] = {"cumple": False, "motivo": motivo}
         else:
@@ -112,28 +306,33 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
 
     idioma_req = criterios.get("idioma_requerido")
     if idioma_req:
-        kw = idioma_req.lower()
-        match = next((r for r in registros if r.get("tipo") == "idioma" and kw in (r.get("idioma") or "").lower()), None)
-        nivel_min_idioma = NIVEL_IDIOMA_ORDEN.get(criterios.get("idioma_nivel_min", ""), 0)
-        habilidad = criterios.get("idioma_habilidad", "habla")
-        nivel_cand = NIVEL_IDIOMA_ORDEN.get(match.get(habilidad, ""), -1) if match else -1
+        # Puede haber varios registros del mismo idioma (p. ej. dos cursos): vale el mejor.
+        coincidencias = [
+            r for r in registros if r.get("tipo") == "idioma" and _texto_incluye_keyword(r.get("idioma"), idioma_req)
+        ]
+        nivel_min_texto = nivel_idioma_normalizado(criterios.get("idioma_nivel_min"))
+        nivel_min_idioma = NIVEL_IDIOMA_ORDEN.get(nivel_min_texto, 0)
+        # -1 (y no 0) cuando el idioma ni siquiera está registrado: así no "cumple"
+        # por defecto un requisito sin nivel mínimo explícito.
+        nivel_cand = max(
+            (NIVEL_IDIOMA_ORDEN.get(nivel_idioma_de_registro(r), 0) for r in coincidencias), default=-1
+        )
         cumple_idioma = nivel_cand >= nivel_min_idioma
-        motivo = f'No cumple el nivel de {idioma_req} requerido ({habilidad}: {criterios.get("idioma_nivel_min")}).'
+        motivo = f'No cumple el nivel de {idioma_req} requerido (mínimo {nivel_min_texto or "cualquiera"} o superior).'
         if not cumple_idioma:
             motivos.append(motivo)
         _marcar_conocimientos(cumple_idioma, motivo)
 
     certificaciones_kw = criterios.get("certificaciones_keywords") or []
     for cert_kw in certificaciones_kw:
-        kw = cert_kw.lower()
 
-        def _coincide(r, kw=kw):
+        def _coincide(r, kw=cert_kw):
             if r.get("tipo") == "certificacion":
-                return kw in (r.get("nombreNorma") or "").lower()
+                return _texto_incluye_keyword(r.get("nombreNorma"), kw)
             if r.get("tipo") == "educacionTrabajo":
-                return kw in (r.get("nombreEvento") or "").lower()
+                return _texto_incluye_keyword(r.get("nombreEvento"), kw)
             if r.get("tipo") == "estudio":
-                return kw in (r.get("titulo") or "").lower()
+                return _texto_incluye_keyword(r.get("titulo"), kw)
             return False
 
         tiene_cert = any(_coincide(r) for r in registros)

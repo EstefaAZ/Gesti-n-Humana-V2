@@ -24,8 +24,7 @@ def _criterios_por_defecto():
         "profesion_keyword": "",
         "experiencia_min_anios": None,
         "idioma_requerido": "",
-        "idioma_habilidad": "habla",
-        "idioma_nivel_min": "Regular",
+        "idioma_nivel_min": "Básico",  # escala única de dominio (ver schemas/vacante.py)
         "certificaciones_keywords": [],
     }
 
