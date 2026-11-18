@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DocHeader } from '../../components/doc-header';
 import { TablaSimple } from '../../components/tabla-simple';
+import { BotonDescargarTodos } from '../../components/boton-descargar-todos';
 import { AuthService } from '../../core/auth.service';
 import * as authApi from '../../lib/api/authApi';
 import * as perfilesApi from '../../lib/api/perfilesApi';
@@ -14,10 +15,10 @@ function fechaCorta(fecha: string | null | undefined): string {
 
 @Component({
   selector: 'app-candidatos-page',
-  imports: [FormsModule, DocHeader, TablaSimple],
+  imports: [FormsModule, DocHeader, TablaSimple, BotonDescargarTodos],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Candidatos" [showCode]="false" />
+    <app-doc-header title="Candidatos" />
     @if (error()) {
       <main class="page"><div class="notice notice--danger">{{ error() }}</div></main>
     } @else if (!candidatos()) {
@@ -50,7 +51,12 @@ function fechaCorta(fecha: string | null | undefined): string {
               [labels]="['Empresa', 'Cargo', 'Tiempo', 'Dedicación']"
             />
 
-            <h3 class="section-title" style="font-size: 14px">Documentos del perfil</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px">
+              <h3 class="section-title" style="font-size: 14px; margin: 0">Documentos del perfil</h3>
+              @if (tieneDocumentos(perfil)) {
+                <app-boton-descargar-todos [descargar]="descargarTodos(cand, perfil)" />
+              }
+            </div>
             @for (cat of categorias; track cat.clave) {
               <div style="margin-bottom: 10px">
                 <span style="font-size: 12.5px; font-weight: 600">{{ cat.etiqueta }}: </span>
@@ -172,6 +178,15 @@ export class CandidatosPage {
       detalle: detalleRegistroII(r),
       establecimiento: r.establecimiento || r.enteCertificador || '—',
     }));
+  }
+
+  protected tieneDocumentos(perfil: any): boolean {
+    return this.categorias.some((c) => (perfil?.documentosAdjuntos?.[c.clave] || []).length > 0);
+  }
+
+  protected descargarTodos(cand: any, perfil: any): () => Promise<unknown> {
+    const nombre = perfil?.datosPersonales?.nombreCompleto || cand.nombreCompleto || 'candidato';
+    return () => perfilesApi.descargarDocumentosDeCandidatoZip(cand.id, `Documentos - ${nombre}.zip`, this.auth.token());
   }
 
   protected descargar(usuarioId: string, categoriaApi: string, indice: number, nombre: string): void {

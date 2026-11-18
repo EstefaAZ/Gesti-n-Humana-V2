@@ -7,13 +7,14 @@ import * as perfilesApi from '../lib/api/perfilesApi';
 import * as solicitudesApi from '../lib/api/solicitudesApi';
 import { CATEGORIAS_DOCUMENTOS } from '../lib/api/solicitudesApi';
 import { pesoDeBase64, pesoLegible } from '../components/zona-archivos';
+import { BotonDescargarTodos } from '../components/boton-descargar-todos';
 
 @Component({
   selector: 'app-documentos-page',
-  imports: [RouterLink, DocHeader, Icon],
+  imports: [RouterLink, DocHeader, Icon, BotonDescargarTodos],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Documentos" [showCode]="false" />
+    <app-doc-header title="Documentos" />
     <main class="page">
       @if (error()) {
         <div class="notice notice--danger">{{ error() }}</div>
@@ -29,7 +30,12 @@ import { pesoDeBase64, pesoLegible } from '../components/zona-archivos';
               <p class="cand-seccion__sub">Se envían automáticamente cada vez que te postulas a una vacante.</p>
             </div>
             @if (perfil()) {
-              <a routerLink="/completar-perfil" class="btn btn-secondary btn-sm"><app-icon name="lapiz" [size]="14" [strokeWidth]="2" /> Actualizar documentos</a>
+              <div class="cand-seccion__acciones">
+                @if (categoriasCompletas() > 0) {
+                  <app-boton-descargar-todos [descargar]="descargarPerfilZip" />
+                }
+                <a routerLink="/completar-perfil" class="btn btn-secondary btn-sm"><app-icon name="lapiz" [size]="14" [strokeWidth]="2" /> Actualizar documentos</a>
+              </div>
             }
           </div>
 
@@ -104,6 +110,8 @@ import { pesoDeBase64, pesoLegible } from '../components/zona-archivos';
                   <div class="cand-envio__cuerpo">
                     @if (totalArchivos(p) === 0) {
                       <p class="cand-doc__vacio">Esta postulación no tiene documentos adjuntos.</p>
+                    } @else {
+                      <div><app-boton-descargar-todos [descargar]="descargarPostulacionZip(p)" /></div>
                     }
                     @for (cat of categorias; track cat.clave) {
                       @if ((p.documentosAdjuntos?.[cat.clave] || []).length > 0) {
@@ -167,6 +175,15 @@ export class DocumentosPage {
 
   protected peso(doc: any): string {
     return pesoLegible(pesoDeBase64(doc?.contenidoBase64));
+  }
+
+  protected readonly descargarPerfilZip = () => {
+    const nombre = this.perfil()?.datosPersonales?.nombreCompleto || 'mi perfil';
+    return perfilesApi.descargarMisDocumentosZip(`Documentos - ${nombre}.zip`, this.auth.token());
+  };
+
+  protected descargarPostulacionZip(p: any): () => Promise<unknown> {
+    return () => solicitudesApi.descargarDocumentosZip(p.radicado, `${p.radicado} - ${p.vacanteCargo || 'documentos'}.zip`, this.auth.token());
   }
 
   protected descargarMiDocumento(categoriaApi: string, indice: number, nombre: string): void {

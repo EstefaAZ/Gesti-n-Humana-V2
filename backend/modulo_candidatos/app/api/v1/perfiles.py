@@ -10,11 +10,28 @@ from app.core.database import get_db
 from app.api.deps import requerir_roles, UsuarioToken
 from app.schemas.perfil_candidato import PerfilCandidatoGuardar, PerfilCandidatoBorrador, PerfilCandidatoOut, EstadoPerfilOut
 from app.services import perfil_candidato_service
+from app.services import zip_documentos_service
 
 router = APIRouter(prefix="/perfiles", tags=["Perfil de candidato"])
 
 ROLES_GESTION = ("gestor_humano", "admin")
 
+
+
+def _zip_de_perfil(db: Session, usuario_id: str) -> Response:
+    perfil = perfil_candidato_service.obtener_perfil(db, usuario_id)
+    if not perfil:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Este candidato no tiene un perfil guardado.")
+    try:
+        contenido = zip_documentos_service.armar_zip(perfil.documentos_adjuntos or {})
+    except zip_documentos_service.SinDocumentosError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    nombre = (perfil.datos_personales or {}).get("nombreCompleto") or "candidato"
+    return Response(
+        content=contenido,
+        media_type="application/zip",
+        headers=zip_documentos_service.respuesta_zip_headers(f"Documentos - {nombre}.zip"),
+    )
 
 @router.get("/me/estado", response_model=EstadoPerfilOut)
 def estado_de_mi_perfil(
@@ -66,6 +83,15 @@ def guardar_mi_borrador(
     return perfil_candidato_service.guardar_borrador(db, usuario.id, datos)
 
 
+@router.get("/me/documentos/zip")
+def descargar_mis_documentos_zip(
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles("candidato")),
+):
+    """Todos los documentos del perfil propio en un .zip (página "Documentos")."""
+    return _zip_de_perfil(db, usuario.id)
+
+
 @router.get("/me/documentos/{categoria}/{indice}")
 def descargar_mi_documento(
     categoria: str,
@@ -88,6 +114,16 @@ def listar_todos_los_perfiles(
 ):
     """Página "Candidatos" de Gestión Humana."""
     return perfil_candidato_service.listar_todos(db)
+
+
+@router.get("/admin/{usuario_id}/documentos/zip")
+def descargar_documentos_de_candidato_zip(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+):
+    """Gestión Humana descarga en un .zip todos los documentos del perfil de un candidato."""
+    return _zip_de_perfil(db, usuario_id)
 
 
 @router.get("/admin/{usuario_id}/documentos/{categoria}/{indice}")

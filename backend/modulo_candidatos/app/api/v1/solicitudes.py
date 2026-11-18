@@ -13,6 +13,7 @@ from app.clients.vacantes_client import VacantesServiceError
 from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
 from app.services import solicitud_service, retencion_service, auditoria_service, email_service, notificacion_service, reporte_service
 from app.services.pdf_service import generar_pdf_solicitud
+from app.services import zip_documentos_service
 
 router = APIRouter(prefix="/solicitudes", tags=["Solicitudes"])
 
@@ -263,6 +264,30 @@ def descargar_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{radicado}.pdf"'},
+    )
+
+
+@router.get("/{radicado}/documentos/zip")
+def descargar_documentos_zip(
+    radicado: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """Todos los documentos adjuntos de una postulación en un .zip. Mismo control
+    de acceso que cada documento: dueño de la solicitud o Gestión Humana."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    _verificar_acceso(solicitud, usuario)
+    try:
+        contenido = zip_documentos_service.armar_zip(solicitud.documentos_adjuntos or {})
+    except zip_documentos_service.SinDocumentosError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    nombre = (solicitud.datos_personales or {}).get("nombreCompleto") or "candidato"
+    return Response(
+        content=contenido,
+        media_type="application/zip",
+        headers=zip_documentos_service.respuesta_zip_headers(f"{radicado} - {nombre}.zip"),
     )
 
 

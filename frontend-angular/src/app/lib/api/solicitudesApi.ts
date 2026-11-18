@@ -167,15 +167,24 @@ export async function descargarReporte(vacanteId, nombreArchivo, token) {
   window.URL.revokeObjectURL(url);
 }
 
+/** Todos los documentos adjuntos de una postulación en un .zip (dueño o Gestión Humana). */
+export async function descargarDocumentosZip(radicado, nombreArchivo, token) {
+  return descargarDocumentoAdjuntoDesde(`${BASE}/${radicado}/documentos/zip`, nombreArchivo || `${radicado}.zip`, token);
+}
+
 export async function descargarDocumentoAdjunto(radicado, categoriaApi, indice, nombreArchivo, token) {
-  const res = await apiFetch(`${BASE}/${radicado}/documentos/${categoriaApi}/${indice}`, { token, raw: true });
+  return descargarDocumentoAdjuntoDesde(`${BASE}/${radicado}/documentos/${categoriaApi}/${indice}`, nombreArchivo, token);
+}
+
+async function descargarDocumentoAdjuntoDesde(url, nombreArchivo, token) {
+  const res = await apiFetch(url, { token, raw: true });
   const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
+  const objUrl = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
+  a.href = objUrl;
   a.download = nombreArchivo || "documento";
   document.body.appendChild(a);
   a.click();
   a.remove();
-  window.URL.revokeObjectURL(url);
+  window.URL.revokeObjectURL(objUrl);
 }

@@ -107,6 +107,16 @@ export async function descargarMiDocumento(categoriaApi, indice, nombreArchivo, 
   return _descargarArchivo(`${BASE}/me/documentos/${categoriaApi}/${indice}`, nombreArchivo, token);
 }
 
+/** Todos los documentos del perfil propio en un .zip (página "Documentos"). */
+export async function descargarMisDocumentosZip(nombreArchivo, token) {
+  return _descargarArchivo(`${BASE}/me/documentos/zip`, nombreArchivo, token);
+}
+
+/** Gestión Humana: todos los documentos del perfil de un candidato en un .zip. */
+export async function descargarDocumentosDeCandidatoZip(usuarioId, nombreArchivo, token) {
+  return _descargarArchivo(`${BASE}/admin/${usuarioId}/documentos/zip`, nombreArchivo, token);
+}
+
 export async function descargarDocumentoDeCandidato(usuarioId, categoriaApi, indice, nombreArchivo, token) {
   return _descargarArchivo(`${BASE}/admin/${usuarioId}/documentos/${categoriaApi}/${indice}`, nombreArchivo, token);
 }
