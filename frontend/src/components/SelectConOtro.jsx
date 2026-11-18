@@ -1,13 +1,27 @@
 import { useState } from "react";
 
+/** minúsculas y sin tildes — para comparar valores guardados antes de que existiera el catálogo. */
+function _normalizar(texto) {
+  return (texto || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
 /**
  * Un <select> con las opciones dadas + "Otro" al final. Si el usuario elige
  * "Otro", cambia a un campo de texto libre (con un enlace para volver a la
  * lista). Si `opciones` viene vacío (por ejemplo, ciudad sin departamento
  * elegido todavía), se muestra directamente como texto libre.
+ *
+ * El match contra `opciones` es tolerante a tildes/mayúsculas: un valor
+ * guardado como "Ingles" preselecciona "Inglés" del catálogo en vez de caer
+ * a modo texto libre solo por la tilde.
  */
 export default function SelectConOtro({ value, onChange, opciones, placeholder = "Seleccione…", disabled = false }) {
-  const [modoTexto, setModoTexto] = useState(() => value !== "" && !opciones.includes(value));
+  const opcionCoincidente = opciones.find((o) => _normalizar(o) === _normalizar(value));
+  const [modoTexto, setModoTexto] = useState(() => value !== "" && !opcionCoincidente);
 
   const sinOpciones = opciones.length === 0;
 
@@ -40,7 +54,7 @@ export default function SelectConOtro({ value, onChange, opciones, placeholder =
 
   return (
     <select
-      value={value}
+      value={opcionCoincidente || value}
       disabled={disabled}
       onChange={(e) => {
         if (e.target.value === "__OTRO__") {

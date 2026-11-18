@@ -1,5 +1,6 @@
 import { apiFetch } from "./httpClient";
 import { API_URLS } from "./config";
+import * as solicitudesApi from "./solicitudesApi";
 
 const BASE_LOGIN = `${API_URLS.login}/api/v1/notificaciones`;
 const BASE_CANDIDATOS = `${API_URLS.candidatos}/api/v1/notificaciones`;
@@ -11,6 +12,8 @@ function _notifACamel(n, servicio) {
     tipo: n.tipo,
     titulo: n.titulo,
     mensaje: n.mensaje,
+    entidadTipo: n.entidad_tipo || null,
+    entidadId: n.entidad_id || null,
     leida: n.leida,
     fechaCreacion: n.fecha_creacion,
   };
@@ -55,4 +58,43 @@ export async function marcarTodasLeidas(token) {
     apiFetch(`${BASE_LOGIN}/me/marcar-todas-leidas`, { method: "POST", token }).catch(() => {}),
     apiFetch(`${BASE_CANDIDATOS}/me/marcar-todas-leidas`, { method: "POST", token }).catch(() => {}),
   ]);
+}
+
+/**
+ * A dónde debe llevar un clic sobre esta notificación — según el tipo y la
+ * entidad asociada. Devuelve null si no hay un destino claro (en ese caso el
+ * clic solo marca como leída y no navega a ninguna parte).
+ *
+ * Se apoya en `entidad_tipo`/`entidad_id`, que las notificaciones ya guardaban;
+ * las anteriores al cambio que no los tengan caen al destino genérico de su
+ * tipo, así que ninguna queda sin comportamiento.
+ */
+export async function resolverDestino(notificacion, token) {
+  if (notificacion.servicio === "login") {
+    // cuenta_desactivada / cuenta_reactivada — es sobre la propia cuenta.
+    return "/perfil";
+  }
+
+  const radicado = notificacion.entidadTipo === "solicitud" ? notificacion.entidadId : null;
+
+  if (notificacion.tipo === "nueva_postulacion" || notificacion.tipo === "postulacion_retirada") {
+    // Difusión para Gestión Humana: abrir la vacante y, dentro, el detalle de
+    // esa postulación. La notificación guarda el radicado, no la vacante, así
+    // que hay que consultarla para saber a qué vacante pertenece.
+    if (!radicado) return "/gestion-humana";
+    try {
+      const solicitud = await solicitudesApi.obtener(radicado, token);
+      return `/gestion-humana?vacante=${solicitud.vacanteId}&radicado=${encodeURIComponent(radicado)}`;
+    } catch {
+      return "/gestion-humana";
+    }
+  }
+
+  if (notificacion.tipo === "solicitud_creada" || notificacion.tipo === "estado_cambiado") {
+    // Sobre la propia postulación del candidato — no hay página de detalle
+    // individual, así que se resalta su fila en "Mis postulaciones".
+    return radicado ? `/mis-postulaciones?radicado=${encodeURIComponent(radicado)}` : "/mis-postulaciones";
+  }
+
+  return null;
 }

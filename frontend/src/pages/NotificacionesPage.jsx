@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
 import { useAuth } from "../context/AuthContext";
 import * as notificacionesApi from "../lib/api/notificacionesApi";
@@ -18,6 +19,7 @@ function formatearFecha(fechaISO) {
 
 export default function NotificacionesPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [notificaciones, setNotificaciones] = useState(null);
   const [error, setError] = useState("");
 
@@ -53,6 +55,13 @@ export default function NotificacionesPage() {
     }
   }
 
+  /** Marca como leída (comportamiento de siempre) y lleva al recurso relacionado. */
+  async function abrirNotificacion(n) {
+    await marcarLeida(n);
+    const destino = await notificacionesApi.resolverDestino(n, token).catch(() => null);
+    if (destino) navigate(destino);
+  }
+
   const hayNoLeidas = (notificaciones || []).some((n) => !n.leida);
 
   return (
@@ -78,10 +87,14 @@ export default function NotificacionesPage() {
               {notificaciones.map((n) => (
                 <li
                   key={`${n.servicio}-${n.id}`}
-                  onClick={() => marcarLeida(n)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => abrirNotificacion(n)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirNotificacion(n); } }}
                   style={{
                     display: "flex", gap: 14, padding: "14px 4px", borderBottom: "1px solid var(--color-border)",
-                    cursor: n.leida ? "default" : "pointer",
+                    // ahora el clic también navega, así que toda la fila es accionable
+                    cursor: "pointer",
                     background: n.leida ? "transparent" : "var(--color-primary-tint)",
                     borderRadius: n.leida ? 0 : "var(--radius)",
                   }}

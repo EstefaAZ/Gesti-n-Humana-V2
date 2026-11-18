@@ -36,7 +36,6 @@ function itemsPara(rol) {
       { to: "/perfil", label: "Mi perfil", icon: IconUser },
       { to: "/documentos", label: "Documentos", icon: IconFolder },
       { to: "/notificaciones", label: "Notificaciones", icon: IconBell },
-      { label: "Configuración", icon: IconSettings, proximamente: true },
     ];
   }
 

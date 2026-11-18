@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { NIVELES_EDUCATIVOS, NIVELES_IDIOMA, TIPOS_VINCULACION, PUBLICO_OBJETIVO_OPCIONES } from "../../data/catalogos";
+import { NIVELES_EDUCATIVOS, NIVELES_IDIOMA, IDIOMAS, TIPOS_VINCULACION, PUBLICO_OBJETIVO_OPCIONES, etiquetaNivelIdioma } from "../../data/catalogos";
 import { formatearMilesCOP } from "../../lib/formato";
+import { normalizarVacanteParaFormulario } from "../../lib/vacanteDefaults";
+import SelectConOtro from "../../components/SelectConOtro";
 
 const ESTADOS = [
   { valor: "borrador", etiqueta: "Borrador" },
@@ -13,7 +15,10 @@ const ESTADOS = [
 const MAX_CERTIFICACIONES = 5;
 
 export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
-  const [v, setV] = useState(vacanteInicial);
+  // Una vacante creada antes del cambio de escala trae criterios con la escala
+  // anterior; se normalizan al abrir el formulario para que los selectores
+  // muestren un valor válido en vez de quedar en blanco.
+  const [v, setV] = useState(() => normalizarVacanteParaFormulario(vacanteInicial));
   const [pdfFile, setPdfFile] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -127,6 +132,7 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
         </legend>
         <p className="text-muted" style={{ fontSize: 12.5, marginTop: -4 }}>
           Estos criterios solo priorizan y advierten a Gestión Humana; nunca bloquean el envío de la solicitud del aspirante.
+          Todos se evalúan como <strong>mínimos</strong>: un aspirante con un nivel superior al pedido también cumple.
         </p>
         <div className="field-grid">
           <div className="field">
@@ -135,6 +141,7 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
               <option value="">Sin requisito</option>
               {NIVELES_EDUCATIVOS.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
+            <span className="hint">Los niveles superiores también cumplen (ej. "Técnico" lo cumple un Universitario).</span>
           </div>
           <div className="field">
             <label>¿Requiere graduado?</label>
@@ -148,21 +155,17 @@ export default function VacanteForm({ vacanteInicial, onGuardar, onCancelar }) {
         <div className="field-grid">
           <div className="field"><label>Años mínimos de experiencia</label><input type="number" min="0" step="0.5" value={v.criterios.experienciaMinAnios} onChange={(e) => setCriterio({ experienciaMinAnios: e.target.value })} /></div>
         </div>
-        <div className="field-grid field-grid--3">
-          <div className="field"><label>Idioma requerido (opcional)</label><input type="text" value={v.criterios.idiomaRequerido} onChange={(e) => setCriterio({ idiomaRequerido: e.target.value })} /></div>
+        <div className="field-grid">
           <div className="field">
-            <label>Habilidad evaluada</label>
-            <select value={v.criterios.idiomaHabilidad} onChange={(e) => setCriterio({ idiomaHabilidad: e.target.value })}>
-              <option value="habla">Lo habla</option>
-              <option value="lee">Lo lee</option>
-              <option value="escribe">Lo escribe</option>
-            </select>
+            <label>Idioma requerido (opcional)</label>
+            <SelectConOtro value={v.criterios.idiomaRequerido} opciones={IDIOMAS} onChange={(val) => setCriterio({ idiomaRequerido: val })} />
           </div>
           <div className="field">
-            <label>Nivel mínimo</label>
+            <label>Nivel mínimo de dominio</label>
             <select value={v.criterios.idiomaNivelMin} onChange={(e) => setCriterio({ idiomaNivelMin: e.target.value })}>
-              {NIVELES_IDIOMA.map((n) => <option key={n} value={n}>{n}</option>)}
+              {NIVELES_IDIOMA.map((n) => <option key={n} value={n}>{etiquetaNivelIdioma(n)}</option>)}
             </select>
+            <span className="hint">Se evalúa un único nivel de dominio (MCER); los niveles superiores también cumplen.</span>
           </div>
         </div>
 
