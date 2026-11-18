@@ -105,8 +105,15 @@ class UsuarioOut(BaseModel):
     cedula: Optional[str] = None
     activo: bool
     fecha_creacion: Optional[datetime] = None
+    tiene_foto: bool = False
 
     model_config = {"from_attributes": True}
+
+
+class SubirFotoPerfil(BaseModel):
+    """La imagen viaja en base64 dentro del JSON, igual que los documentos del resto de la app."""
+    contenido_base64: str = Field(min_length=1)
+    tipo: str
 
 
 class Token(BaseModel):

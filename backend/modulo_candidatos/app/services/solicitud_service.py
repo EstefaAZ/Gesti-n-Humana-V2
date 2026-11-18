@@ -44,16 +44,32 @@ class PostulacionActivaError(Exception):
 
 ESTADOS_VACANTE_EN_CURSO = ("publicada", "en_proceso")
 
+# Estados en los que el candidato YA NO sigue participando en ese proceso —
+# si se retiró o lo rechazaron, esa solicitud no debe seguir contando como
+# "postulación activa", sin importar que la vacante en sí siga publicada.
+ESTADOS_SOLICITUD_INACTIVOS = ("Retirada", "Rechazada")
+
 
 def _tiene_postulacion_activa_en_otra_vacante(db: Session, usuario_id: str, token: Optional[str]) -> bool:
-    """Revisa TODAS las solicitudes previas del candidato y consulta el estado
-    ACTUAL de cada vacante asociada (puede haber cambiado desde que se postuló).
-    Si alguna sigue "publicada" o "en_proceso", el candidato no puede postularse
-    a una vacante nueva hasta que esa se cierre o se cancele."""
-    solicitudes_previas = db.query(Solicitud).filter(Solicitud.usuario_id == usuario_id).all()
+    """Revisa las solicitudes previas del candidato que todavía siguen en pie
+    (ni retiradas ni rechazadas) y consulta el estado ACTUAL de cada vacante
+    asociada (puede haber cambiado desde que se postuló). Si alguna sigue
+    "publicada" o "en_proceso", el candidato no puede postularse a una
+    vacante nueva hasta que esa se cierre, se cancele, o él se retire de ella."""
+    solicitudes_previas = (
+        db.query(Solicitud)
+        .filter(Solicitud.usuario_id == usuario_id, Solicitud.estado.notin_(ESTADOS_SOLICITUD_INACTIVOS))
+        .all()
+    )
     for sol in solicitudes_previas:
-        vacante = vacantes_client.obtener_vacante(sol.vacante_id, token=token)
-        if vacante and vacante.get("estado") in ESTADOS_VACANTE_EN_CURSO:
+        # obtener_estado_proceso (no obtener_vacante): ve también las vacantes ocultas
+        # para candidatos, como "en_proceso", que antes no se contaban.
+        vacante = vacantes_client.obtener_estado_proceso(sol.vacante_id, token=token)
+        # "publicada" con la fecha de cierre vencida ya no está en curso (el módulo de
+        # Vacantes la pasa a "cerrada"; esta_cerrada cubre el caso por si acaso).
+        if vacante and vacante.get("estado") in ESTADOS_VACANTE_EN_CURSO and not (
+            vacante.get("estado") == "publicada" and vacante.get("esta_cerrada")
+        ):
             return True
     return False
 

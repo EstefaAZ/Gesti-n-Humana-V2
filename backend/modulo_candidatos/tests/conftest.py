@@ -81,4 +81,12 @@ def mock_vacantes(monkeypatch):
         return VACANTES_MOCK.get(vacante_id)
 
     monkeypatch.setattr(vacantes_client, "obtener_vacante", fake_obtener_vacante)
+
+    # El estado del proceso sale del mismo mock; se busca obtener_vacante al momento
+    # de llamar para respetar los tests que lo vuelven a reemplazar a mitad de camino.
+    def fake_obtener_estado_proceso(vacante_id, token=None):
+        v = vacantes_client.obtener_vacante(vacante_id, token=token)
+        return {"id": v["id"], "estado": v.get("estado"), "esta_cerrada": v.get("esta_cerrada", False)} if v else None
+
+    monkeypatch.setattr(vacantes_client, "obtener_estado_proceso", fake_obtener_estado_proceso)
     yield

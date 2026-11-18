@@ -1011,3 +1011,79 @@ def test_auditoria_ordena_del_mas_reciente_al_mas_antiguo():
     assert len(eventos) == 2
     assert "segundo@example.com" in eventos[0]["descripcion"]  # el más reciente va primero
     assert "primero@example.com" in eventos[1]["descripcion"]
+
+
+# ---------------------------------------------------------------
+# Foto de perfil
+# ---------------------------------------------------------------
+
+import base64 as _b64
+
+PNG_1x1 = _b64.b64encode(
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+).decode()
+
+
+def _headers_registrado():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_foto_subir_ver_y_quitar():
+    h = _headers_registrado()
+    assert client.get("/api/v1/auth/me", headers=h).json()["tiene_foto"] is False
+    assert client.get("/api/v1/auth/me/foto", headers=h).status_code == 404
+
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h)
+    assert r.status_code == 200
+    assert r.json()["tiene_foto"] is True
+
+    foto = client.get("/api/v1/auth/me/foto", headers=h)
+    assert foto.status_code == 200
+    assert foto.headers["content-type"] == "image/png"
+    assert foto.content == _b64.b64decode(PNG_1x1)
+
+    # Reemplazarla no duplica nada
+    assert client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h).status_code == 200
+
+    r = client.delete("/api/v1/auth/me/foto", headers=h)
+    assert r.status_code == 200
+    assert r.json()["tiene_foto"] is False
+    assert client.get("/api/v1/auth/me/foto", headers=h).status_code == 404
+
+
+def test_foto_rechaza_tipo_no_permitido_y_contenido_falso():
+    h = _headers_registrado()
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/gif"}, headers=h)
+    assert r.status_code == 422
+    # Dice ser JPG pero los bytes son de un PNG
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/jpeg"}, headers=h)
+    assert r.status_code == 422
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": "esto no es base64!!", "tipo": "image/png"}, headers=h)
+    assert r.status_code == 422
+
+
+def test_foto_rechaza_mas_de_2mb():
+    h = _headers_registrado()
+    grande = _b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * (2 * 1024 * 1024)).decode()
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": grande, "tipo": "image/png"}, headers=h)
+    assert r.status_code == 422
+    assert "2 MB" in r.json()["detail"]
+
+
+def test_foto_requiere_sesion():
+    assert client.get("/api/v1/auth/me/foto").status_code == 401
+    assert client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}).status_code == 401
+
+
+def test_eliminar_cuenta_borra_tambien_la_foto():
+    from app.models.foto_perfil import FotoPerfil
+
+    h = _headers_registrado()
+    client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h)
+    assert client.delete("/api/v1/auth/me", headers=h).status_code == 204
+
+    db = next(override_get_db())
+    assert db.query(FotoPerfil).count() == 0

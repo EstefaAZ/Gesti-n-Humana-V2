@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import requerir_roles, UsuarioToken
+from app.api.deps import requerir_roles, obtener_usuario_actual, UsuarioToken
 from app.schemas.vacante import (
     VacanteCrear, VacanteActualizar, VacanteOut, EstadisticasVacantes,
     EventoAuditoriaOut, CambiarEstadoVacante,
@@ -36,6 +36,26 @@ def obtener_vacante_publica(vacante_id: str, db: Session = Depends(get_db)):
     if not vacante or vacante.estado not in ESTADOS_VISIBLES_CANDIDATO:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vacante no encontrada.")
     return vacante
+
+
+@router.get("/{vacante_id}/estado-proceso")
+def estado_proceso_vacante(
+    vacante_id: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """
+    Solo el estado de una vacante, AUNQUE esté oculta para candidatos
+    ("en_proceso", "cancelada_desierta"…). La usa el módulo de candidatos, con
+    el token del candidato, para saber si una postulación anterior sigue en
+    curso: la ruta pública devuelve 404 para "en_proceso" y por eso esas
+    postulaciones no se contaban y se podía uno inscribir en dos procesos a la vez.
+    No expone nada más de la vacante.
+    """
+    vacante = vacante_service.obtener_vacante(db, vacante_id)
+    if not vacante:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vacante no encontrada.")
+    return {"id": vacante.id, "estado": vacante.estado, "esta_cerrada": vacante.esta_cerrada}
 
 
 # ---------------------------------------------------------------
