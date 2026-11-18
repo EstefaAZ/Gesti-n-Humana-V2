@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"  # para armar enlaces dentro de los correos
 
     # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:4200"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "CAMBIAR-ESTA-CLAVE-EN-PRODUCCION"
     ALGORITHM: str = "HS256"
 
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:4200"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

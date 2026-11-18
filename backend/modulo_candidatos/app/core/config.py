@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "CAMBIAR-ESTA-CLAVE-EN-PRODUCCION"
     ALGORITHM: str = "HS256"
 
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:4200"
 
     # URL base del módulo Vacantes — se consulta por HTTP para traer la vacante
     # y sus criterios de evaluación (cada módulo tiene su propia base de datos).
