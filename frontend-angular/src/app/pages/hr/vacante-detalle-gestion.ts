@@ -107,10 +107,10 @@ import { formatearFecha } from '../../lib/formato';
             <colgroup>
               <col style="width: 22%" />
               <col style="width: 12%" />
-              <col style="width: 14%" />
+              <col style="width: 12%" />
               <col style="width: 10%" />
-              <col style="width: 34%" />
-              <col style="width: 8%" />
+              <col style="width: 31%" />
+              <col style="width: 13%" />
             </colgroup>
             <thead>
               <tr>
@@ -133,7 +133,9 @@ import { formatearFecha } from '../../lib/formato';
                   <td>{{ fechaCorta(p.fechaSolicitud) }}</td>
                   <td><app-estado-postulacion-badge [estado]="p.estado" /></td>
                   <td style="max-width: 220px; white-space: normal"><app-evaluacion-badge [evaluacion]="p.evaluacion" /></td>
-                  <td><button class="hr-link-btn" (click)="detalleId.set(p.radicado)">Ver detalle</button></td>
+                  <td style="text-align: right; white-space: nowrap">
+                    <button type="button" class="btn btn-secondary btn-sm" (click)="detalleId.set(p.radicado)">Ver detalles</button>
+                  </td>
                 </tr>
               }
             </tbody>

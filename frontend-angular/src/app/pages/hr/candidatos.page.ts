@@ -108,7 +108,9 @@ function fechaCorta(fecha: string | null | undefined): string {
                       </span>
                     </td>
                     <td>{{ fechaCorta(c.fechaCreacion) }}</td>
-                    <td><button type="button" class="hr-link-btn" (click)="seleccionado.set(c)">Ver perfil</button></td>
+                    <td style="text-align: right; white-space: nowrap">
+                      <button type="button" class="btn btn-secondary btn-sm" (click)="seleccionado.set(c)">Ver perfil</button>
+                    </td>
                   </tr>
                 }
               </tbody>
