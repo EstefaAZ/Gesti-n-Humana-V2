@@ -500,6 +500,7 @@ h1[tabindex='-1']:focus { outline: none; }
 .formulario-app input[type='date'],
 .formulario-app input[type='month'],
 .formulario-app input[type='number'],
+.formulario-app input[type='time'],
 .formulario-app select,
 .formulario-app textarea {
   font-family: var(--font-body);
@@ -750,4 +751,392 @@ h1[tabindex='-1']:focus { outline: none; }
   .familiar { grid-template-columns: minmax(0, 1fr) auto; }
   .familiar .field { grid-column: 1; }
   .familiar__quitar { grid-column: 2; grid-row: 1; align-self: start; margin: 22px 0 0; }
+}
+
+/* ==========================================================================
+   Procesos de Selección (Gestión Humana) — rediseño de lista, detalle y
+   formulario de vacante. Prefijo ps- para no afectar otras pantallas.
+   ========================================================================== */
+
+/* Mismo estilo que el resto de campos (global.css no incluía la hora). */
+input[type='time'] {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  width: 100%;
+}
+
+.ps-tarjeta {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- Encabezado de la lista ---------- */
+
+.ps-encabezado {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.ps-encabezado__titulo { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-primary-dark); margin: 0; }
+.ps-encabezado__resumen { margin: 4px 0 0; font-size: 13.5px; color: var(--color-text-muted); }
+.ps-encabezado__resumen strong { color: var(--color-text); font-weight: 600; }
+
+/* ---------- Barra de búsqueda + filtros por estado ---------- */
+
+.ps-barra { padding: 16px 18px; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 14px; }
+
+.ps-buscador { position: relative; max-width: 380px; }
+.ps-buscador__icono { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted); pointer-events: none; display: inline-flex; }
+.ps-buscador input[type='search'] { padding-left: 36px; max-width: none; width: 100%; }
+
+.ps-filtros { display: flex; flex-wrap: wrap; gap: 8px; }
+.ps-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.ps-chip:hover { background: var(--color-surface-sunken); }
+.ps-chip.is-activo { background: var(--color-primary-dark); border-color: var(--color-primary-dark); color: #fff; }
+.ps-chip.is-vacio:not(.is-activo) { color: var(--color-text-muted); font-weight: 500; }
+.ps-chip__conteo { font-variant-numeric: tabular-nums; font-weight: 700; opacity: 0.85; }
+.ps-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* Punto de color por estado (mismos tonos que las píldoras). */
+.ps-punto { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--color-text-muted); }
+.ps-punto--publicada { background: var(--color-accent); }
+.ps-punto--en_proceso { background: #C99A00; }
+.ps-punto--cerrada { background: var(--color-danger); }
+.ps-punto--borrador { background: #9AA79F; }
+.ps-punto--cancelada_desierta { background: #2F6FC0; }
+.ps-chip.is-activo .ps-punto { box-shadow: 0 0 0 2px #fff; }
+
+/* ---------- Tabla de vacantes ---------- */
+
+.ps-tabla { width: 100%; border-collapse: collapse; }
+.ps-tabla th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  padding: 12px;
+  background: #FAFCFA;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.ps-tabla td { padding: 14px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; font-size: 14px; }
+.ps-tabla tbody tr:last-child td { border-bottom: none; }
+.ps-tabla th:first-child, .ps-tabla td:first-child { padding-left: 18px; }
+.ps-tabla th:last-child, .ps-tabla td:last-child { padding-right: 14px; }
+.ps-tabla .ps-num { text-align: center; }
+.ps-fila { cursor: pointer; transition: background-color 120ms ease; }
+.ps-fila:hover { background: #F6FBF7; }
+
+.ps-cargo {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.ps-fila:hover .ps-cargo { color: var(--color-primary); }
+.ps-cargo:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 2px; }
+.ps-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 12.5px; color: var(--color-text-muted); }
+.ps-meta__codigo { font-family: var(--font-mono); font-size: 11.5px; }
+.ps-meta__item { display: inline-flex; align-items: center; gap: 4px; }
+
+.ps-cierre { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ps-cierre__hora { color: var(--color-text-muted); margin-left: 4px; }
+.ps-cierre__aviso { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--color-warning); }
+
+.ps-conteo { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); font-variant-numeric: tabular-nums; }
+.ps-conteo.is-cero { color: var(--color-text-muted); font-weight: 600; }
+
+.ps-pie-tabla { padding: 12px 18px; border-top: 1px solid var(--color-border); font-size: 12.5px; color: var(--color-text-muted); }
+.ps-vacio { padding: 40px 20px; text-align: center; color: var(--color-text-muted); font-size: 14px; }
+.ps-vacio .btn { margin-top: 12px; }
+
+/* Píldora de estado con flecha cuando se puede cambiar. */
+button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
+.vac-status-pill { white-space: nowrap; }
+
+/* ---------- Detalle de la vacante ---------- */
+
+/* "Volver a vacantes": mismo botón secundario que Editar / Descargar reporte. */
+.ps-volver { margin-bottom: 16px; }
+
+.ps-cabecera { padding: 26px 28px 24px; margin-bottom: 20px; }
+.ps-cabecera__fila { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.ps-cabecera__titulo { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--color-primary-dark); margin: 6px 0 0; line-height: 1.25; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.ps-cabecera__titulo .vac-status-pill,
+.ps-cabecera__titulo .vac-status-select { font-family: var(--font-body); font-size: 12px; font-weight: 700; line-height: 1.4; padding: 4px 10px; }
+.ps-cabecera__titulo .vac-status-select { width: auto; }
+.ps-cabecera__acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.ps-cabecera__descripcion { margin: 12px 0 0; font-size: 14px; line-height: 1.55; color: var(--color-text-muted); max-width: 68ch; }
+
+.ps-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  margin: 22px 0 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #FAFCFA;
+}
+.ps-dato { padding: 14px 16px; border-left: 1px solid var(--color-border); min-width: 0; }
+.ps-dato:first-child { border-left: none; }
+.ps-dato__etiqueta { display: block; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-muted); margin-bottom: 4px; }
+.ps-dato__valor { font-size: 15px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ps-dato__valor--grande { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-primary-dark); line-height: 1.1; }
+.ps-dato__sub { display: block; font-size: 12px; color: var(--color-text-muted); font-weight: 500; margin-top: 2px; }
+@media (max-width: 640px) {
+  .ps-dato { border-left: none; border-top: 1px solid var(--color-border); }
+  .ps-dato:first-child { border-top: none; }
+}
+
+.ps-criterios { margin-top: 20px; }
+.ps-subtitulo { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); margin: 0 0 8px; }
+.ps-etiquetas { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.ps-etiqueta { display: inline-flex; align-items: baseline; gap: 5px; padding: 6px 11px; border-radius: 8px; background: var(--color-primary-tint); border: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
+.ps-etiqueta strong { color: var(--color-primary-dark); font-weight: 600; }
+.ps-sin-criterios { font-size: 13px; color: var(--color-text-muted); margin: 0; }
+
+.ps-candidatos__cabecera { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 18px 18px 14px; border-bottom: 1px solid var(--color-border); }
+.ps-candidatos__titulo { font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); margin: 0; display: flex; align-items: center; gap: 8px; }
+.ps-contador { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--color-accent-tint); color: var(--color-primary-dark); font-family: var(--font-body); font-size: 12px; font-weight: 700; }
+.ps-resumen { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--color-text-muted); }
+.ps-resumen span { display: inline-flex; align-items: center; gap: 6px; }
+.ps-aspirante { font-weight: 600; color: var(--color-text); }
+.ps-aspirante__cc { display: block; font-family: var(--font-mono); font-size: 11.5px; color: var(--color-text-muted); font-weight: 400; margin-top: 2px; }
+.ps-tabla td.ps-arriba { vertical-align: top; }
+
+/* ---------- Formulario de vacante (por pasos, como Completar perfil) ---------- */
+
+.ps-wizard__cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.ps-wizard__titulo { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-primary-dark); margin: 0; }
+.ps-wizard__sub { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); }
+.ps-wizard__derecha { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+.ps-certificaciones { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.ps-certificacion { display: flex; gap: 8px; align-items: center; }
+.ps-certificacion input { flex: 1; }
+.ps-certificaciones .btn { align-self: flex-start; }
+
+/* Paso "Revisión": resumen por bloques con enlace para volver a editar cada uno. */
+.ps-revision { display: flex; flex-direction: column; gap: 14px; }
+.ps-revision__bloque { border: 1px solid var(--color-border); border-radius: 12px; padding: 16px 18px; background: #FAFCFA; }
+.ps-revision__cabecera { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ps-revision__cabecera h4 { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--color-primary-dark); }
+.ps-revision__cabecera .hr-link-btn { padding: 4px 0; }
+.ps-revision__datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px 20px; margin: 0; }
+@media (max-width: 640px) {
+  .ps-revision__datos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+  .ps-revision__bloque { padding: 14px; }
+}
+.ps-revision__dato { min-width: 0; }
+.ps-revision__dato--ancho { grid-column: 1 / -1; }
+.ps-revision__dato dt { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-muted); margin-bottom: 2px; }
+.ps-revision__dato dd { margin: 0; font-size: 14px; font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+
+.ps-solo-movil { display: none; }
+
+@media (max-width: 640px) {
+  /* Lista de vacantes: cada fila pasa a ser una tarjeta (cargo arriba; cierre,
+     postulaciones, estado y menú en una línea), sin scroll horizontal. */
+  .ps-tabla--vacantes thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .ps-tabla--vacantes, .ps-tabla--vacantes tbody { display: block; }
+  .ps-tabla--vacantes tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .ps-tabla--vacantes tbody tr:last-child { border-bottom: none; }
+  .ps-tabla--vacantes td,
+  .ps-tabla--vacantes td:first-child,
+  .ps-tabla--vacantes td:last-child { display: block; padding: 0; border: none; }
+  .ps-tabla--vacantes td:first-child { grid-column: 1 / -1; }
+  .ps-tabla--vacantes .ps-cierre { white-space: normal; font-size: 13px; }
+  .ps-tabla--vacantes .ps-conteo { font-size: 15px; }
+  .ps-solo-movil { display: inline; font-family: var(--font-body); font-size: 12px; font-weight: 500; color: var(--color-text-muted); }
+
+  .ps-cabecera { padding-left: 18px; padding-right: 18px; }
+  .ps-wizard__cabecera { flex-direction: column-reverse; }
+  .ps-wizard__cabecera .btn { align-self: flex-end; }
+  .ps-cabecera__titulo { font-size: 20px; }
+}
+
+/* ==========================================================================
+   Páginas del candidato — Vacantes, Mis postulaciones, Documentos y
+   Notificaciones. Prefijo cand- (mismos tokens que Procesos de Selección).
+   ========================================================================== */
+
+.cand-encabezado { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.cand-encabezado__titulo { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-primary-dark); margin: 0; }
+.cand-encabezado__sub { margin: 4px 0 0; font-size: 13.5px; color: var(--color-text-muted); }
+.cand-encabezado__sub strong { color: var(--color-text); }
+.cand-encabezado .ps-buscador { flex: 1 1 280px; max-width: 360px; }
+
+.cand-vacio { text-align: center; padding: 44px 24px; }
+.cand-vacio__icono { width: 48px; height: 48px; border-radius: 50%; background: var(--color-primary-tint); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.cand-vacio__titulo { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); }
+.cand-vacio__texto { margin: 6px auto 0; max-width: 46ch; font-size: 13.5px; color: var(--color-text-muted); line-height: 1.5; }
+.cand-vacio .btn { margin-top: 16px; }
+
+/* ---------- Vacantes (convocatorias abiertas) ---------- */
+
+.cand-vacantes { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.cand-vacante { display: flex; flex-direction: column; padding: 20px; gap: 10px; transition: border-color 160ms ease, box-shadow 160ms ease; }
+.cand-vacante:hover { border-color: var(--color-border-strong); box-shadow: 0 2px 4px rgba(0, 77, 32, 0.06), 0 10px 24px rgba(0, 77, 32, 0.08); }
+.cand-vacante__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cand-vacante__cargo { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1.3; color: var(--color-primary-dark); }
+.cand-vacante__descripcion { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--color-text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cand-vacante__datos { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--color-text-muted); }
+.cand-vacante__datos span { display: inline-flex; align-items: center; gap: 5px; }
+.cand-vacante__pie { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cand-vacante__cierre { font-size: 12.5px; color: var(--color-text-muted); line-height: 1.4; }
+.cand-vacante__cierre strong { display: block; color: var(--color-text); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.cand-aviso { color: var(--color-warning); font-weight: 600; }
+.cand-pildora { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.cand-pildora--nueva { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.cand-pildora--postulado { background: #E3EEFC; color: #1D5DAD; }
+.cand-pildora--pronto { background: var(--color-surface-sunken); color: var(--color-text-muted); }
+
+/* ---------- Mis postulaciones ---------- */
+
+.cand-postulaciones { display: flex; flex-direction: column; gap: 14px; }
+.cand-postulacion { padding: 20px 22px; transition: box-shadow 200ms ease, border-color 200ms ease; }
+.cand-postulacion.is-destacada { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-tint), var(--shadow-card); }
+.cand-postulacion__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.cand-postulacion__cargo { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); line-height: 1.3; }
+.cand-postulacion__meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font-size: 12.5px; color: var(--color-text-muted); }
+.cand-postulacion__meta .mono { font-family: var(--font-mono); font-size: 11.5px; }
+.cand-postulacion__acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+/* Franja con el estado actual de la convocatoria. */
+.cand-convocatoria { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; background: var(--color-primary-tint); color: var(--color-primary-dark); }
+.cand-convocatoria app-icon { flex: 0 0 auto; margin-top: 1px; }
+.cand-convocatoria strong { display: block; }
+.cand-convocatoria span { color: var(--color-text-muted); }
+.cand-convocatoria--cerrada { background: #F4F6F5; color: var(--color-text); }
+.cand-convocatoria--cancelada { background: var(--color-danger-tint); color: var(--color-danger); }
+.cand-convocatoria--cancelada span { color: #8C3B36; }
+.cand-convocatoria--proceso { background: #FFF6D9; color: #7A5C00; }
+
+/* Etapas de la postulación (Recibida → … → Decisión). */
+.cand-etapas { display: flex; list-style: none; margin: 16px 0 0; padding: 0; }
+.cand-etapa { flex: 1 1 0; position: relative; text-align: center; font-size: 11.5px; color: var(--color-text-muted); padding-top: 18px; min-width: 0; }
+.cand-etapa::before { content: ''; position: absolute; top: 4px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #fff; border: 2px solid var(--color-border-strong); z-index: 1; }
+.cand-etapa + .cand-etapa::after { content: ''; position: absolute; top: 8px; right: 50%; width: 100%; height: 2px; background: var(--color-border); }
+.cand-etapa.is-hecha::before { background: var(--color-accent); border-color: var(--color-accent); }
+.cand-etapa.is-hecha::after, .cand-etapa.is-actual::after { background: var(--color-accent); }
+.cand-etapa.is-actual { color: var(--color-primary-dark); font-weight: 700; }
+.cand-etapa.is-actual::before { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-accent-tint); }
+.cand-etapa.is-negativa::before { background: var(--color-danger); border-color: var(--color-danger); box-shadow: 0 0 0 4px var(--color-danger-tint); }
+.cand-etapa.is-negativa { color: var(--color-danger); }
+@media (max-width: 560px) {
+  .cand-etapa { font-size: 0; }
+  .cand-etapa.is-actual { font-size: 11.5px; }
+}
+
+/* ---------- Documentos ---------- */
+
+.cand-seccion { padding: 22px 24px; margin-bottom: 20px; }
+.cand-seccion__cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.cand-seccion__titulo { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); }
+.cand-seccion__sub { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); max-width: 62ch; line-height: 1.5; }
+
+.cand-progreso { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 13px; color: var(--color-text-muted); }
+.cand-progreso__barra { flex: 1; max-width: 240px; height: 6px; border-radius: 999px; background: var(--color-border); overflow: hidden; }
+.cand-progreso__barra span { display: block; height: 100%; background: var(--color-accent); border-radius: inherit; }
+
+.cand-docs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.cand-doc { border: 1px solid var(--color-border); border-radius: 12px; padding: 14px; background: #FAFCFA; }
+.cand-doc.is-falta { background: #fff; border-style: dashed; border-color: var(--color-border-strong); }
+.cand-doc__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+.cand-doc__nombre { font-size: 13.5px; font-weight: 700; color: var(--color-text); margin: 0; }
+.cand-doc__vacio { margin: 0; font-size: 12.5px; color: var(--color-text-muted); }
+.cand-doc .archivos-lista { margin: 0; }
+.cand-doc .archivo-item { background: #fff; }
+.cand-pildora--ok { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.cand-pildora--falta { background: var(--color-warning-tint); color: #7A4E06; }
+
+.cand-envios { display: flex; flex-direction: column; gap: 10px; }
+.cand-envio { border: 1px solid var(--color-border); border-radius: 12px; background: #fff; }
+.cand-envio > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; }
+.cand-envio > summary::-webkit-details-marker { display: none; }
+.cand-envio > summary:hover { background: #F6FBF7; }
+.cand-envio > summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cand-envio__titulo { font-weight: 600; font-size: 14px; color: var(--color-text); }
+.cand-envio__meta { display: block; font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+.cand-envio__flecha { transition: transform 160ms ease; color: var(--color-text-muted); flex: 0 0 auto; }
+.cand-envio[open] .cand-envio__flecha { transform: rotate(180deg); }
+.cand-envio__cuerpo { padding: 4px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.cand-envio__categoria { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-muted); margin: 0 0 6px; }
+
+/* ---------- Notificaciones ---------- */
+
+.cand-notif__barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--color-border); }
+.cand-notif__grupo { margin: 0; padding: 14px 18px 6px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.cand-notif__lista { list-style: none; margin: 0; padding: 0 8px 8px; }
+.cand-notif {
+  display: flex;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.cand-notif:hover { background: #F6FBF7; }
+.cand-notif:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.cand-notif.is-nueva { background: var(--color-primary-tint); }
+.cand-notif.is-nueva:hover { background: #E2F3E6; }
+.cand-notif__icono { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--color-surface-sunken); color: var(--color-primary); }
+.cand-notif.is-nueva .cand-notif__icono { background: #fff; }
+.cand-notif__texto { flex: 1; min-width: 0; }
+.cand-notif__titulo { display: block; font-size: 14px; font-weight: 600; color: var(--color-text); }
+.cand-notif.is-nueva .cand-notif__titulo { font-weight: 700; }
+.cand-notif__mensaje { display: block; margin-top: 2px; font-size: 13px; line-height: 1.45; color: var(--color-text-muted); }
+.cand-notif__fecha { display: block; margin-top: 6px; font-size: 12px; color: var(--color-text-muted); }
+.cand-notif__punto { flex: 0 0 auto; width: 9px; height: 9px; margin-top: 6px; border-radius: 50%; background: var(--color-accent); }
+.cand-notif__punto--leida { background: transparent; }
+
+@media (max-width: 640px) {
+  .cand-seccion { padding: 18px; }
+  .cand-postulacion { padding: 18px; }
+  .cand-notif__barra { padding: 12px 14px; }
 }

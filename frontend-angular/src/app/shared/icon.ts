@@ -47,6 +47,11 @@ const TRAZOS: Record<string, string> = {
   mas: '<path d="M12 5v14M5 12h14" />',
   chevronAbajo: '<path d="M6 9l6 6 6-6" />',
   subir: '<path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />',
+  descargar: '<path d="M12 4v12M7 11l5 5 5-5" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />',
+  lapiz: '<path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />',
+  calendario: '<rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" />',
+  ubicacion: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />',
+  buscar: '<circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />',
   firma: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" /><path d="M14 21h7" />',
 };
 

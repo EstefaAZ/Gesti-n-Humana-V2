@@ -3,7 +3,9 @@ import { Icon } from '../shared/icon';
 
 // Nombre e ícono de cada paso. La clave sigue siendo el numeral del formato
 // GTH-FOR-03 (I, II, VI…), pero ya no se muestra: en su lugar va un ícono.
-const PASOS: Record<string, { nombre: string; icono: string }> = {
+export type DefinicionPaso = { nombre: string; icono: string };
+
+const PASOS: Record<string, DefinicionPaso> = {
   I: { nombre: 'Datos personales', icono: 'persona' },
   II: { nombre: 'Estudios', icono: 'birrete' },
   VI: { nombre: 'Experiencia', icono: 'briefcase' },
@@ -18,6 +20,7 @@ const PASOS: Record<string, { nombre: string; icono: string }> = {
  * paso, unidos por una línea que se pinta de verde a medida que se avanza; el
  * paso terminado conserva su ícono y suma un ✓ en la esquina. En pantallas
  * angostas se ocultan los nombres y aparece "Paso N de M · Nombre".
+ * Otro formulario (p. ej. Nueva vacante) puede pasar sus propios pasos en `definiciones`.
  */
 @Component({
   selector: 'app-folio-nav',
@@ -34,10 +37,10 @@ const PASOS: Record<string, { nombre: string; icono: string }> = {
             [attr.aria-current]="step === activeStep() ? 'step' : null"
           >
             <span class="pasos__circulo" aria-hidden="true">
-              <app-icon [name]="pasos[step]?.icono || 'circle'" [size]="18" [strokeWidth]="1.8" />
+              <app-icon [name]="pasos()[step]?.icono || 'circle'" [size]="18" [strokeWidth]="1.8" />
             </span>
             <span class="pasos__nombre">
-              {{ pasos[step]?.nombre || step }}
+              {{ pasos()[step]?.nombre || step }}
               @if (doneSteps().includes(step) && step !== activeStep()) {
                 <span class="sr-only">(completado)</span>
               }
@@ -46,7 +49,7 @@ const PASOS: Record<string, { nombre: string; icono: string }> = {
         }
       </ol>
       <p class="pasos__resumen" aria-hidden="true">
-        Paso {{ indiceActivo() + 1 }} de {{ steps().length }} · <strong>{{ pasos[activeStep()]?.nombre || activeStep() }}</strong>
+        Paso {{ indiceActivo() + 1 }} de {{ steps().length }} · <strong>{{ pasos()[activeStep()]?.nombre || activeStep() }}</strong>
       </p>
     </nav>
   `,
@@ -55,6 +58,7 @@ export class FolioNav {
   readonly steps = input<string[]>([]);
   readonly activeStep = input<string>('');
   readonly doneSteps = input<string[]>([]);
-  protected readonly pasos = PASOS;
+  readonly definiciones = input<Record<string, DefinicionPaso> | null>(null);
+  protected readonly pasos = computed(() => this.definiciones() ?? PASOS);
   protected readonly indiceActivo = computed(() => Math.max(0, this.steps().indexOf(this.activeStep())));
 }

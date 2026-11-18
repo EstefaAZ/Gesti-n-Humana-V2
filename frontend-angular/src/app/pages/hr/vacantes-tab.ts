@@ -6,6 +6,7 @@ import { VacanteForm } from './vacante-form';
 import { VacanteDetalleGestion } from './vacante-detalle-gestion';
 import { AccionesMenu, Accion } from '../../components/acciones-menu';
 import { Autofocus } from '../../shared/autofocus';
+import { Icon } from '../../shared/icon';
 import { AuthService } from '../../core/auth.service';
 import * as vacantesApi from '../../lib/api/vacantesApi';
 import * as solicitudesApi from '../../lib/api/solicitudesApi';
@@ -18,7 +19,7 @@ import { formatearFecha } from '../../lib/formato';
 
 @Component({
   selector: 'app-vacantes-tab',
-  imports: [FormsModule, VacanteForm, VacanteDetalleGestion, AccionesMenu, Autofocus],
+  imports: [FormsModule, VacanteForm, VacanteDetalleGestion, AccionesMenu, Autofocus, Icon],
   host: { style: 'display: contents' },
   template: `
     @if (modo() === 'form') {
@@ -32,6 +33,7 @@ import { formatearFecha } from '../../lib/formato';
           (volver)="volverALista()"
           (cambiarEstado)="cambiarEstado($event.vacante, $event.estado)"
           (descargarReporte)="descargarReporte($event)"
+          (editar)="editar($event)"
         />
       } @else {
         <div class="empty-state">No se encontró la vacante.</div>
@@ -42,73 +44,104 @@ import { formatearFecha } from '../../lib/formato';
           <div class="notice notice--danger">{{ error() }}</div>
         }
 
-        <div class="hr-table-actions" style="justify-content: flex-end; margin-bottom: 16px">
-          <button type="button" class="btn btn-primary" (click)="nuevaVacante()">+ Nueva vacante</button>
+        <div class="ps-encabezado">
+          <div>
+            <h2 class="ps-encabezado__titulo">Vacantes</h2>
+            <p class="ps-encabezado__resumen">
+              <strong>{{ vacantes().length }}</strong> {{ vacantes().length === 1 ? 'vacante' : 'vacantes' }} ·
+              <strong>{{ totalPostulaciones() }}</strong> {{ totalPostulaciones() === 1 ? 'postulación recibida' : 'postulaciones recibidas' }}
+            </p>
+          </div>
+          <button type="button" class="btn btn-primary" (click)="nuevaVacante()">
+            <app-icon name="mas" [size]="16" [strokeWidth]="2.2" /> Nueva vacante
+          </button>
         </div>
 
-        <div class="stat-cards-grid stat-cards-grid--compact" style="margin-bottom: 20px">
-          @for (e of estados; track e) {
-            <button
-              type="button"
-              class="stat-card"
-              style="text-align: left; cursor: pointer"
-              [style.border]="filtroEstado() === e ? '2px solid var(--color-primary)' : null"
-              [attr.aria-pressed]="filtroEstado() === e"
-              (click)="filtroEstado.set(filtroEstado() === e ? 'todas' : e)"
-            >
-              <div class="stat-card__value">{{ conteoPorEstado(e) }}</div>
-              <div class="stat-card__label">{{ etiquetaEstado[e] }}</div>
-            </button>
-          }
-        </div>
-
-        <div class="card">
-          <div class="hr-table-actions" style="margin-bottom: 16px">
-            <input
-              type="search"
-              aria-label="Buscar vacantes"
-              autocomplete="off"
-              placeholder="Buscar por cargo o Proceso de Selección No.…"
-              [value]="busqueda()"
-              (input)="busqueda.set($any($event.target).value)"
-              style="max-width: 320px"
-            />
-            @if (filtroEstado() !== 'todas') {
-              <button type="button" class="hr-link-btn" (click)="filtroEstado.set('todas')">Quitar filtro ({{ etiquetaEstado[filtroEstado()] }}) ✕</button>
-            }
+        <div class="ps-tarjeta">
+          <div class="ps-barra">
+            <div class="ps-buscador">
+              <span class="ps-buscador__icono" aria-hidden="true"><app-icon name="buscar" [size]="16" [strokeWidth]="2" /></span>
+              <input
+                type="search"
+                aria-label="Buscar vacantes"
+                autocomplete="off"
+                placeholder="Buscar por cargo o número de proceso…"
+                [value]="busqueda()"
+                (input)="busqueda.set($any($event.target).value)"
+              />
+            </div>
+            <div class="ps-filtros" role="group" aria-label="Filtrar por estado">
+              <button type="button" class="ps-chip" [class.is-activo]="filtroEstado() === 'todas'" [attr.aria-pressed]="filtroEstado() === 'todas'" (click)="filtroEstado.set('todas')">
+                Todas <span class="ps-chip__conteo">{{ vacantes().length }}</span>
+              </button>
+              @for (e of estados; track e) {
+                <button
+                  type="button"
+                  class="ps-chip"
+                  [class.is-activo]="filtroEstado() === e"
+                  [class.is-vacio]="conteoPorEstado(e) === 0"
+                  [attr.aria-pressed]="filtroEstado() === e"
+                  (click)="filtroEstado.set(filtroEstado() === e ? 'todas' : e)"
+                >
+                  <span class="ps-punto ps-punto--{{ e }}" aria-hidden="true"></span>
+                  {{ etiquetaEstado[e] }} <span class="ps-chip__conteo">{{ conteoPorEstado(e) }}</span>
+                </button>
+              }
+            </div>
           </div>
 
           @if (filtradas().length === 0) {
-            <div class="empty-state">{{ vacantes().length === 0 ? 'Aún no hay vacantes creadas.' : 'Ninguna vacante coincide con el filtro.' }}</div>
+            <div class="ps-vacio">
+              @if (vacantes().length === 0) {
+                <p style="margin: 0">Aún no hay vacantes creadas.</p>
+                <button type="button" class="btn btn-secondary btn-sm" (click)="nuevaVacante()">Crear la primera vacante</button>
+              } @else {
+                <p style="margin: 0">Ninguna vacante coincide con la búsqueda o el filtro.</p>
+                <button type="button" class="btn btn-secondary btn-sm" (click)="limpiarFiltros()">Quitar filtros</button>
+              }
+            </div>
           } @else {
-            <table class="plain-table">
+            <div style="overflow-x: auto">
+            <table class="ps-tabla ps-tabla--vacantes">
               <thead>
                 <tr>
                   <th>Vacante</th>
-                  <th>Fecha cierre</th>
-                  <th>Postulaciones</th>
-                  <th>Fecha publicación</th>
+                  <th>Cierre</th>
+                  <th class="ps-num">Postulaciones</th>
                   <th>Estado</th>
                   <th><span class="sr-only">Acciones</span></th>
                 </tr>
               </thead>
               <tbody>
                 @for (v of filtradas(); track v.id) {
-                  <tr>
+                  <tr class="ps-fila" (click)="verDetalles(v)">
                     <td>
-                      <span style="font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted)">{{ v.procesoNo }}</span>
-                      <br />
-                      <button type="button" class="hr-link-btn" style="font-size: 14px; font-weight: 600; padding: 0" (click)="verDetalles(v)">
-                        {{ v.cargo }}
-                      </button>
-                      @if (v.tieneDocumentoPdf) {
-                        <span title="Tiene PDF adjunto" style="margin-left: 6px; font-size: 12px">📄</span>
+                      <button type="button" class="ps-cargo" (click)="$event.stopPropagation(); verDetalles(v)">{{ v.cargo }}</button>
+                      <div class="ps-meta">
+                        <span class="ps-meta__codigo">{{ v.procesoNo }}</span>
+                        @if (v.sede) {
+                          <span class="ps-meta__item"><app-icon name="ubicacion" [size]="13" [strokeWidth]="2" />{{ v.sede }}</span>
+                        }
+                        @if (v.fechaCreacion) {
+                          <span class="ps-meta__item">Publicada {{ fechaCorta(v.fechaCreacion) }}</span>
+                        }
+                        @if (v.tieneDocumentoPdf) {
+                          <span class="ps-meta__item" title="Tiene el PDF oficial adjunto"><app-icon name="documento" [size]="13" [strokeWidth]="2" />PDF</span>
+                        }
+                      </div>
+                    </td>
+                    <td class="ps-cierre">
+                      @if (v.fechaCierre) {
+                        {{ fecha(v.fechaCierre) }}<span class="ps-cierre__hora">{{ v.horaCierre || '' }}</span>
+                        @if (avisoCierre(v); as aviso) {
+                          <span class="ps-cierre__aviso">{{ aviso }}</span>
+                        }
+                      } @else {
+                        <span class="text-muted">—</span>
                       }
                     </td>
-                    <td>{{ fecha(v.fechaCierre) || '—' }} {{ v.horaCierre || '' }}</td>
-                    <td style="text-align: center; font-weight: 700">{{ conteo()[v.id] || 0 }}</td>
-                    <td>{{ v.fechaCreacion ? fechaCorta(v.fechaCreacion) : '—' }}</td>
-                    <td>
+                    <td class="ps-num"><span class="ps-conteo" [class.is-cero]="!conteo()[v.id]">{{ conteo()[v.id] || 0 }}<span class="ps-solo-movil"> {{ (conteo()[v.id] || 0) === 1 ? 'postulación' : 'postulaciones' }}</span></span></td>
+                    <td (click)="$event.stopPropagation()">
                       @if (editandoEstadoId() === v.id) {
                         <select
                           appAutofocus
@@ -126,15 +159,16 @@ import { formatearFecha } from '../../lib/formato';
                         <span class="vac-status-pill {{ claseEstado[v.estado] || '' }}">{{ etiquetaEstado[v.estado] }}</span>
                       }
                     </td>
-                    <td>
+                    <td (click)="$event.stopPropagation()" style="width: 1%">
                       <app-acciones-menu [acciones]="accionesDe(v)" />
                     </td>
                   </tr>
                 }
               </tbody>
             </table>
+            </div>
+            <div class="ps-pie-tabla">Mostrando {{ filtradas().length }} de {{ vacantes().length }} vacantes</div>
           }
-          <p class="text-muted" style="font-size: 12px; margin-top: 12px">Mostrando {{ filtradas().length }} de {{ vacantes().length }} vacantes</p>
         </div>
       </div>
     }
@@ -208,6 +242,33 @@ export class VacantesTab {
     return this.vacantes()
       .filter((v) => filtro === 'todas' || v.estado === filtro)
       .filter((v) => !busqueda.trim() || `${v.cargo} ${v.procesoNo}`.toLowerCase().includes(busqueda.toLowerCase()));
+  }
+
+  protected totalPostulaciones(): number {
+    const conteo = this.conteo();
+    return this.vacantes().reduce((total, v) => total + (conteo[v.id] || 0), 0);
+  }
+
+  protected limpiarFiltros(): void {
+    this.filtroEstado.set('todas');
+    this.busqueda.set('');
+  }
+
+  /** "Cierra hoy" / "Cierra en N días" para vacantes publicadas que cierran en menos de una semana. */
+  protected avisoCierre(v: any): string | null {
+    if (v.estado !== 'publicada' || !v.fechaCierre) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v.fechaCierre);
+    if (!m) return null;
+    const [h, min] = String(v.horaCierre || '23:59').split(':').map(Number);
+    const cierre = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), h || 0, min || 0);
+    const ahora = new Date();
+    if (cierre <= ahora) return null;
+    const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+    const diaCierre = new Date(cierre.getFullYear(), cierre.getMonth(), cierre.getDate());
+    const dias = Math.round((diaCierre.getTime() - hoy.getTime()) / 86400000);
+    if (dias > 7) return null;
+    if (dias === 0) return 'Cierra hoy';
+    return dias === 1 ? 'Cierra mañana' : `Cierra en ${dias} días`;
   }
 
   protected fechaCorta(fecha: string): string {
