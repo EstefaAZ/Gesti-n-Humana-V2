@@ -57,7 +57,7 @@ async function reducirFoto(archivo: File): Promise<string> {
   imports: [DocHeader, Icon],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Mi perfil" [showCode]="false" />
+    <app-doc-header title="Mi perfil" />
     <main class="page">
       <p class="section-intro" style="margin-top: -8px">Administra tu información personal y la seguridad de tu cuenta.</p>
 

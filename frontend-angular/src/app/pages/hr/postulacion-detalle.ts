@@ -1,159 +1,379 @@
-import { Component, OnChanges, SimpleChanges, inject, input, output, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { EvaluacionBadge } from '../../components/evaluacion-badge';
-import { TablaSimple } from '../../components/tabla-simple';
+import { AfterViewInit, Component, ElementRef, OnChanges, OnDestroy, SimpleChanges, inject, input, output, signal, viewChild } from '@angular/core';
+import { EstadoPostulacionBadge } from '../../components/estado-postulacion-badge';
+import { Icon } from '../../shared/icon';
+import { BotonDescargarTodos } from '../../components/boton-descargar-todos';
 import { AuthService } from '../../core/auth.service';
-import { detalleRegistroII } from '../../data/catalogos';
+import { TIPO_REGISTRO_LABELS, detalleRegistroII } from '../../data/catalogos';
 import * as solicitudesApi from '../../lib/api/solicitudesApi';
 import { CATEGORIAS_DOCUMENTOS } from '../../lib/api/solicitudesApi';
+import { formatearFecha } from '../../lib/formato';
 
-const ESTADOS = ['Recibida', 'En revisión', 'Preseleccionado', 'Entrevista programada', 'Rechazada', 'Aceptada'];
+// Estados que Gestión Humana puede asignar, con una ayuda corta de qué significa cada uno.
+const ESTADOS = [
+  { valor: 'Recibida', clase: 'recibida', ayuda: 'La solicitud llegó y aún no se revisa.' },
+  { valor: 'En revisión', clase: 'revision', ayuda: 'Gestión Humana está revisando el perfil.' },
+  { valor: 'Preseleccionado', clase: 'preseleccionado', ayuda: 'Pasa a la siguiente etapa del proceso.' },
+  { valor: 'Entrevista programada', clase: 'entrevista', ayuda: 'Se citó al candidato a entrevista.' },
+  { valor: 'Aceptada', clase: 'aceptada', ayuda: 'Fue seleccionado para el cargo.' },
+  { valor: 'Rechazada', clase: 'rechazada', ayuda: 'No continúa en el proceso.' },
+];
 
-import { CampoAccesible } from '../../shared/campo-accesible';
+const CRITERIOS = [
+  { clave: 'estudios', nombre: 'Estudios' },
+  { clave: 'experiencia', nombre: 'Experiencia' },
+  { clave: 'conocimientos', nombre: 'Conocimientos complementarios' },
+];
 
+/**
+ * Resumen de una postulación para Gestión Humana, en un panel lateral sobre la
+ * tabla de candidatos (antes era una tarjeta al final de la página). Se cierra
+ * con la X, con Escape o con clic fuera del panel.
+ */
 @Component({
   selector: 'app-postulacion-detalle',
-  imports: [CampoAccesible, FormsModule, EvaluacionBadge, TablaSimple],
+  imports: [EstadoPostulacionBadge, Icon, BotonDescargarTodos],
   host: { style: 'display: contents' },
   template: `
-    <div class="card mt-24">
-      <div class="wizard-actions" style="margin-top: 0; padding-top: 0; border-top: none">
-        <h2 class="section-title" style="margin: 0">{{ dp().nombreCompleto }}</h2>
-        <div class="hr-table-actions">
-          <button type="button" class="btn btn-secondary" (click)="descargarPdf()">Descargar PDF</button>
-          <button type="button" class="hr-link-btn" (click)="cerrar.emit()">Cerrar</button>
-        </div>
-      </div>
-
-      <p class="text-muted">Radicado: <strong>{{ solicitud().radicado }}</strong></p>
-
-      <app-evaluacion-badge [evaluacion]="solicitud().evaluacion" />
-
-      <div class="notice notice--info" style="margin-top: 16px">
-        <strong>Estado actual: {{ estado() }}</strong>
-        <div class="field-grid" style="margin-top: 10px">
-          <div class="field">
-            <select aria-label="Nuevo estado de la postulación" [ngModel]="nuevoEstado()" (ngModelChange)="nuevoEstado.set($event)">
-              @for (e of estados; track e) {
-                <option [value]="e">{{ e }}</option>
+    <div class="pd-fondo" (click)="cerrar.emit()" aria-hidden="true"></div>
+    <aside class="pd-panel" role="dialog" aria-modal="true" aria-labelledby="pd-nombre" (keydown.escape)="cerrar.emit()">
+      <header class="pd-cabecera">
+        <div class="pd-cabecera__fila">
+          <span class="pd-avatar" aria-hidden="true">{{ iniciales() }}</span>
+          <div class="pd-cabecera__texto">
+            <h2 class="pd-nombre" id="pd-nombre">{{ dp().nombreCompleto || 'Aspirante' }}</h2>
+            <p class="pd-sub">
+              @if (dp().cedula) {
+                <span>C.C. {{ dp().cedula }}</span>
               }
-            </select>
+              @if (dp().profesion) {
+                <span>{{ dp().profesion }}</span>
+              }
+            </p>
           </div>
-          <div class="field">
-            <button type="button" class="btn btn-secondary" (click)="guardarEstado()" [disabled]="guardando() || nuevoEstado() === estado()">
-              {{ guardando() ? 'Guardando…' : 'Actualizar estado' }}
-            </button>
-          </div>
+          <button #botonCerrar type="button" class="pd-cerrar" aria-label="Cerrar resumen" (click)="cerrar.emit()">
+            <app-icon name="cerrar" [size]="18" [strokeWidth]="2.2" />
+          </button>
         </div>
-      </div>
-
-      <h3 class="section-title" style="font-size: 14px; margin-top: 20px">Datos personales</h3>
-      <app-tabla-simple [filas]="filasDatosPersonales()" [campos]="['etiqueta', 'valor']" [labels]="['Etiqueta', 'Valor']" sinEncabezado />
-
-      <h3 class="section-title" style="font-size: 14px">Estudios, cursos, certificaciones e idiomas</h3>
-      <app-tabla-simple [filas]="filasRegistrosII()" [campos]="['tipo', 'detalle', 'establecimiento']" [labels]="['Tipo', 'Detalle', 'Establecimiento/Ente']" />
-
-      <h3 class="section-title" style="font-size: 14px">Experiencia laboral</h3>
-      <app-tabla-simple
-        [filas]="solicitud().experiencia"
-        [campos]="['empresa', 'cargo', 'tiempoLaborado', 'dedicacion']"
-        [labels]="['Empresa', 'Cargo', 'Tiempo', 'Dedicación']"
-      />
-
-      <h3 class="section-title" style="font-size: 14px">Conflicto de interés</h3>
-      @if (solicitud().conflicto?.tieneVinculo === 'si') {
-        <app-tabla-simple
-          [filas]="solicitud().conflicto.familiares"
-          [campos]="['parentesco', 'nombreEmpleado', 'cargo']"
-          [labels]="['Parentesco', 'Nombre', 'Cargo']"
-        />
-      } @else {
-        <p class="text-muted" style="font-size: 12.5px">No declaró vínculos.</p>
-      }
-
-      <h3 class="section-title" style="font-size: 14px">Documentos adjuntos</h3>
-      @for (cat of categorias; track cat.clave) {
-        <div style="margin-bottom: 10px">
-          <span style="font-size: 12.5px; font-weight: 600">{{ cat.etiqueta }}: </span>
-          @if (archivos(cat.clave).length === 0) {
-            <span class="text-muted" style="font-size: 12.5px">sin adjuntar</span>
-          } @else {
-            @for (doc of archivos(cat.clave); track $index; let i = $index) {
-              <button type="button" class="hr-link-btn" style="margin-right: 10px" (click)="descargarAdjunto(cat.claveApi, i, doc.nombre)">
-                📄 {{ doc.nombre }}
-              </button>
-            }
+        <div class="pd-cabecera__meta">
+          <app-estado-postulacion-badge [estado]="estado()" />
+          <span>Radicado <span class="pd-mono">{{ solicitud().radicado }}</span></span>
+          @if (solicitud().fechaSolicitud) {
+            <span>Recibida {{ fechaHora(solicitud().fechaSolicitud) }}</span>
           }
         </div>
-      }
+        <div class="pd-cabecera__acciones">
+          <button type="button" class="btn btn-secondary btn-sm" (click)="descargarPdf()">
+            <app-icon name="descargar" [size]="14" [strokeWidth]="2" /> Descargar solicitud (PDF)
+          </button>
+          @if (dp().correo) {
+            <a class="btn btn-secondary btn-sm" [href]="'mailto:' + dp().correo"><app-icon name="mail" [size]="14" [strokeWidth]="2" /> Escribir correo</a>
+          }
+        </div>
+      </header>
 
-      <h3 class="section-title" style="font-size: 14px">Autorización</h3>
-      @if (solicitud().autorizacion?.acepta) {
-        <p style="font-size: 13px">
-          Autorización de tratamiento de datos <strong>concedida</strong> por {{ solicitud().autorizacion?.nombreCompleto || 'el candidato' }}
-          — {{ fechaSolicitud() }}
-        </p>
-      } @else {
-        <p style="font-size: 13px" class="text-muted">No hay registro de autorización para esta solicitud.</p>
-      }
-    </div>
+      <div class="pd-cuerpo">
+        <!-- Evaluación automática -->
+        <section class="pd-bloque">
+          <h3 class="pd-titulo">Evaluación automática</h3>
+          @if (solicitud().evaluacion; as ev) {
+            <div class="pd-veredicto" [class.pd-veredicto--ok]="ev.cumple" [class.pd-veredicto--no]="!ev.cumple">
+              <app-icon [name]="ev.cumple ? 'check' : 'circle'" [size]="18" [strokeWidth]="2.4" />
+              <div>
+                <strong>{{ ev.cumple ? 'Cumple todos los criterios' : 'No cumple ' + ev.motivos.length + (ev.motivos.length === 1 ? ' criterio' : ' criterios') }}</strong>
+                <span>La evaluación solo prioriza; la decisión es de Gestión Humana.</span>
+              </div>
+            </div>
+            <ul class="pd-criterios">
+              @for (c of criterios; track c.clave) {
+                @if (ev.detalle?.[c.clave]; as d) {
+                  <li class="pd-criterio">
+                    <span class="pd-criterio__marca"
+                      [class.is-ok]="d.cumple === true" [class.is-no]="d.cumple === false" [class.is-na]="d.cumple === null || d.cumple === undefined"
+                      aria-hidden="true">{{ d.cumple === true ? '✓' : d.cumple === false ? '✕' : '–' }}</span>
+                    <div>
+                      <span class="pd-criterio__nombre">{{ c.nombre }}</span>
+                      <span class="pd-criterio__detalle">
+                        {{ d.cumple === true ? 'Cumple' : d.cumple === false ? (d.motivo || 'No cumple') : 'Sin requisito configurado' }}
+                      </span>
+                    </div>
+                  </li>
+                }
+              }
+            </ul>
+          } @else {
+            <p class="pd-vacio">Esta postulación no tiene evaluación automática.</p>
+          }
+        </section>
+
+        <!-- Estado -->
+        <section class="pd-bloque formulario-app">
+          <h3 class="pd-titulo">Estado de la postulación</h3>
+          @if (estado() === 'Retirada') {
+            <p class="pd-alerta" style="margin: 0">El candidato se retiró de este proceso; su estado ya no se puede cambiar.</p>
+          } @else {
+            <div class="field">
+              <label for="pd-nuevo-estado">Cambiar estado</label>
+              <select id="pd-nuevo-estado" [value]="nuevoEstado()" (change)="nuevoEstado.set($any($event.target).value)" [disabled]="guardando()">
+                @for (e of estados; track e.valor) {
+                  <option [value]="e.valor" [selected]="nuevoEstado() === e.valor">{{ e.valor }}{{ estado() === e.valor ? ' (actual)' : '' }}</option>
+                }
+              </select>
+              <span class="hint">{{ ayudaDe(nuevoEstado()) }}</span>
+            </div>
+            @if (nuevoEstado() !== estado()) {
+              <div class="pd-confirmar" role="status">
+                <p>
+                  Cambiar de <strong>{{ estado() }}</strong> a <strong>{{ nuevoEstado() }}</strong>.
+                  <span>El candidato recibirá una notificación y un correo.</span>
+                </p>
+                <div class="pd-confirmar__botones">
+                  <button type="button" class="btn btn-secondary btn-sm" (click)="nuevoEstado.set(estado())" [disabled]="guardando()">Cancelar</button>
+                  <button type="button" class="btn btn-primary btn-sm" (click)="guardarEstado()" [disabled]="guardando()">
+                    {{ guardando() ? 'Guardando…' : 'Confirmar cambio' }}
+                  </button>
+                </div>
+              </div>
+            }
+          }
+          @if (historial().length > 0) {
+            <ol class="pd-historial" aria-label="Historial de estados">
+              @for (h of historial(); track $index) {
+                <li>
+                  <span class="pd-historial__estado">{{ h.estado }}</span>
+                  <span class="pd-historial__fecha">{{ fechaHora(h.fecha) }}</span>
+                </li>
+              }
+            </ol>
+          }
+        </section>
+
+        <!-- Contacto -->
+        <section class="pd-bloque">
+          <h3 class="pd-titulo">Contacto y datos personales</h3>
+          <dl class="pd-datos">
+            <div><dt>Correo</dt><dd>{{ dp().correo || '—' }}</dd></div>
+            <div><dt>Celular</dt><dd>{{ dp().celular || '—' }}</dd></div>
+            <div class="pd-datos__ancho"><dt>Residencia</dt><dd>{{ residencia() }}</dd></div>
+            <div><dt>Estado civil</dt><dd>{{ dp().estadoCivil || '—' }}</dd></div>
+            <div><dt>Fecha de nacimiento</dt><dd>{{ fecha(dp().fechaNacimiento) || '—' }}</dd></div>
+            <div><dt>Profesión</dt><dd>{{ dp().profesion || '—' }}</dd></div>
+            <div><dt>Tarjeta profesional</dt><dd>{{ dp().tarjetaProfesional || '—' }}</dd></div>
+          </dl>
+        </section>
+
+        <!-- Estudios -->
+        <section class="pd-bloque">
+          <h3 class="pd-titulo">Estudios, cursos e idiomas <span class="pd-contador">{{ (solicitud().registrosII || []).length }}</span></h3>
+          @if ((solicitud().registrosII || []).length === 0) {
+            <p class="pd-vacio">No registró estudios.</p>
+          } @else {
+            <ul class="pd-lista">
+              @for (r of solicitud().registrosII; track $index) {
+                <li class="pd-item">
+                  <span class="pd-item__icono" aria-hidden="true"><app-icon [name]="r.tipo === 'certificacion' ? 'documento' : 'birrete'" [size]="16" [strokeWidth]="1.9" /></span>
+                  <div class="pd-item__texto">
+                    <span class="pd-item__titulo">{{ detalle(r) }}</span>
+                    <span class="pd-item__sub">
+                      {{ tipoRegistro(r) }}@if (r.nivelEducativo) { · {{ r.nivelEducativo }}}@if (r.graduado) { · {{ r.graduado === 'si' ? 'Graduado' : 'Sin graduar' }}}
+                    </span>
+                    @if (r.establecimiento || r.enteCertificador) {
+                      <span class="pd-item__sub">{{ r.establecimiento || r.enteCertificador }}</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <!-- Experiencia -->
+        <section class="pd-bloque">
+          <h3 class="pd-titulo">Experiencia laboral <span class="pd-contador">{{ (solicitud().experiencia || []).length }}</span></h3>
+          @if ((solicitud().experiencia || []).length === 0) {
+            <p class="pd-vacio">No registró experiencia laboral.</p>
+          } @else {
+            <ul class="pd-lista">
+              @for (e of solicitud().experiencia; track $index) {
+                <li class="pd-item">
+                  <span class="pd-item__icono" aria-hidden="true"><app-icon name="briefcase" [size]="16" [strokeWidth]="1.9" /></span>
+                  <div class="pd-item__texto">
+                    <span class="pd-item__titulo">{{ e.cargo || 'Cargo sin especificar' }}</span>
+                    <span class="pd-item__sub">{{ e.empresa || '—' }}@if (e.ciudad) { · {{ e.ciudad }}}</span>
+                    <span class="pd-item__sub">
+                      {{ fecha(e.fechaInicio) || '—' }} – {{ e.actual ? 'Actualidad' : fecha(e.fechaTerminacion) || '—' }}
+                      @if (e.tiempoLaborado && e.tiempoLaborado !== '—') { · {{ e.tiempoLaborado }}}
+                      @if (e.dedicacion) { · {{ e.dedicacion }}}
+                    </span>
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <!-- Conflicto de interés -->
+        <section class="pd-bloque">
+          <h3 class="pd-titulo">Conflicto de interés</h3>
+          @if (solicitud().conflicto?.tieneVinculo === 'si' && (solicitud().conflicto?.familiares || []).length > 0) {
+            <p class="pd-alerta">Declaró vínculo con empleados o directivos:</p>
+            <ul class="pd-lista">
+              @for (f of solicitud().conflicto.familiares; track $index) {
+                <li class="pd-item">
+                  <span class="pd-item__icono" aria-hidden="true"><app-icon name="users" [size]="16" [strokeWidth]="1.9" /></span>
+                  <div class="pd-item__texto">
+                    <span class="pd-item__titulo">{{ f.nombreEmpleado || '—' }}</span>
+                    <span class="pd-item__sub">{{ f.parentesco || '—' }} · {{ f.cargo || '—' }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="pd-vacio">No declaró vínculos con empleados o directivos.</p>
+          }
+          @if (solicitud().conflicto?.tieneOtraInhabilidad === 'si') {
+            <p class="pd-alerta" style="margin-top: 10px">Otra inhabilidad o conflicto: {{ solicitud().conflicto?.descripcionInhabilidad || 'sin descripción' }}</p>
+          }
+        </section>
+
+        <!-- Documentos -->
+        <section class="pd-bloque">
+          <div class="pd-titulo-fila">
+            <h3 class="pd-titulo">Documentos adjuntos <span class="pd-contador">{{ totalArchivos() }}</span></h3>
+            @if (totalArchivos() > 0) {
+              <app-boton-descargar-todos [descargar]="descargarTodos" etiqueta="Descargar todos" />
+            }
+          </div>
+          <div class="pd-docs">
+            @for (cat of categorias; track cat.clave) {
+              <div>
+                <p class="pd-docs__categoria">{{ cat.etiqueta }}</p>
+                @if (archivos(cat.clave).length === 0) {
+                  <p class="pd-vacio pd-vacio--falta">Sin adjuntar</p>
+                } @else {
+                  <ul class="archivos-lista">
+                    @for (doc of archivos(cat.clave); track $index; let i = $index) {
+                      <li class="archivo-item">
+                        <span class="archivo-item__icono" aria-hidden="true"><app-icon name="documento" [size]="16" [strokeWidth]="1.8" /></span>
+                        <span class="archivo-item__texto"><span class="archivo-item__nombre" [title]="doc.nombre">{{ doc.nombre }}</span></span>
+                        <button type="button" class="hr-link-btn" [attr.aria-label]="'Descargar ' + doc.nombre" (click)="descargarAdjunto(cat.claveApi, i, doc.nombre)">
+                          <app-icon name="descargar" [size]="16" [strokeWidth]="2" />
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+          </div>
+        </section>
+
+        <!-- Autorización -->
+        <section class="pd-bloque">
+          <h3 class="pd-titulo">Autorización de datos</h3>
+          @if (solicitud().autorizacion?.acepta) {
+            <div class="pd-veredicto pd-veredicto--ok">
+              <app-icon name="check" [size]="18" [strokeWidth]="2.4" />
+              <div>
+                <strong>Autorización concedida</strong>
+                <span>Firmada por {{ solicitud().autorizacion?.nombreCompleto || 'el candidato' }}{{ solicitud().fechaSolicitud ? ' · ' + fechaHora(solicitud().fechaSolicitud) : '' }}</span>
+              </div>
+            </div>
+          } @else {
+            <p class="pd-vacio">No hay registro de autorización para esta solicitud.</p>
+          }
+        </section>
+      </div>
+    </aside>
   `,
 })
-export class PostulacionDetalle implements OnChanges {
+export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
   private readonly auth = inject(AuthService);
   readonly solicitud = input.required<any>();
   readonly cerrar = output<void>();
   readonly cambioEstado = output<void>();
 
+  private readonly botonCerrar = viewChild<ElementRef<HTMLButtonElement>>('botonCerrar');
+  private focoAnterior: HTMLElement | null = null;
+
   protected readonly estados = ESTADOS;
+  protected readonly criterios = CRITERIOS;
   protected readonly categorias = CATEGORIAS_DOCUMENTOS;
+  protected readonly fecha = formatearFecha;
+  protected readonly detalle = detalleRegistroII;
   protected readonly estado = signal('');
   protected readonly nuevoEstado = signal('');
   protected readonly guardando = signal(false);
+  protected readonly historial = signal<{ estado: string; fecha: string }[]>([]);
 
   ngOnChanges(changes: SimpleChanges): void {
     const ch = changes['solicitud'];
     if (ch && (ch.firstChange || ch.previousValue?.radicado !== ch.currentValue?.radicado)) {
       this.estado.set(this.solicitud().estado);
       this.nuevoEstado.set(this.solicitud().estado);
+      this.historial.set([...(this.solicitud().historialEstados || [])].reverse());
     }
+  }
+
+  ngAfterViewInit(): void {
+    // Mientras el panel está abierto la página de fondo no se desplaza, y el foco
+    // entra al panel (vuelve al botón "Ver detalles" al cerrarlo).
+    this.focoAnterior = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    this.botonCerrar()?.nativeElement.focus();
+  }
+
+  ngOnDestroy(): void {
+    document.body.style.overflow = '';
+    this.focoAnterior?.focus?.();
+  }
+
+  protected ayudaDe(valor: string): string {
+    return ESTADOS.find((e) => e.valor === valor)?.ayuda || '';
   }
 
   protected dp(): any {
     return this.solicitud().datosPersonales || {};
   }
 
-  protected filasDatosPersonales(): any[] {
-    const dp = this.dp();
-    return [
-      { etiqueta: 'Cédula', valor: dp.cedula },
-      { etiqueta: 'Correo', valor: dp.correo },
-      { etiqueta: 'Celular', valor: dp.celular },
-      { etiqueta: 'Residencia', valor: `${dp.direccion}, ${dp.municipio}, ${dp.deptoResidencia}` },
-      { etiqueta: 'Profesión', valor: dp.profesion || '—' },
-      { etiqueta: 'Estado civil', valor: dp.estadoCivil },
-    ];
+  protected iniciales(): string {
+    const partes = String(this.dp().nombreCompleto || '').trim().split(/\s+/).filter(Boolean);
+    return ((partes[0]?.[0] || '') + (partes.length > 1 ? partes[partes.length > 2 ? 2 : 1][0] : '')).toUpperCase() || '?';
   }
 
-  protected filasRegistrosII(): any[] {
-    return (this.solicitud().registrosII || []).map((r: any) => ({
-      tipo: r.tipoLabel,
-      detalle: detalleRegistroII(r),
-      establecimiento: r.establecimiento || r.enteCertificador || '—',
-    }));
+  protected residencia(): string {
+    const dp = this.dp();
+    return [dp.direccion, dp.municipio, dp.deptoResidencia].filter(Boolean).join(', ') || '—';
+  }
+
+  protected tipoRegistro(r: any): string {
+    return TIPO_REGISTRO_LABELS[r.tipo] || r.tipoLabel || 'Registro';
   }
 
   protected archivos(clave: string): any[] {
     return this.solicitud().documentosAdjuntos?.[clave] || [];
   }
 
-  protected fechaSolicitud(): string {
-    return new Date(this.solicitud().fechaSolicitud).toLocaleString('es-CO');
+  protected totalArchivos(): number {
+    return this.categorias.reduce((total, c) => total + this.archivos(c.clave).length, 0);
+  }
+
+  protected fechaHora(valor: string | null | undefined): string {
+    if (!valor) return '';
+    const f = new Date(valor);
+    if (Number.isNaN(f.getTime())) return '';
+    return f.toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
   protected descargarPdf(): void {
     solicitudesApi.descargarPdf(this.solicitud().radicado, this.auth.token());
   }
+
+  protected readonly descargarTodos = () =>
+    solicitudesApi.descargarDocumentosZip(
+      this.solicitud().radicado,
+      `${this.solicitud().radicado} - ${this.dp().nombreCompleto || 'candidato'}.zip`,
+      this.auth.token(),
+    );
 
   protected descargarAdjunto(categoriaApi: string, indice: number, nombre: string): void {
     solicitudesApi.descargarDocumentoAdjunto(this.solicitud().radicado, categoriaApi, indice, nombre, this.auth.token());
@@ -164,6 +384,7 @@ export class PostulacionDetalle implements OnChanges {
     try {
       const actualizada = await solicitudesApi.cambiarEstado(this.solicitud().radicado, this.nuevoEstado(), this.auth.token());
       this.estado.set(actualizada.estado);
+      this.historial.set([...(actualizada.historialEstados || [])].reverse());
       this.cambioEstado.emit();
     } catch {
       alert('No se pudo actualizar el estado.');

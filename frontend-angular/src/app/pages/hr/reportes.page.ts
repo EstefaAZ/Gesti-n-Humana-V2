@@ -12,7 +12,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
   imports: [CampoAccesible, DocHeader],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Reportes" [showCode]="false" />
+    <app-doc-header title="Reportes" />
     @if (error()) {
       <main class="page"><div class="notice notice--danger">{{ error() }}</div></main>
     } @else if (!vacantes()) {

@@ -1072,6 +1072,7 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
 .cand-seccion { padding: 22px 24px; margin-bottom: 20px; }
 .cand-seccion__cabecera { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 .cand-seccion__titulo { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); }
+.cand-seccion__acciones { display: flex; gap: 8px; flex-wrap: wrap; }
 .cand-seccion__sub { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); max-width: 62ch; line-height: 1.5; }
 
 .cand-progreso { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 13px; color: var(--color-text-muted); }
@@ -1139,4 +1140,109 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
   .cand-seccion { padding: 18px; }
   .cand-postulacion { padding: 18px; }
   .cand-notif__barra { padding: 12px 14px; }
+}
+
+/* ==========================================================================
+   Resumen de una postulación (Gestión Humana) — panel lateral sobre la tabla
+   de candidatos postulados. Prefijo pd-.
+   ========================================================================== */
+
+.pd-fondo { position: fixed; inset: 0; z-index: 60; background: rgba(12, 32, 20, 0.38); animation: pd-aparecer 200ms ease-out; }
+.pd-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  width: min(580px, 100%);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  box-shadow: -12px 0 40px rgba(0, 40, 16, 0.18);
+  animation: pd-entrar 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pd-aparecer { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pd-entrar { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .pd-fondo, .pd-panel { animation: none; }
+}
+
+.pd-cabecera { padding: 20px 22px 16px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.pd-cabecera__fila { display: flex; align-items: flex-start; gap: 14px; }
+.pd-avatar { flex: 0 0 auto; width: 48px; height: 48px; border-radius: 50%; background: var(--color-primary-dark); color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 17px; display: inline-flex; align-items: center; justify-content: center; }
+.pd-cabecera__texto { flex: 1; min-width: 0; }
+.pd-nombre { margin: 2px 0 0; font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--color-primary-dark); line-height: 1.25; overflow-wrap: anywhere; }
+.pd-sub { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; color: var(--color-text-muted); }
+.pd-cerrar { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.pd-cerrar:hover { background: var(--color-surface-sunken); }
+.pd-cerrar:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pd-cabecera__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 14px; font-size: 12.5px; color: var(--color-text-muted); }
+.pd-mono { font-family: var(--font-mono); font-size: 12px; color: var(--color-text); }
+.pd-cabecera__acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+.pd-cuerpo { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 16px 22px 28px; display: flex; flex-direction: column; gap: 12px; }
+.pd-bloque { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px 18px; }
+.pd-titulo { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.pd-titulo-fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.pd-titulo-fila .pd-titulo { margin: 0; }
+.pd-contador { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; background: var(--color-surface-sunken); color: var(--color-primary-dark); font-size: 11px; letter-spacing: 0; }
+.pd-vacio { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+.pd-vacio--falta { font-size: 12.5px; }
+.pd-alerta { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: #7A4E06; }
+
+.pd-veredicto { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
+.pd-veredicto strong { display: block; font-size: 14px; }
+.pd-veredicto span { color: var(--color-text-muted); }
+.pd-veredicto app-icon { flex: 0 0 auto; margin-top: 1px; }
+.pd-veredicto--ok { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.pd-veredicto--no { background: var(--color-warning-tint); color: #7A4E06; }
+
+.pd-criterios { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pd-criterio { display: flex; gap: 10px; align-items: flex-start; }
+.pd-criterio__marca { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.pd-criterio__marca.is-ok { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.pd-criterio__marca.is-no { background: var(--color-danger-tint); color: var(--color-danger); }
+.pd-criterio__marca.is-na { background: var(--color-surface-sunken); color: var(--color-text-muted); }
+.pd-criterio__nombre { display: block; font-size: 13.5px; font-weight: 600; color: var(--color-text); }
+.pd-criterio__detalle { display: block; font-size: 12.5px; color: var(--color-text-muted); line-height: 1.45; }
+
+/* "Cambiar estado": el mismo campo desplegable de los formularios (.formulario-app). */
+.pd-bloque.formulario-app select { width: 100%; }
+.pd-bloque.formulario-app .field { gap: 6px; }
+
+.pd-confirmar { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: #FAFCFA; border: 1px dashed var(--color-border-strong); display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pd-confirmar p { margin: 0; font-size: 13px; color: var(--color-text); line-height: 1.45; }
+.pd-confirmar p span { display: block; font-size: 12px; color: var(--color-text-muted); }
+.pd-confirmar__botones { display: flex; gap: 8px; }
+
+.pd-historial { list-style: none; margin: 16px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--color-border); display: flex; flex-direction: column; gap: 8px; }
+.pd-historial li { position: relative; display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.pd-historial li::before { content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-surface); border: 2px solid var(--color-border-strong); }
+.pd-historial li:first-child::before { background: var(--color-accent); border-color: var(--color-accent); }
+.pd-historial__estado { font-weight: 600; color: var(--color-text); }
+.pd-historial__fecha { color: var(--color-text-muted); white-space: nowrap; }
+
+.pd-datos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin: 0; }
+.pd-datos dt { font-size: 11.5px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 2px; }
+.pd-datos dd { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.pd-datos__ancho { grid-column: 1 / -1; }
+
+.pd-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pd-item { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--color-border); }
+.pd-item:first-child { border-top: none; padding-top: 0; }
+.pd-item:last-child { padding-bottom: 0; }
+.pd-item__icono { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 8px; background: var(--color-primary-tint); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; }
+.pd-item__texto { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pd-item__titulo { font-size: 13.5px; font-weight: 600; color: var(--color-text); overflow-wrap: anywhere; }
+.pd-item__sub { font-size: 12.5px; color: var(--color-text-muted); line-height: 1.4; }
+
+.pd-docs { display: flex; flex-direction: column; gap: 12px; }
+.pd-docs__categoria { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--color-text); }
+.pd-docs .archivos-lista { margin: 0; }
+
+@media (max-width: 560px) {
+  .pd-cabecera { padding: 16px; }
+  .pd-cuerpo { padding: 12px 12px 24px; }
+  .pd-bloque { padding: 14px; }
+  .pd-datos { grid-template-columns: 1fr; }
 }

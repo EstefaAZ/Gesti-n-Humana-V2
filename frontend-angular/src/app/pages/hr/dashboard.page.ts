@@ -37,7 +37,7 @@ const COLOR_ESTADO_VACANTE: Record<string, string> = {
   imports: [RouterLink, DocHeader, GraficoBarras, GraficoDona],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Dashboard" [showCode]="false" />
+    <app-doc-header title="Dashboard" />
     @if (error()) {
       <main class="page"><div class="card"><div class="notice notice--danger">{{ error() }}</div></div></main>
     } @else if (!loginStats() || !vacantesStats() || !candidatosStats()) {

@@ -7,7 +7,7 @@ import { VacantesTab } from './vacantes-tab';
   imports: [DocHeader, VacantesTab],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Procesos de Selección" [showCode]="false" />
+    <app-doc-header title="Procesos de Selección" />
     <main class="page">
       <app-vacantes-tab />
     </main>

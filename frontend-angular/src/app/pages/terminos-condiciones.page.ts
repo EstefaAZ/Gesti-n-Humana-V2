@@ -7,7 +7,7 @@ import { DocHeader } from '../components/doc-header';
   imports: [RouterLink, DocHeader],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Términos y Condiciones" [showCode]="false" />
+    <app-doc-header title="Términos y Condiciones" />
     <main class="page">
       <div class="card">
         <div class="notice notice--warning">

@@ -41,7 +41,7 @@ const ORDEN_GRUPOS = ['Hoy', 'Ayer', 'Esta semana', 'Anteriores'];
   imports: [DocHeader, Icon],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Notificaciones" [showCode]="false" />
+    <app-doc-header title="Notificaciones" />
     <main class="page">
       @if (error()) {
         <div class="notice notice--danger">{{ error() }}</div>

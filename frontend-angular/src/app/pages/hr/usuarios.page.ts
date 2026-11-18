@@ -18,7 +18,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
   imports: [CampoAccesible, FormsModule, DocHeader, AccionesMenu, Autofocus],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Usuarios" [showCode]="false" />
+    <app-doc-header title="Usuarios" />
     <main class="page" style="max-width: 900px">
       @if (error()) {
         <div class="notice notice--danger">{{ error() }}</div>

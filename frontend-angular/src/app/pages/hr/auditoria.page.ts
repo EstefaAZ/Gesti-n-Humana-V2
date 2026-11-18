@@ -21,7 +21,7 @@ function formatearFecha(fechaISO: string | null | undefined): string {
   imports: [FormsModule, DocHeader],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Auditoría" [showCode]="false" />
+    <app-doc-header title="Auditoría" />
     <main class="page" style="max-width: 1000px">
       <p class="section-intro" style="margin-top: -8px">Registro de quién hizo qué y cuándo. Se muestran los últimos 100 eventos de cada uno.</p>
 

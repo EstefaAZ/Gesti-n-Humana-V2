@@ -65,7 +65,7 @@ function _perfilAEstadoWizard(perfil: any): any {
   host: { style: 'display: contents' },
   template: `
     @if (!cargando() && state()) {
-      <app-doc-header title="Completa tu perfil" [showCode]="false" />
+      <app-doc-header title="Completa tu perfil" />
       <main class="page">
         <div class="card formulario-app">
           <div class="notice notice--info">

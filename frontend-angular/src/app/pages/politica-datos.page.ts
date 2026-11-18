@@ -7,7 +7,7 @@ import { DocHeader } from '../components/doc-header';
   imports: [RouterLink, DocHeader],
   host: { style: 'display: contents' },
   template: `
-    <app-doc-header title="Política de Tratamiento de Datos Personales" [showCode]="false" />
+    <app-doc-header title="Política de Tratamiento de Datos Personales" />
     <main class="page">
       <div class="card">
         <div class="notice notice--warning">
