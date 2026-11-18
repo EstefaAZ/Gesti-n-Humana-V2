@@ -920,12 +920,27 @@ def test_validar_configuracion_produccion_rechaza_cors_abierto(monkeypatch):
         config_module.validar_configuracion_produccion()
 
 
+def test_validar_configuracion_produccion_rechaza_sqlite(monkeypatch):
+    # Bug reportado: datos "desaparecían" tras redeploy — SQLite dentro de un
+    # contenedor sin volumen persistente se pierde en cada redeploy. En
+    # producción esto debe bloquear el arranque, igual que un SECRET_KEY inseguro.
+    from app.core import config as config_module
+
+    monkeypatch.setattr(config_module.settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(config_module.settings, "SECRET_KEY", "una-clave-real-generada-aleatoriamente")
+    monkeypatch.setattr(config_module.settings, "ALLOWED_ORIGINS", "https://seleccion.aguasnacionales.com")
+    monkeypatch.setattr(config_module.settings, "DATABASE_URL", "sqlite:///./login_dev.db")
+    with pytest.raises(RuntimeError, match="DATABASE_URL"):
+        config_module.validar_configuracion_produccion()
+
+
 def test_validar_configuracion_produccion_pasa_con_valores_reales(monkeypatch):
     from app.core import config as config_module
 
     monkeypatch.setattr(config_module.settings, "ENVIRONMENT", "production")
     monkeypatch.setattr(config_module.settings, "SECRET_KEY", "una-clave-real-generada-aleatoriamente")
     monkeypatch.setattr(config_module.settings, "ALLOWED_ORIGINS", "https://seleccion.aguasnacionales.com")
+    monkeypatch.setattr(config_module.settings, "DATABASE_URL", "postgresql://usuario:clave@db:5432/aguas_nacionales_seleccion")
     config_module.validar_configuracion_produccion()  # no debe lanzar nada
 
 
