@@ -12,7 +12,7 @@ import { PAISES } from '../../data/paises';
   host: { style: 'display: contents' },
   template: `
     <section>
-      <h2 class="section-title">I. Datos Personales y Familiares</h2>
+      <h2 class="section-title">Datos Personales y Familiares</h2>
       <p class="section-intro">Diligencie su información básica de contacto e identificación.</p>
 
       <div class="field-grid">

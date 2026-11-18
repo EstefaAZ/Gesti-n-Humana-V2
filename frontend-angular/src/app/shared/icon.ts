@@ -40,6 +40,11 @@ const TRAZOS: Record<string, string> = {
   cuentaX: '<circle cx="10" cy="8" r="4" /><path d="M2 21c0-4.4 3.6-7 8-7 1.7 0 3.2.4 4.5 1.1" /><line x1="16" y1="16" x2="22" y2="22" /><line x1="22" y1="16" x2="16" y2="22" />',
   papelera: '<path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" />',
   checkMini: '<polyline points="20 6 9 17 4 12" />',
+  // ---- Pasos de Completar perfil / Postularme ----
+  birrete: '<path d="M2 9l10-5 10 5-10 5-10-5z" /><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5" /><path d="M22 9v6" />',
+  balanza: '<path d="M12 3v18M7 21h10M4 7h16" /><path d="M4 7l-2.5 6a3 3 0 0 0 5 0L4 7zM20 7l-2.5 6a3 3 0 0 0 5 0L20 7z" />',
+  documento: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z" /><path d="M14 3v5h5M9 13h6M9 17h4" />',
+  firma: '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5z" /><path d="M14 21h7" />',
 };
 
 @Component({

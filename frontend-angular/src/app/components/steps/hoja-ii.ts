@@ -9,7 +9,7 @@ const MAX_REGISTROS = 15;
   host: { style: 'display: contents' },
   template: `
     <section>
-      <h2 class="section-title">II. Estudios, Cursos, Certificaciones e Idiomas</h2>
+      <h2 class="section-title">Estudios, Cursos, Certificaciones e Idiomas</h2>
       <p class="section-intro">
         Agregue un registro por cada estudio, curso, certificación o idioma que desee declarar. Puede agregar hasta
         15 registros y eliminar cualquiera que haya agregado por error. Si necesita registrar más de 15, contacte a

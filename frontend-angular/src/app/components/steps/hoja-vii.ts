@@ -12,7 +12,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
   host: { style: 'display: contents' },
   template: `
     <section>
-      <h2 class="section-title">VII. Declaración Conflicto de Interés</h2>
+      <h2 class="section-title">Declaración Conflicto de Interés</h2>
 
       <div class="field" style="margin-bottom: 20px">
         <label>

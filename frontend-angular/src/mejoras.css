@@ -409,3 +409,80 @@ h1[tabindex='-1']:focus { outline: none; }
 .sidebar__user-texto { display: flex; flex-direction: column; min-width: 0; }
 .sidebar__user-texto .sidebar__user-name,
 .sidebar__user-texto .sidebar__user-rol { display: block; }
+
+/* ---------- Pasos de Completar perfil / Postularme (línea de progreso) ---------- */
+
+/* Reemplaza las pestañas cuadradas (.folio-tab de global.css). Un círculo con
+   ícono por paso, unidos por una línea que se pinta de verde al avanzar. */
+.pasos { margin-bottom: 26px; }
+.pasos__lista { display: flex; list-style: none; margin: 0; padding: 0; }
+.pasos__paso {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+/* Tramo de línea que llega a cada paso desde el anterior. */
+.pasos__paso + .pasos__paso::before {
+  content: "";
+  position: absolute;
+  top: 19px;
+  right: 50%;
+  width: 100%;
+  height: 3px;
+  border-radius: 3px;
+  background: #D8E7DC;
+  transition: background-color 0.3s ease;
+}
+.pasos__paso.is-done + .pasos__paso::before { background: #2EA04A; }
+
+.pasos__circulo {
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 2px solid #D8E7DC;
+  color: #5B6B60;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+}
+.pasos__paso.is-done .pasos__circulo { background: #2EA04A; border-color: #2EA04A; color: #fff; }
+.pasos__paso.is-active .pasos__circulo { background: #006228; border-color: #006228; color: #fff; box-shadow: 0 0 0 5px #D4F0DA; }
+/* Terminado: conserva su ícono y suma un ✓ pequeño en la esquina. */
+.pasos__paso.is-done .pasos__circulo::after {
+  content: "✓";
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #006228;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.pasos__nombre { font-size: 12.5px; line-height: 1.3; color: var(--color-text-muted); text-align: center; padding: 0 4px; }
+.pasos__paso.is-done .pasos__nombre { color: var(--green-700); }
+.pasos__paso.is-active .pasos__nombre { color: var(--color-primary-dark); font-weight: 600; }
+
+.pasos__resumen { display: none; margin: 14px 0 0; font-size: 13px; color: var(--color-text-muted); text-align: center; }
+.pasos__resumen strong { color: var(--color-primary-dark); }
+
+/* En pantallas angostas no caben los nombres: se ocultan y aparece "Paso N de M · Nombre". */
+@media (max-width: 640px) {
+  .pasos__nombre { display: none; }
+  .pasos__resumen { display: block; }
+  .pasos__circulo { width: 34px; height: 34px; }
+  .pasos__paso + .pasos__paso::before { top: 16px; }
+}

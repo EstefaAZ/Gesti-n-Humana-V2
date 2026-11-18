@@ -8,7 +8,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
   host: { style: 'display: contents' },
   template: `
     <section>
-      <h2 class="section-title">VIII. Autorización del Aspirante</h2>
+      <h2 class="section-title">Autorización del Aspirante</h2>
 
       <div class="clauses">
         <ol>

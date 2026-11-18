@@ -9,7 +9,7 @@ const MAX_EXPERIENCIAS = 10;
   host: { style: 'display: contents' },
   template: `
     <section>
-      <h2 class="section-title">VI. Experiencia Laboral</h2>
+      <h2 class="section-title">Experiencia Laboral</h2>
       <p class="section-intro">
         Use el botón "Agregar otra experiencia laboral" tantas veces como necesite para registrar todas sus
         experiencias (máximo 10). Durante el proceso de selección, Aguas Nacionales EPM S.A E.S.P. solicitará
