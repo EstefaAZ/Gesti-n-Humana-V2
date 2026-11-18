@@ -59,7 +59,7 @@ def test_reporte_encabezado_hoja_resultados_reclutamiento_concatena_con_la_etiqu
     contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, [_solicitud_fake()])
     wb = openpyxl.load_workbook(io.BytesIO(contenido))
     ws = wb["Resultados_reclutamiento"]
-    assert ws["D5"].value == "PROCESO DE SELECCIÓN Nº: 2026-1"
+    assert ws["A5"].value == "PROCESO DE SELECCIÓN Nº: 2026-1"
     assert ws["A6"].value == "CARGO: Analista de Prueba"
     assert ws["A7"].value == "SALARIO BASICO: 3.000.000"
 
@@ -202,3 +202,27 @@ def test_descargar_reporte_devuelve_un_xlsx_valido():
     wb = openpyxl.load_workbook(io.BytesIO(r.content))
     ws = wb["Aspirantes"]
     assert ws["A13"].value == SOLICITUD_VALIDA["datos_personales"]["cedula"]
+
+
+def test_reporte_conserva_el_logo_en_ambas_hojas_y_a1_sin_error():
+    contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, [_solicitud_fake()])
+    wb = openpyxl.load_workbook(io.BytesIO(contenido))
+    for hoja in ("Aspirantes", "Resultados_reclutamiento"):
+        ws = wb[hoja]
+        assert len(ws._images) == 1
+        assert ws["A1"].value is None  # antes quedaba "#VALUE!"
+
+
+def test_reporte_total_cuenta_desde_el_primer_aspirante():
+    contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, [])
+    ws = openpyxl.load_workbook(io.BytesIO(contenido))["Aspirantes"]
+    assert ws["I59"].value == '=COUNTIF(I13:I58,"X")'
+    assert ws["J59"].value == '=COUNTIF(J13:J58,"X")'
+
+
+def test_reporte_resultados_no_escribe_en_la_fila_separadora():
+    solicitudes = [_solicitud_fake(datos_personales={"cedula": str(i), "nombreCompleto": f"A{i}"}) for i in range(20)]
+    contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, solicitudes)
+    ws = openpyxl.load_workbook(io.BytesIO(contenido))["Resultados_reclutamiento"]
+    assert ws["A28"].value == "12"
+    assert ws["A29"].value is None

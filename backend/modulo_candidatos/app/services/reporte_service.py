@@ -9,10 +9,17 @@
 # GTH-FOR-04 es ahora el único reporte descargable por vacante).
 # ==============================================================
 
+import copy
 import io
 import os
+import zipfile
 
 import openpyxl
+from openpyxl.drawing.image import Image as ImagenExcel
+from openpyxl.drawing.spreadsheet_drawing import AnchorMarker, OneCellAnchor
+from openpyxl.drawing.xdr import XDRPositiveSize2D
+from openpyxl.utils import get_column_letter
+from openpyxl.utils.units import pixels_to_EMU
 
 from app.services import evaluacion_service
 
@@ -22,9 +29,13 @@ RUTA_PLANTILLA = os.path.join(os.path.dirname(__file__), "..", "resources", "GTH
 FILA_INICIO_ASPIRANTES = 13
 MAX_FILAS_ASPIRANTES = 46
 
-# Hoja "Resultados_reclutamiento": filas 16 a 29 (14 aspirantes máximo).
+# Hoja "Resultados_reclutamiento": filas 16 a 28 (13 aspirantes máximo; la 29 es
+# una fila separadora de 8 pt antes de "INFORMACIÓN IMPORTANTE").
 FILA_INICIO_RECLUTAMIENTO = 16
-MAX_FILAS_RECLUTAMIENTO = 14
+MAX_FILAS_RECLUTAMIENTO = 13
+
+# Rango combinado donde va el logo en ambas hojas.
+CELDAS_LOGO = ("A", "C", 1, 3)
 
 
 def _describir_estudios(criterios: dict) -> str:
@@ -73,6 +84,76 @@ def _marcas_evaluacion(solicitud) -> dict:
     return marcas
 
 
+def _logo_de_la_plantilla() -> bytes | None:
+    """En la plantilla el logo está "colocado en la celda" A1 (imagen dentro de la
+    celda de Excel). openpyxl no conserva ese tipo de imagen: al guardar, A1 queda
+    como #VALUE! y el logo desaparece. Se toma el PNG del propio archivo para
+    volver a ponerlo como imagen flotante sobre A1:C3."""
+    try:
+        with zipfile.ZipFile(RUTA_PLANTILLA) as z:
+            medios = sorted(n for n in z.namelist() if n.startswith("xl/media/"))
+            return z.read(medios[0]) if medios else None
+    except (OSError, zipfile.BadZipFile):
+        return None
+
+
+def _ancho_px(ws, letra: str) -> float:
+    ancho = ws.column_dimensions[letra].width if letra in ws.column_dimensions else None
+    return (ancho or 8.43) * 7 + 5  # caracteres -> píxeles (fuente Calibri 11)
+
+
+def _alto_px(ws, fila: int) -> float:
+    return (ws.row_dimensions[fila].height or 15) * 96 / 72  # puntos -> píxeles
+
+
+def _poner_logo(ws, png: bytes):
+    """Logo centrado dentro de A1:C3, con margen, sin deformarlo."""
+    col_ini, col_fin, fila_ini, fila_fin = CELDAS_LOGO
+    cols = [get_column_letter(i) for i in range(openpyxl.utils.column_index_from_string(col_ini),
+                                                 openpyxl.utils.column_index_from_string(col_fin) + 1)]
+    anchos = [_ancho_px(ws, c) for c in cols]
+    altos = [_alto_px(ws, f) for f in range(fila_ini, fila_fin + 1)]
+
+    imagen = ImagenExcel(io.BytesIO(png))
+    escala = min((sum(anchos) - 24) / imagen.width, (sum(altos) - 16) / imagen.height, 1.0)
+    ancho, alto = imagen.width * escala, imagen.height * escala
+    x, y = (sum(anchos) - ancho) / 2, (sum(altos) - alto) / 2
+
+    # El ancla es la celda donde empieza la imagen + desplazamiento dentro de ella.
+    col_idx = 0
+    while col_idx < len(anchos) - 1 and x >= anchos[col_idx]:
+        x -= anchos[col_idx]
+        col_idx += 1
+    fila_idx = 0
+    while fila_idx < len(altos) - 1 and y >= altos[fila_idx]:
+        y -= altos[fila_idx]
+        fila_idx += 1
+
+    marcador = AnchorMarker(
+        col=openpyxl.utils.column_index_from_string(cols[col_idx]) - 1, colOff=pixels_to_EMU(x),
+        row=fila_ini - 1 + fila_idx, rowOff=pixels_to_EMU(y),
+    )
+    imagen.anchor = OneCellAnchor(_from=marcador, ext=XDRPositiveSize2D(pixels_to_EMU(ancho), pixels_to_EMU(alto)))
+    ws["A1"] = None  # quita el #VALUE! que deja la imagen-en-celda que openpyxl no entiende
+    ws.add_image(imagen)
+
+
+def _corregir_plantilla_aspirantes(ws):
+    """Dos detalles de la plantilla actual que afectarían el reporte:
+    - TOTAL (I59/J59) cuenta desde la fila 14, pero el primer aspirante va en la 13.
+    - B13 perdió su formato (sin bordes) respecto al resto de la columna."""
+    fin = FILA_INICIO_ASPIRANTES + MAX_FILAS_ASPIRANTES - 1
+    for col in ("I", "J"):
+        ws[f"{col}{fin + 1}"] = f'=COUNTIF({col}{FILA_INICIO_ASPIRANTES}:{col}{fin},"X")'
+    modelo = ws[f"B{FILA_INICIO_ASPIRANTES + 1}"]
+    celda = ws[f"B{FILA_INICIO_ASPIRANTES}"]
+    celda.border = copy.copy(modelo.border)
+    celda.fill = copy.copy(modelo.fill)
+    celda.font = copy.copy(modelo.font)
+    celda.alignment = copy.copy(modelo.alignment)
+    celda.number_format = modelo.number_format
+
+
 def _escribir_fila(ws, fila_num: int, datos: dict):
     for col_letra, valor in datos.items():
         if valor in (None, ""):
@@ -98,10 +179,15 @@ def generar_reporte_vacante(vacante_info: dict, solicitudes: list) -> bytes:
     desc_conocimientos = _describir_conocimientos(criterios)
 
     ws1 = wb["Aspirantes"]
-    # A1 en la plantilla original trae una fórmula rota (#VALUE!) — no es algo
-    # que este generador introduce, ya venía así en el archivo fuente. Se limpia
-    # para que el reporte no salga con ese error de fórmula.
-    ws1["A1"] = None
+    ws2 = wb["Resultados_reclutamiento"]
+    logo = _logo_de_la_plantilla()
+    for ws in (ws1, ws2):
+        if logo:
+            _poner_logo(ws, logo)
+        else:
+            ws["A1"] = None
+    _corregir_plantilla_aspirantes(ws1)
+
     ws1["D4"] = cargo
     ws1["D5"] = proceso_no
     ws1["D6"] = fecha_apertura
@@ -117,8 +203,8 @@ def generar_reporte_vacante(vacante_info: dict, solicitudes: list) -> bytes:
         fila.update(_marcas_evaluacion(solicitud))
         _escribir_fila(ws1, fila_num, fila)
 
-    ws2 = wb["Resultados_reclutamiento"]
-    ws2["D5"] = f"PROCESO DE SELECCIÓN Nº: {proceso_no}"
+    # En esta versión de la plantilla la fila 5 es una sola celda combinada A5:L5.
+    ws2["A5"] = f"PROCESO DE SELECCIÓN Nº: {proceso_no}"
     ws2["A6"] = f"CARGO: {cargo}"
     ws2["A7"] = f"SALARIO BASICO: {salario}"
     ws2["A8"] = f"FECHA APERTURA: {fecha_apertura}"
