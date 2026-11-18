@@ -26,7 +26,7 @@ ROLES_GESTION = ("gestor_humano", "admin")
 
 @router.get("", response_model=list[VacanteOut])
 def listar_vacantes_publicas(db: Session = Depends(get_db)):
-    """Solo vacantes activas — lo que ve un candidato navegando el sitio."""
+    """Solo convocatorias publicadas y abiertas — lo que ve un candidato navegando el sitio."""
     return vacante_service.listar_vacantes(db, solo_visibles=True)
 
 
@@ -55,7 +55,14 @@ def estado_proceso_vacante(
     vacante = vacante_service.obtener_vacante(db, vacante_id)
     if not vacante:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vacante no encontrada.")
-    return {"id": vacante.id, "estado": vacante.estado, "esta_cerrada": vacante.esta_cerrada}
+    return {
+        "id": vacante.id,
+        "estado": vacante.estado,
+        "esta_cerrada": vacante.esta_cerrada,
+        # Datos públicos de la convocatoria, para que "Mis postulaciones" diga cuándo cierra.
+        "fecha_cierre": vacante.fecha_cierre,
+        "hora_cierre": vacante.hora_cierre,
+    }
 
 
 # ---------------------------------------------------------------

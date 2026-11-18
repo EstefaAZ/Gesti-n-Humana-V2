@@ -234,6 +234,29 @@ def listar_por_usuario(db: Session, usuario_id: str) -> list[Solicitud]:
     )
 
 
+def estado_de_convocatorias(vacante_ids, token: Optional[str]) -> dict:
+    """{vacante_id: {...estado actual...}} para mostrar en "Mis postulaciones" si la
+    convocatoria sigue abierta, se cerró o se canceló. Se consulta una vez por
+    vacante. Si el servicio de Vacantes no responde, esa vacante queda sin dato
+    (la lista de postulaciones se muestra igual)."""
+    resultado = {}
+    for vacante_id in dict.fromkeys(vacante_ids):
+        try:
+            info = vacantes_client.obtener_estado_proceso(vacante_id, token=token)
+        except vacantes_client.VacantesServiceError:
+            continue
+        if info is None:
+            resultado[vacante_id] = {"eliminada": True, "esta_cerrada": True}
+        else:
+            resultado[vacante_id] = {
+                "estado": info.get("estado"),
+                "esta_cerrada": bool(info.get("esta_cerrada")),
+                "fecha_cierre": info.get("fecha_cierre"),
+                "hora_cierre": info.get("hora_cierre"),
+            }
+    return resultado
+
+
 def listar_por_vacante(db: Session, vacante_id: str) -> list[Solicitud]:
     return (
         db.query(Solicitud)

@@ -119,8 +119,17 @@ def inscribirme_con_perfil(
 
 
 @router.get("/mias", response_model=list[SolicitudOut])
-def mis_solicitudes(db: Session = Depends(get_db), usuario: UsuarioToken = Depends(obtener_usuario_actual)):
-    return solicitud_service.listar_por_usuario(db, usuario.id)
+def mis_solicitudes(
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+    token: str = Depends(oauth2_scheme),
+):
+    solicitudes = solicitud_service.listar_por_usuario(db, usuario.id)
+    convocatorias = solicitud_service.estado_de_convocatorias([s.vacante_id for s in solicitudes], token)
+    return [
+        SolicitudOut.model_validate(s).model_copy(update={"convocatoria": convocatorias.get(s.vacante_id)})
+        for s in solicitudes
+    ]
 
 
 @router.get("/vacante/{vacante_id}", response_model=list[SolicitudOut])

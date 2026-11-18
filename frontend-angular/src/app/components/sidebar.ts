@@ -19,7 +19,7 @@ function itemsPara(rol: string | undefined): ItemMenu[] {
       { to: '/', label: 'Vacantes', icon: 'briefcase' },
       { to: '/mis-postulaciones', label: 'Mis postulaciones', icon: 'folder' },
       { to: '/perfil', label: 'Mi perfil', icon: 'user' },
-      { to: '/documentos', label: 'Documentos', icon: 'folder' },
+      { to: '/documentos', label: 'Documentos', icon: 'documento' },
       { to: '/notificaciones', label: 'Notificaciones', icon: 'bell' },
     ];
   }

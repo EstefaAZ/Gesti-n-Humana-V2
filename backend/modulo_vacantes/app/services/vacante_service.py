@@ -100,6 +100,12 @@ def listar_vacantes(db: Session, solo_visibles: bool = False) -> list[VacanteOut
         query = query.filter(Vacante.estado.in_(ESTADOS_VISIBLES_CANDIDATO))
     vacantes = query.order_by(Vacante.fecha_creacion.desc()).all()
     cerrar_vencidas(db, vacantes)
+    if solo_visibles:
+        # Al candidato solo se le listan convocatorias abiertas: las cerradas o
+        # canceladas no aparecen en "Vacantes". Si ya se había postulado, lo ve
+        # en "Mis postulaciones". El detalle por id sigue respondiendo para las
+        # cerradas (enlaces viejos, notificaciones), con su aviso de cierre.
+        vacantes = [v for v in vacantes if v.estado == "publicada" and not esta_cerrada(v)]
     return [_a_out(v) for v in vacantes]
 
 

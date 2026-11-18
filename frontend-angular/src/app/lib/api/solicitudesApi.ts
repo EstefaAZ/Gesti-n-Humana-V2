@@ -36,6 +36,16 @@ function _solicitudACamel(s) {
     estado: s.estado,
     historialEstados: s.historial_estados,
     fechaSolicitud: s.fecha_solicitud,
+    // Solo en "Mis postulaciones": estado actual de la convocatoria (null si no se pudo consultar).
+    convocatoria: s.convocatoria
+      ? {
+          estado: s.convocatoria.estado,
+          estaCerrada: !!s.convocatoria.esta_cerrada,
+          fechaCierre: s.convocatoria.fecha_cierre,
+          horaCierre: s.convocatoria.hora_cierre,
+          eliminada: !!s.convocatoria.eliminada,
+        }
+      : null,
   };
 }
 

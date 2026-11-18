@@ -113,20 +113,34 @@ def test_vacante_en_borrador_no_aparece_en_listado_publico_pero_si_en_admin():
     assert r_detalle_publico.status_code == 404
 
 
-def test_solo_publicada_y_cerrada_son_visibles_para_candidatos():
+def test_solo_las_publicadas_abiertas_aparecen_en_el_listado_de_candidatos():
     ids_ocultos = []
-    for estado in ("borrador", "en_proceso", "cancelada_desierta"):
+    for estado in ("borrador", "en_proceso", "cancelada_desierta", "cerrada"):
         r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": estado}, headers=HEADERS_GESTOR)
         ids_ocultos.append(r.json()["id"])
 
     r_publicada = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "publicada"}, headers=HEADERS_GESTOR)
-    r_cerrada = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "cerrada"}, headers=HEADERS_GESTOR)
 
     ids_publico = {v["id"] for v in client.get("/api/v1/vacantes").json()}
     assert r_publicada.json()["id"] in ids_publico
-    assert r_cerrada.json()["id"] in ids_publico
     for id_oculto in ids_ocultos:
         assert id_oculto not in ids_publico
+
+
+def test_publicada_con_fecha_de_cierre_vencida_no_aparece_en_el_listado():
+    r = client.post(
+        "/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "publicada", "fecha_cierre": "2020-01-01"}, headers=HEADERS_GESTOR
+    )
+    ids_publico = {v["id"] for v in client.get("/api/v1/vacantes").json()}
+    assert r.json()["id"] not in ids_publico
+
+
+def test_vacante_cerrada_sigue_abriendo_por_enlace_directo():
+    # Quien tenga el enlace (o una notificación) ve el detalle con su aviso de cierre.
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "cerrada"}, headers=HEADERS_GESTOR)
+    detalle = client.get(f"/api/v1/vacantes/{r.json()['id']}")
+    assert detalle.status_code == 200
+    assert detalle.json()["esta_cerrada"] is True
 
 
 def test_admin_todas_requiere_rol_gestion():
@@ -427,7 +441,10 @@ def test_estado_proceso_incluye_vacantes_ocultas_para_candidatos():
     # …pero el estado del proceso sí, con cualquier sesión válida (Candidatos lo usa con el token del candidato).
     r = client.get(f"/api/v1/vacantes/{vid}/estado-proceso", headers=HEADERS_CANDIDATO)
     assert r.status_code == 200
-    assert r.json() == {"id": vid, "estado": "en_proceso", "esta_cerrada": False}
+    datos = r.json()
+    assert {k: datos[k] for k in ("id", "estado", "esta_cerrada")} == {"id": vid, "estado": "en_proceso", "esta_cerrada": False}
+    # Fecha y hora de cierre: datos públicos que "Mis postulaciones" muestra al candidato.
+    assert set(datos) == {"id", "estado", "esta_cerrada", "fecha_cierre", "hora_cierre"}
 
 
 def test_estado_proceso_requiere_sesion_y_404_si_no_existe():

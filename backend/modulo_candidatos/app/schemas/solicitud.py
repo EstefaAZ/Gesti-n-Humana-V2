@@ -145,8 +145,22 @@ class SolicitudOut(BaseModel):
     historial_estados: list[dict[str, Any]]
     anonimizada: bool = False
     fecha_solicitud: Optional[FechaUTC] = None
+    # Solo en "Mis postulaciones": estado ACTUAL de la convocatoria (puede haber
+    # cambiado después de postularse). None si no se pudo consultar.
+    convocatoria: Optional["EstadoConvocatoria"] = None
 
     model_config = {"from_attributes": True}
+
+
+class EstadoConvocatoria(BaseModel):
+    estado: Optional[str] = None          # publicada, en_proceso, cerrada, cancelada_desierta, borrador
+    esta_cerrada: bool = False
+    fecha_cierre: Optional[str] = None
+    hora_cierre: Optional[str] = None
+    eliminada: bool = False               # la vacante ya no existe
+
+
+SolicitudOut.model_rebuild()  # resuelve la referencia a EstadoConvocatoria (definida después)
 
 
 class SolicitudResumen(BaseModel):

@@ -116,6 +116,36 @@ def test_mis_solicitudes_solo_devuelve_las_propias():
     assert len(r2.json()) == 1
 
 
+def test_mis_solicitudes_incluye_el_estado_actual_de_la_convocatoria(monkeypatch):
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    r = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO)
+    assert r.json()[0]["convocatoria"]["estado"] == "publicada"
+    assert r.json()[0]["convocatoria"]["esta_cerrada"] is False
+
+    # Gestión Humana cancela la convocatoria después de la postulación: el candidato lo ve.
+    from app.clients import vacantes_client
+    monkeypatch.setattr(
+        vacantes_client, "obtener_estado_proceso",
+        lambda vacante_id, token=None: {"id": vacante_id, "estado": "cancelada_desierta", "esta_cerrada": True},
+    )
+    conv = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO).json()[0]["convocatoria"]
+    assert conv["estado"] == "cancelada_desierta"
+    assert conv["esta_cerrada"] is True
+
+
+def test_mis_solicitudes_funciona_aunque_vacantes_no_responda(monkeypatch):
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    from app.clients import vacantes_client
+
+    def caido(vacante_id, token=None):
+        raise vacantes_client.VacantesServiceError("sin conexión")
+
+    monkeypatch.setattr(vacantes_client, "obtener_estado_proceso", caido)
+    r = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()[0]["convocatoria"] is None
+
+
 def test_otro_candidato_no_puede_ver_solicitud_ajena_pero_gestor_si():
     r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
     radicado = r.json()["radicado"]
