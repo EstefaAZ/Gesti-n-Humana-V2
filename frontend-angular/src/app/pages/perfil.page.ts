@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { DocHeader } from '../components/doc-header';
 import { Icon } from '../shared/icon';
 import { AuthService } from '../core/auth.service';
@@ -54,20 +54,75 @@ async function reducirFoto(archivo: File): Promise<string> {
 
 @Component({
   selector: 'app-perfil-page',
-  imports: [DocHeader, Icon],
+  imports: [DocHeader, Icon, RouterLink],
   host: { style: 'display: contents' },
   template: `
     <app-doc-header title="Mi perfil" />
     <main class="page">
-      <p class="section-intro" style="margin-top: -8px">Administra tu información personal y la seguridad de tu cuenta.</p>
+      <!-- ---------- Cabecera del perfil ---------- -->
+      <section class="ps-tarjeta mp-cabecera" aria-labelledby="mp-nombre">
+        <div class="mp-avatar">
+          <div class="mp-avatar__circulo">
+            @if (fotoUrl()) {
+              <img [src]="fotoUrl()" alt="Tu foto de perfil" />
+            } @else {
+              <span aria-hidden="true">{{ iniciales(nombreGuardado()) || '?' }}</span>
+            }
+          </div>
+          <!-- El input de archivo va oculto; lo abre el botón (más fácil de estilizar y de usar con teclado). -->
+          <input #inputFoto type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" tabindex="-1" aria-hidden="true" (change)="onFotoElegida($event)" />
+          <button type="button" class="mp-avatar__boton" (click)="inputFoto.click()" [disabled]="procesandoFoto()" [attr.aria-label]="fotoUrl() ? 'Cambiar foto de perfil' : 'Subir foto de perfil'" title="Cambiar foto">
+            <app-icon name="camara" [size]="16" [strokeWidth]="2" />
+          </button>
+        </div>
 
-      <!-- ---------- Información personal ---------- -->
-      <div class="section-card">
-        <div class="section-card__header">
-          <span class="section-card__icon"><app-icon name="persona" [size]="18" [strokeWidth]="2" /></span>
+        <div class="mp-cabecera__texto">
+          <h2 class="mp-nombre" id="mp-nombre">{{ nombreGuardado() || 'Tu perfil' }}</h2>
+          <p class="mp-correo">{{ correoGuardado() }}</p>
+          <div class="mp-etiquetas">
+            <span class="cand-pildora cand-pildora--nueva">{{ etiquetaRol() }}</span>
+            @if (miembroDesde()) {
+              <span class="mp-dato"><app-icon name="calendario" [size]="13" [strokeWidth]="2" /> Miembro desde {{ miembroDesde() }}</span>
+            }
+            @if (cedula()) {
+              <span class="mp-dato">C.C. {{ cedula() }}</span>
+            }
+          </div>
+          <p class="mp-foto-estado" [class.mp-foto-estado--error]="errorFoto()" role="status" aria-live="polite">
+            @if (procesandoFoto()) {
+              Guardando foto…
+            } @else if (errorFoto() || mensajeFoto()) {
+              {{ errorFoto() || mensajeFoto() }}
+            } @else {
+              Foto en JPG, PNG o WebP.
+            }
+            @if (fotoUrl() && !procesandoFoto()) {
+              · <button type="button" class="hr-link-btn hr-link-btn--danger" (click)="onQuitarFoto()">Quitar foto</button>
+            }
+          </p>
+        </div>
+
+        @if (esCandidato()) {
+          <div class="mp-hoja" [class.is-completa]="perfilCompletado()">
+            <span class="mp-hoja__icono" aria-hidden="true"><app-icon [name]="perfilCompletado() ? 'check' : 'documento'" [size]="18" [strokeWidth]="2" /></span>
+            <div>
+              <strong>{{ perfilCompletado() ? 'Hoja de vida completa' : 'Hoja de vida incompleta' }}</strong>
+              <span>{{ perfilCompletado() ? 'Puedes postularte con un clic.' : 'Complétala para postularte.' }}</span>
+            </div>
+            <a routerLink="/completar-perfil" class="btn btn-sm" [class.btn-primary]="!perfilCompletado()" [class.btn-secondary]="perfilCompletado()">
+              {{ perfilCompletado() ? 'Editar' : 'Completar' }}
+            </a>
+          </div>
+        }
+      </section>
+
+      <!-- ---------- Datos de la cuenta ---------- -->
+      <section class="ps-tarjeta mp-seccion" aria-labelledby="mp-datos">
+        <div class="mp-seccion__cabecera">
+          <span class="mp-seccion__icono" aria-hidden="true"><app-icon name="persona" [size]="18" [strokeWidth]="2" /></span>
           <div>
-            <h2 class="section-card__title">Información personal</h2>
-            <p class="section-card__subtitle">Actualiza tus datos personales y de contacto.</p>
+            <h3 class="mp-seccion__titulo" id="mp-datos">Datos de la cuenta</h3>
+            <p class="mp-seccion__sub">Tu nombre y el correo donde recibes las notificaciones de tus postulaciones.</p>
           </div>
         </div>
 
@@ -75,261 +130,149 @@ async function reducirFoto(archivo: File): Promise<string> {
           <div class="notice notice--danger">{{ errorDatos() }}</div>
         }
         @if (okDatos()) {
-          <div class="notice notice--info">Perfil actualizado.</div>
+          <div class="notice notice--info">Tus datos se actualizaron.</div>
         }
 
         <form (submit)="onGuardarDatos($event)">
-          <div class="profile-info-layout">
-            <div class="profile-info-layout__avatar">
-              <div class="avatar-upload">
-                <div class="avatar-circle">
-                  @if (fotoUrl()) {
-                    <img class="avatar-circle__img" [src]="fotoUrl()" alt="Tu foto de perfil" />
-                  } @else {
-                    <span aria-hidden="true">{{ iniciales(nombreCompleto()) || '?' }}</span>
-                  }
-                </div>
-                <!-- El input de archivo va oculto; lo abre el botón (más fácil de estilizar y de usar con teclado). -->
-                <input
-                  #inputFoto
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  class="sr-only"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  (change)="onFotoElegida($event)"
-                />
-                <button type="button" class="btn btn-secondary btn-sm" (click)="inputFoto.click()" [disabled]="procesandoFoto()">
-                  <app-icon name="camara" [size]="14" [strokeWidth]="2" />
-                  {{ procesandoFoto() ? 'Guardando…' : fotoUrl() ? 'Cambiar foto' : 'Subir foto' }}
-                </button>
-                @if (fotoUrl() && !procesandoFoto()) {
-                  <button type="button" class="hr-link-btn hr-link-btn--danger" (click)="onQuitarFoto()">Quitar foto</button>
-                }
-                <p
-                  class="avatar-upload__estado"
-                  [class.avatar-upload__estado--error]="errorFoto()"
-                  role="status"
-                  aria-live="polite"
-                >{{ errorFoto() || mensajeFoto() || 'JPG, PNG o WebP.' }}</p>
+          <div class="mp-campos">
+            <div class="campo-auth">
+              <label for="nombreCompleto">Nombre completo</label>
+              <div class="campo-auth__wrap">
+                <span class="campo-auth__icono"><app-icon name="user" [size]="16" [strokeWidth]="1.6" /></span>
+                <input id="nombreCompleto" class="campo-auth__input" type="text" autocomplete="name" required minlength="3" [value]="nombreCompleto()" (input)="nombreCompleto.set($any($event.target).value)" />
               </div>
             </div>
-
-            <div class="profile-info-layout__fields">
-              <div class="campo-auth">
-                <label for="nombreCompleto">Nombre completo</label>
-                <div class="campo-auth__wrap">
-                  <span class="campo-auth__icono"><app-icon name="user" [size]="16" [strokeWidth]="1.6" /></span>
-                  <input
-                    id="nombreCompleto"
-                    class="campo-auth__input"
-                    type="text"
-                    autocomplete="name"
-                    required
-                    minlength="3"
-                    [value]="nombreCompleto()"
-                    (input)="nombreCompleto.set($any($event.target).value)"
-                  />
-                </div>
-              </div>
-              <div class="campo-auth">
-                <label for="email">Correo electrónico</label>
-                <div class="campo-auth__wrap">
-                  <span class="campo-auth__icono"><app-icon name="mail" [size]="16" [strokeWidth]="1.6" /></span>
-                  <input
-                    id="email"
-                    class="campo-auth__input"
-                    type="email"
-                    required
-                    autocomplete="email"
-                    spellcheck="false"
-                    [value]="email()"
-                    (input)="email.set($any($event.target).value)"
-                  />
-                </div>
-              </div>
-
-              <div class="notice notice--info">
-                Este correo se utiliza para notificaciones y comunicaciones relacionadas con tus postulaciones.
-              </div>
-
-              <div style="display: flex; justify-content: flex-end; margin-top: 20px">
-                <button type="submit" class="btn btn-primary" [disabled]="guardandoDatos()">
-                  {{ guardandoDatos() ? 'Guardando…' : 'Guardar cambios' }}
-                </button>
+            <div class="campo-auth">
+              <label for="email">Correo electrónico</label>
+              <div class="campo-auth__wrap">
+                <span class="campo-auth__icono"><app-icon name="mail" [size]="16" [strokeWidth]="1.6" /></span>
+                <input id="email" class="campo-auth__input" type="email" required autocomplete="email" spellcheck="false" [value]="email()" (input)="email.set($any($event.target).value)" />
               </div>
             </div>
           </div>
-        </form>
-      </div>
-
-      <!-- ---------- Seguridad de la cuenta ---------- -->
-      <div class="section-card mt-24">
-        <div class="section-card__header">
-          <span class="section-card__icon"><app-icon name="escudo" [size]="18" [strokeWidth]="2" /></span>
-          <div>
-            <h2 class="section-card__title">Seguridad de la cuenta</h2>
-            <p class="section-card__subtitle">Cambia tu contraseña periódicamente para mantener tu cuenta segura.</p>
-          </div>
-        </div>
-
-        @if (errorPassword()) {
-          <div class="notice notice--danger">{{ errorPassword() }}</div>
-        }
-        @if (okPassword()) {
-          <div class="notice notice--info">Contraseña actualizada.</div>
-        }
-
-        <form (submit)="onCambiarPassword($event)">
-          <div class="campo-auth">
-            <label for="passwordActual">Contraseña actual</label>
-            <div class="campo-auth__wrap">
-              <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
-              <input
-                id="passwordActual"
-                class="campo-auth__input campo-auth__input--con-boton"
-                [type]="verActual() ? 'text' : 'password'"
-                required
-                autocomplete="current-password"
-                [value]="passwordActual()"
-                (input)="passwordActual.set($any($event.target).value)"
-              />
-              <button
-                type="button"
-                class="campo-auth__toggle"
-                (click)="verActual.set(!verActual())"
-                [attr.aria-label]="verActual() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-                [attr.aria-pressed]="verActual()"
-              >
-                <app-icon [name]="verActual() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
-              </button>
-            </div>
-          </div>
-
-          <div class="campo-auth" [style.margin-bottom.px]="passwordNueva() ? 6 : 18">
-            <label for="passwordNueva">Nueva contraseña</label>
-            <div class="campo-auth__wrap">
-              <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
-              <input
-                id="passwordNueva"
-                class="campo-auth__input campo-auth__input--con-boton"
-                [type]="verNueva() ? 'text' : 'password'"
-                required
-                minlength="8"
-                autocomplete="new-password"
-                [value]="passwordNueva()"
-                (input)="passwordNueva.set($any($event.target).value)"
-              />
-              <button
-                type="button"
-                class="campo-auth__toggle"
-                (click)="verNueva.set(!verNueva())"
-                [attr.aria-label]="verNueva() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-                [attr.aria-pressed]="verNueva()"
-              >
-                <app-icon [name]="verNueva() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
-              </button>
-            </div>
-          </div>
-
-          @if (passwordNueva()) {
-            <div class="pw-strength" aria-live="polite">
-              <div class="pw-strength__bars">
-                @for (i of [0, 1, 2, 3]; track i) {
-                  <span [class]="claseBarra(i)"></span>
-                }
-              </div>
-              <span class="pw-strength__label level-{{ fuerza().nivel }}">{{ fuerza().label }}</span>
-            </div>
-          }
-
-          @if (passwordNueva()) {
-            <div style="display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 6px; margin: 10px 0 20px">
-              @for (c of criterios; track c.label) {
-                <div
-                  style="display: flex; align-items: center; gap: 6px; font-size: 13px"
-                  [style.color]="c.test(passwordNueva()) ? 'var(--color-primary)' : 'var(--color-text-muted)'"
-                >
-                  @if (c.test(passwordNueva())) {
-                    <app-icon name="checkMini" [size]="14" [strokeWidth]="2.5" />
-                  } @else {
-                    <app-icon name="circle" [size]="14" [strokeWidth]="2" />
-                  }
-                  {{ c.label }}
-                </div>
-              }
-            </div>
-          }
-
-          <div class="campo-auth">
-            <label for="passwordConfirmar">Confirmar nueva contraseña</label>
-            <div class="campo-auth__wrap">
-              <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
-              <input
-                id="passwordConfirmar"
-                class="campo-auth__input campo-auth__input--con-boton"
-                [type]="verConfirmar() ? 'text' : 'password'"
-                required
-                autocomplete="new-password"
-                [value]="passwordConfirmar()"
-                (input)="passwordConfirmar.set($any($event.target).value)"
-              />
-              <button
-                type="button"
-                class="campo-auth__toggle"
-                (click)="verConfirmar.set(!verConfirmar())"
-                [attr.aria-label]="verConfirmar() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-                [attr.aria-pressed]="verConfirmar()"
-              >
-                <app-icon [name]="verConfirmar() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
-              </button>
-            </div>
-          </div>
-
-          <div style="display: flex; justify-content: flex-end; margin-top: 6px">
-            <button type="submit" class="btn btn-primary" [disabled]="guardandoPassword()">
-              <app-icon name="lockBadge" [size]="14" [strokeWidth]="2" /> {{ guardandoPassword() ? 'Cambiando…' : 'Cambiar contraseña' }}
+          <div class="mp-acciones">
+            @if (datosCambiados()) {
+              <button type="button" class="btn btn-secondary btn-sm" (click)="descartarDatos()" [disabled]="guardandoDatos()">Descartar</button>
+            }
+            <button type="submit" class="btn btn-primary btn-sm" [disabled]="guardandoDatos() || !datosCambiados()">
+              {{ guardandoDatos() ? 'Guardando…' : 'Guardar cambios' }}
             </button>
           </div>
         </form>
-      </div>
+      </section>
 
-      <!-- ---------- Eliminar / desactivar cuenta ---------- -->
-      <div class="section-card section-card--danger mt-24">
-        <div class="section-card__header">
-          <span class="section-card__icon section-card__icon--danger"><app-icon name="cuentaX" [size]="18" [strokeWidth]="2" /></span>
-          <div>
-            <h2 class="section-card__title section-card__title--danger">{{ esAdmin() ? 'Eliminar cuenta' : 'Desactivar cuenta' }}</h2>
-            <p class="section-card__subtitle">
-              {{ esAdmin() ? 'Esta acción es permanente y no se puede deshacer.' : 'Podrás solicitar que la reactiven más adelante.' }}
-            </p>
+      <!-- ---------- Contraseña ---------- -->
+      <section class="ps-tarjeta mp-seccion" aria-labelledby="mp-seguridad">
+        <div class="mp-seccion__cabecera mp-seccion__cabecera--fila">
+          <span class="mp-seccion__icono" aria-hidden="true"><app-icon name="escudo" [size]="18" [strokeWidth]="2" /></span>
+          <div style="flex: 1; min-width: 0">
+            <h3 class="mp-seccion__titulo" id="mp-seguridad">Contraseña</h3>
+            <p class="mp-seccion__sub">Cámbiala periódicamente para mantener tu cuenta segura.</p>
           </div>
+          @if (!mostrarPassword()) {
+            <button type="button" class="btn btn-secondary btn-sm" (click)="abrirPassword()">
+              <app-icon name="lock" [size]="14" [strokeWidth]="2" /> Cambiar contraseña
+            </button>
+          }
         </div>
 
-        <p class="text-muted" style="font-size: 13px">
-          @if (esAdmin()) {
-            Al eliminar tu cuenta, se borrarán de forma permanente todos tus datos y postulaciones. Tus postulaciones no se borran automáticamente junto con la cuenta. Elimínalas primero desde "Mis postulaciones" si también quieres borrarlas.
-          } @else {
-            Al desactivar tu cuenta, no podrás iniciar sesión ni postularte a nuevas vacantes hasta que Gestión Humana la reactive. Tus postulaciones actuales se conservan.
-          }
-        </p>
-
-        @if (errorBaja()) {
-          <div class="notice notice--danger">{{ errorBaja() }}</div>
+        @if (okPassword() && !mostrarPassword()) {
+          <div class="notice notice--info" style="margin: 16px 0 0">Tu contraseña se actualizó.</div>
         }
 
-        <div style="display: flex; justify-content: flex-end">
-          <button
-            type="button"
-            class="btn btn-danger-outline"
-            (click)="esAdmin() ? onEliminarCuenta() : onDesactivarCuenta()"
-            [disabled]="procesandoBaja()"
-          >
-            <app-icon name="papelera" [size]="14" [strokeWidth]="2" />
-            {{ textoBotonBaja() }}
-          </button>
+        @if (mostrarPassword()) {
+          <form class="mp-password" (submit)="onCambiarPassword($event)">
+            @if (errorPassword()) {
+              <div class="notice notice--danger">{{ errorPassword() }}</div>
+            }
+            <div class="campo-auth">
+              <label for="passwordActual">Contraseña actual</label>
+              <div class="campo-auth__wrap">
+                <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
+                <input id="passwordActual" class="campo-auth__input campo-auth__input--con-boton" [type]="verActual() ? 'text' : 'password'" required autocomplete="current-password" [value]="passwordActual()" (input)="passwordActual.set($any($event.target).value)" />
+                <button type="button" class="campo-auth__toggle" (click)="verActual.set(!verActual())" [attr.aria-label]="verActual() ? 'Ocultar contraseña' : 'Mostrar contraseña'" [attr.aria-pressed]="verActual()">
+                  <app-icon [name]="verActual() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
+                </button>
+              </div>
+            </div>
+
+            <div class="mp-campos">
+              <div class="campo-auth">
+                <label for="passwordNueva">Nueva contraseña</label>
+                <div class="campo-auth__wrap">
+                  <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
+                  <input id="passwordNueva" class="campo-auth__input campo-auth__input--con-boton" [type]="verNueva() ? 'text' : 'password'" required minlength="8" autocomplete="new-password" [value]="passwordNueva()" (input)="passwordNueva.set($any($event.target).value)" />
+                  <button type="button" class="campo-auth__toggle" (click)="verNueva.set(!verNueva())" [attr.aria-label]="verNueva() ? 'Ocultar contraseña' : 'Mostrar contraseña'" [attr.aria-pressed]="verNueva()">
+                    <app-icon [name]="verNueva() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
+                  </button>
+                </div>
+              </div>
+              <div class="campo-auth">
+                <label for="passwordConfirmar">Confirmar nueva contraseña</label>
+                <div class="campo-auth__wrap">
+                  <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
+                  <input id="passwordConfirmar" class="campo-auth__input campo-auth__input--con-boton" [type]="verConfirmar() ? 'text' : 'password'" required autocomplete="new-password" [value]="passwordConfirmar()" (input)="passwordConfirmar.set($any($event.target).value)" />
+                  <button type="button" class="campo-auth__toggle" (click)="verConfirmar.set(!verConfirmar())" [attr.aria-label]="verConfirmar() ? 'Ocultar contraseña' : 'Mostrar contraseña'" [attr.aria-pressed]="verConfirmar()">
+                    <app-icon [name]="verConfirmar() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
+                  </button>
+                </div>
+                @if (passwordConfirmar() && passwordConfirmar() !== passwordNueva()) {
+                  <span class="mp-no-coincide">No coincide con la nueva contraseña.</span>
+                }
+              </div>
+            </div>
+
+            @if (passwordNueva()) {
+              <div class="mp-fuerza">
+                <div class="pw-strength" aria-live="polite">
+                  <div class="pw-strength__bars">
+                    @for (i of [0, 1, 2, 3]; track i) {
+                      <span [class]="claseBarra(i)"></span>
+                    }
+                  </div>
+                  <span class="pw-strength__label level-{{ fuerza().nivel }}">{{ fuerza().label }}</span>
+                </div>
+                <ul class="mp-criterios">
+                  @for (c of criterios; track c.label) {
+                    <li [class.is-ok]="c.test(passwordNueva())">
+                      <app-icon [name]="c.test(passwordNueva()) ? 'checkMini' : 'circle'" [size]="14" [strokeWidth]="c.test(passwordNueva()) ? 2.5 : 2" />
+                      {{ c.label }}
+                    </li>
+                  }
+                </ul>
+              </div>
+            }
+
+            <div class="mp-acciones">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="cerrarPassword()" [disabled]="guardandoPassword()">Cancelar</button>
+              <button type="submit" class="btn btn-primary btn-sm" [disabled]="guardandoPassword()">
+                <app-icon name="lockBadge" [size]="14" [strokeWidth]="2" /> {{ guardandoPassword() ? 'Cambiando…' : 'Guardar contraseña' }}
+              </button>
+            </div>
+          </form>
+        }
+      </section>
+
+      <!-- ---------- Desactivar / eliminar cuenta ---------- -->
+      <section class="mp-riesgo" aria-labelledby="mp-baja">
+        <div style="flex: 1; min-width: 0">
+          <h3 class="mp-riesgo__titulo" id="mp-baja">{{ esAdmin() ? 'Eliminar cuenta' : 'Desactivar cuenta' }}</h3>
+          <p class="mp-riesgo__texto">
+            @if (esAdmin()) {
+              Se borran de forma permanente tus datos. Esta acción no se puede deshacer.
+            } @else {
+              No podrás iniciar sesión ni postularte hasta que Gestión Humana la reactive. Tus postulaciones se conservan.
+            }
+          </p>
+          @if (errorBaja()) {
+            <div class="notice notice--danger" style="margin: 10px 0 0">{{ errorBaja() }}</div>
+          }
         </div>
-      </div>
+        <button type="button" class="btn btn-danger-outline btn-sm" (click)="esAdmin() ? onEliminarCuenta() : onDesactivarCuenta()" [disabled]="procesandoBaja()">
+          <app-icon name="papelera" [size]="14" [strokeWidth]="2" />
+          {{ textoBotonBaja() }}
+        </button>
+      </section>
     </main>
   `,
 })
@@ -415,6 +358,62 @@ export class PerfilPage {
   protected readonly errorBaja = signal('');
   protected readonly procesandoBaja = signal(false);
 
+  // ---- Cabecera ----
+  protected readonly perfilCompletado = this.auth.perfilCompletado;
+  protected readonly mostrarPassword = signal(false);
+
+  protected nombreGuardado(): string {
+    return this.auth.usuario()?.nombreCompleto || '';
+  }
+
+  protected correoGuardado(): string {
+    return this.auth.usuario()?.email || '';
+  }
+
+  protected cedula(): string {
+    return this.auth.usuario()?.cedula || '';
+  }
+
+  protected esCandidato(): boolean {
+    return this.auth.usuario()?.rol === 'candidato';
+  }
+
+  protected etiquetaRol(): string {
+    const rol = this.auth.usuario()?.rol;
+    return rol === 'admin' ? 'Administrador' : rol === 'gestor_humano' ? 'Gestión Humana' : 'Candidato';
+  }
+
+  protected miembroDesde(): string {
+    const f = this.auth.usuario()?.fechaCreacion;
+    if (!f) return '';
+    const d = new Date(f);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+  }
+
+  protected datosCambiados(): boolean {
+    return this.nombreCompleto().trim() !== this.nombreGuardado() || this.email().trim() !== this.correoGuardado();
+  }
+
+  protected descartarDatos(): void {
+    this.nombreCompleto.set(this.nombreGuardado());
+    this.email.set(this.correoGuardado());
+    this.errorDatos.set('');
+  }
+
+  protected abrirPassword(): void {
+    this.okPassword.set(false);
+    this.errorPassword.set('');
+    this.mostrarPassword.set(true);
+  }
+
+  protected cerrarPassword(): void {
+    this.passwordActual.set('');
+    this.passwordNueva.set('');
+    this.passwordConfirmar.set('');
+    this.errorPassword.set('');
+    this.mostrarPassword.set(false);
+  }
+
   protected esAdmin(): boolean {
     return this.auth.usuario()?.rol === 'admin';
   }
@@ -467,6 +466,7 @@ export class PerfilPage {
       this.passwordNueva.set('');
       this.passwordConfirmar.set('');
       this.okPassword.set(true);
+      this.mostrarPassword.set(false);
     } catch (err: any) {
       this.errorPassword.set(err instanceof ApiError ? err.detail : 'No se pudo cambiar la contraseña.');
     } finally {

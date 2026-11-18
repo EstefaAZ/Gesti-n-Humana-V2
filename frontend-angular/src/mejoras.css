@@ -1265,3 +1265,71 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
   .rp-tabla td:last-child { grid-column: 1 / -1; text-align: left !important; width: auto !important; }
   .rp-tabla td:last-child .btn { width: 100%; }
 }
+
+/* ==========================================================================
+   Mi perfil — cabecera con foto, datos de la cuenta, contraseña (plegable) y
+   desactivar cuenta. Prefijo mp-.
+   ========================================================================== */
+
+.mp-cabecera { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; padding: 24px 26px; margin-bottom: 16px; }
+.mp-avatar { position: relative; flex: 0 0 auto; }
+.mp-avatar__circulo { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; background: var(--color-accent-tint); color: var(--color-primary-dark); font-family: var(--font-display); font-size: 32px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px #fff, 0 0 0 5px var(--color-border); }
+.mp-avatar__circulo img { width: 100%; height: 100%; object-fit: cover; }
+.mp-avatar__boton { position: absolute; right: -2px; bottom: -2px; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff; background: var(--color-primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 40, 16, 0.2); transition: background-color 140ms ease; }
+.mp-avatar__boton:hover:not(:disabled) { background: var(--color-primary-dark); }
+.mp-avatar__boton:disabled { opacity: 0.6; cursor: wait; }
+.mp-avatar__boton:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.mp-cabecera__texto { flex: 1 1 240px; min-width: 0; }
+.mp-nombre { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--color-primary-dark); line-height: 1.25; overflow-wrap: anywhere; }
+.mp-correo { margin: 2px 0 0; font-size: 14px; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.mp-etiquetas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 10px; }
+.mp-dato { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--color-text-muted); }
+.mp-foto-estado { margin: 10px 0 0; font-size: 12.5px; color: var(--color-text-muted); }
+.mp-foto-estado--error { color: var(--color-danger); }
+.mp-foto-estado .hr-link-btn { padding: 0; font-size: 12.5px; }
+
+.mp-hoja { flex: 1 1 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: var(--color-warning-tint); color: #7A4E06; font-size: 13px; }
+.mp-hoja.is-completa { background: var(--color-primary-tint); color: var(--color-primary-dark); }
+.mp-hoja > div { flex: 1; min-width: 0; }
+.mp-hoja strong { display: block; font-size: 13.5px; }
+.mp-hoja span { color: var(--color-text-muted); }
+.mp-hoja__icono { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; }
+
+.mp-seccion { padding: 22px 26px; margin-bottom: 16px; }
+.mp-seccion__cabecera { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
+.mp-seccion__cabecera--fila { align-items: center; margin-bottom: 0; flex-wrap: wrap; }
+.mp-seccion__icono { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; background: var(--color-primary-tint); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; }
+.mp-seccion__titulo { margin: 2px 0 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; color: var(--color-primary-dark); }
+.mp-seccion__sub { margin: 2px 0 0; font-size: 13px; color: var(--color-text-muted); line-height: 1.45; }
+
+.mp-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; }
+.mp-campos .campo-auth { min-width: 0; }
+.mp-acciones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.mp-password { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-border); }
+.mp-no-coincide { display: block; margin-top: 6px; font-size: 12px; color: var(--color-danger); }
+
+.mp-fuerza { margin: -6px 0 18px; padding: 12px 14px; border-radius: 10px; background: #FAFCFA; border: 1px solid var(--color-border); }
+.mp-fuerza .pw-strength { margin: 0; }
+.mp-criterios { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 16px; }
+.mp-criterios li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-text-muted); }
+.mp-criterios li.is-ok { color: var(--color-primary); }
+
+.mp-riesgo { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 20px; border-radius: 12px; border: 1px solid #F0D2D0; background: #FFFAFA; }
+.mp-riesgo__titulo { margin: 0; font-size: 14.5px; font-weight: 700; color: var(--color-danger); }
+.mp-riesgo__texto { margin: 3px 0 0; font-size: 13px; line-height: 1.45; color: var(--color-text-muted); }
+
+/* Edge/IE agregan su propio "ojo" a los campos de contraseña; ya hay uno de la app. */
+.campo-auth input[type='password']::-ms-reveal,
+.campo-auth input[type='password']::-ms-clear { display: none; }
+
+@media (max-width: 640px) {
+  .mp-cabecera { padding: 20px 18px; flex-direction: column; text-align: center; }
+  .mp-cabecera__texto { flex: 0 0 auto; width: 100%; }
+  .mp-seccion__cabecera--fila .btn { flex: 1 1 100%; }
+  .mp-etiquetas { justify-content: center; }
+  .mp-hoja { text-align: left; }
+  .mp-seccion { padding: 18px; }
+  .mp-campos { grid-template-columns: 1fr; }
+  .mp-riesgo .btn { width: 100%; }
+}
