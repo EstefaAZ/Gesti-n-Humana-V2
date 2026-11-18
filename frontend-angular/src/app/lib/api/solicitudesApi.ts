@@ -125,13 +125,33 @@ export async function retirar(radicado, token) {
   return _solicitudACamel(data);
 }
 
+/**
+ * Nombre del archivo que manda el servidor en Content-Disposition (filename*
+ * con tildes, si viene; si no, filename). null si no viene ninguno.
+ */
+function nombreDesdeCabecera(res: Response): string | null {
+  const cabecera = res.headers.get("Content-Disposition") || "";
+  const conTildes = /filename\*=UTF-8''([^;]+)/i.exec(cabecera);
+  if (conTildes) {
+    try {
+      return decodeURIComponent(conTildes[1].trim());
+    } catch {
+      // si viene mal codificado, se usa el nombre simple
+    }
+  }
+  const simple = /filename="?([^";]+)"?/i.exec(cabecera);
+  return simple ? simple[1].trim() : null;
+}
+
+/** PDF de la solicitud, con el nombre "ID del proceso - Nombre candidato.pdf" que arma el servidor. */
 export async function descargarPdf(radicado, token) {
   const res = await apiFetch(`${BASE}/${radicado}/pdf`, { token, raw: true });
+  const nombre = nombreDesdeCabecera(res) || `${radicado}.pdf`;
   const blob = await res.blob();
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${radicado}.pdf`;
+  a.download = nombre;
   document.body.appendChild(a);
   a.click();
   a.remove();

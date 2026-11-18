@@ -260,10 +260,14 @@ def descargar_pdf(
     _verificar_acceso(solicitud, usuario)
 
     pdf_bytes = generar_pdf_solicitud(_solicitud_a_dict(solicitud))
+    # "ID del proceso - Nombre candidato.pdf"; si falta alguno de los dos, se usa el radicado.
+    proceso = solicitud.vacante_proceso_no or (solicitud.datos_personales or {}).get("proceso")
+    nombre = (solicitud.datos_personales or {}).get("nombreCompleto")
+    nombre_pdf = f"{proceso} - {nombre}.pdf" if proceso and nombre else f"{radicado}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{radicado}.pdf"'},
+        headers={"Content-Disposition": zip_documentos_service.content_disposition(nombre_pdf, f"{radicado}.pdf")},
     )
 
 

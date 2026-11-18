@@ -392,3 +392,29 @@ def test_fecha_solicitud_sale_en_utc_con_zona_horaria():
     r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
     assert r.status_code == 201
     assert r.json()["fecha_solicitud"].endswith("Z")
+
+
+def test_pdf_se_descarga_como_id_del_proceso_y_nombre_del_candidato():
+    from urllib.parse import unquote
+
+    datos = {**SOLICITUD_VALIDA, "datos_personales": {**SOLICITUD_VALIDA["datos_personales"], "proceso": "2026-P02-05"}}
+    radicado = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO).json()["radicado"]
+    cabecera = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers=HEADERS_CANDIDATO).headers["content-disposition"]
+    assert unquote(cabecera.split("filename*=UTF-8''")[1]) == "2026-P02-05 - Estefanía Delgado Bernal.pdf"
+    # Respaldo sin tildes para navegadores que no leen filename*.
+    assert 'filename="2026-P02-05 - Estefania Delgado Bernal.pdf"' in cabecera
+
+
+def test_pdf_sin_id_de_proceso_se_descarga_con_el_radicado():
+    radicado = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO).json()["radicado"]
+    cabecera = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers=HEADERS_CANDIDATO).headers["content-disposition"]
+    assert f'filename="{radicado}.pdf"' in cabecera
+
+
+def test_el_navegador_puede_leer_el_nombre_de_las_descargas():
+    from app.core.config import settings
+
+    origen = settings.ALLOWED_ORIGINS.split(",")[0].strip()
+    radicado = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO).json()["radicado"]
+    r = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers={**HEADERS_CANDIDATO, "Origin": origen})
+    assert "content-disposition" in r.headers.get("access-control-expose-headers", "").lower()

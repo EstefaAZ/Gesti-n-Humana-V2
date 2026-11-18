@@ -64,5 +64,17 @@ def armar_zip(documentos: dict) -> bytes:
     return buffer.getvalue()
 
 
+def content_disposition(nombre_archivo: str, por_defecto: str = "documento") -> str:
+    """Cabecera de descarga con el nombre real (con tildes) para los navegadores que
+    lo soportan (filename*, RFC 5987) y una versión sin tildes de respaldo."""
+    from urllib.parse import quote
+
+    # Una "/" en el ID del proceso no es una ruta: se cambia por "-" antes de limpiar.
+    nombre_archivo = str(nombre_archivo or "").replace("/", "-").replace("\\", "-")
+    respaldo = nombre_seguro(nombre_archivo, por_defecto)
+    real = re.sub(r'[\/:*?"<>|\x00-\x1f]', "", str(nombre_archivo or "")).strip(" .") or respaldo
+    return f"attachment; filename=\"{respaldo}\"; filename*=UTF-8''{quote(real)}"
+
+
 def respuesta_zip_headers(nombre_archivo: str) -> dict:
     return {"Content-Disposition": f'attachment; filename="{nombre_seguro(nombre_archivo, "documentos.zip")}"'}
