@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../core/auth.service';
+import { FotoPerfilService, iniciales } from '../core/foto-perfil.service';
 import { Icon } from '../shared/icon';
 
 interface ItemMenu {
@@ -112,12 +113,29 @@ const ETIQUETAS_ROL: Record<string, string> = { candidato: 'Candidato', gestor_h
       </nav>
 
       <div class="sidebar__footer">
-        @if (!colapsado()) {
-          <div class="sidebar__user">
-            <div class="sidebar__user-name">{{ auth.usuario()?.nombreCompleto }}</div>
-            <div class="sidebar__user-rol">{{ etiquetaRol() }}</div>
-          </div>
-        }
+        <!-- Foto (o iniciales) + nombre. Con el menú colapsado queda solo el avatar. -->
+        <a
+          routerLink="/perfil"
+          class="sidebar__user"
+          [class.sidebar__user--colapsado]="colapsado()"
+          [attr.aria-label]="colapsado() ? 'Mi perfil: ' + (auth.usuario()?.nombreCompleto || '') : null"
+          [title]="colapsado() ? (auth.usuario()?.nombreCompleto || 'Mi perfil') : ''"
+          (click)="cerrarEnMovil()"
+        >
+          <span class="sidebar__avatar" aria-hidden="true">
+            @if (foto.url()) {
+              <img [src]="foto.url()" alt="" />
+            } @else {
+              {{ iniciales(auth.usuario()?.nombreCompleto) || '?' }}
+            }
+          </span>
+          @if (!colapsado()) {
+            <span class="sidebar__user-texto">
+              <span class="sidebar__user-name">{{ auth.usuario()?.nombreCompleto }}</span>
+              <span class="sidebar__user-rol">{{ etiquetaRol() }}</span>
+            </span>
+          }
+        </a>
         <button type="button" class="sidebar__item sidebar__logout" (click)="handleLogout()" title="Cerrar sesión">
           <app-icon name="logout" />
           @if (!colapsado()) {
@@ -130,6 +148,8 @@ const ETIQUETAS_ROL: Record<string, string> = { candidato: 'Candidato', gestor_h
 })
 export class Sidebar {
   protected readonly auth = inject(AuthService);
+  protected readonly foto = inject(FotoPerfilService);
+  protected readonly iniciales = iniciales;
   private readonly router = inject(Router);
   /** Pantallas pequeñas: el menú se abre por encima del contenido y arranca cerrado. */
   private readonly consultaMovil = window.matchMedia('(max-width: 720px)');

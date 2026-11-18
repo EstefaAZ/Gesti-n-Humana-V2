@@ -1,4 +1,4 @@
-import { apiFetch } from "./httpClient";
+import { apiFetch, ApiError } from "./httpClient";
 import { API_URLS } from "./config";
 
 const BASE = `${API_URLS.login}/api/v1/auth`;
@@ -47,6 +47,29 @@ export async function cambiarPassword(passwordActual, passwordNueva, token) {
     token,
     body: { password_actual: passwordActual, password_nueva: passwordNueva },
   });
+}
+
+// ---- Foto de perfil ----
+
+/** Devuelve la foto como Blob, o null si el usuario no tiene. */
+export async function obtenerFoto(token): Promise<Blob | null> {
+  try {
+    const res = await apiFetch(`${BASE}/me/foto`, { token, raw: true });
+    return await res.blob();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}
+
+export async function subirFoto(contenidoBase64: string, tipo: string, token) {
+  const usuario = await apiFetch(`${BASE}/me/foto`, { method: "PUT", token, body: { contenido_base64: contenidoBase64, tipo } });
+  return _usuarioACamel(usuario);
+}
+
+export async function eliminarFoto(token) {
+  const usuario = await apiFetch(`${BASE}/me/foto`, { method: "DELETE", token });
+  return _usuarioACamel(usuario);
 }
 
 export async function eliminarCuenta(token) {
@@ -139,5 +162,6 @@ function _usuarioACamel(u) {
     cedula: u.cedula,
     activo: u.activo,
     fechaCreacion: u.fecha_creacion,
+    tieneFoto: !!u.tiene_foto,
   };
 }

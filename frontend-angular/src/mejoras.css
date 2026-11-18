@@ -188,59 +188,98 @@ input[type='search']:focus-visible { outline: 2px solid var(--color-primary); ou
    orientar al lector de pantalla; no necesita anillo visible. */
 h1[tabindex='-1']:focus { outline: none; }
 
-/* ---------- Botones de las pantallas de autenticación ---------- */
+/* ---------- Botones: un solo estilo en toda la app ---------- */
 
-/* Antes el hover se manejaba con mouseenter/mouseleave en JS: en el celular
-   quedaba "pegado" tras tocar y no había respuesta al presionar. */
+/* Todos los botones de acción (.btn de la app y .auth-btn del login/registro)
+   salen de estas variables: mismo verde, radio, tipografía y respuesta al
+   presionar. Se tomó el estilo del login. */
+:root {
+  --btn-radius: 10px;
+  --btn-font-size: 15px;
+  --btn-font-size-sm: 13px;
+  --btn-font-weight: 600;
+  --btn-primario: #006228;
+  --btn-primario-hover: #004D20;
+  --btn-secundario-borde: #2EA04A;
+  --btn-secundario-texto: #004D20;
+  --btn-secundario-hover: #EDF8EF;
+  --btn-transicion: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.btn,
 .auth-btn,
 .auth-btn-secondary {
-  width: 100%;
-  border-radius: 10px;
-  font-family: inherit;
-  font-weight: 600;
-  display: flex;
+  font-family: var(--font-body);
+  font-size: var(--btn-font-size);
+  font-weight: var(--btn-font-weight);
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  border-radius: var(--btn-radius);
+  border: 1px solid transparent;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   box-sizing: border-box;
   cursor: pointer;
-  margin: 0;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.auth-btn {
-  padding: 14px;
-  background: #006228;
-  border: 1px solid #006228;
-  color: #fff;
-  font-size: 15px;
-  letter-spacing: 0.01em;
-  appearance: none;
-}
-
-.auth-btn-secondary {
-  padding: 13px;
-  background: #fff;
-  border: 1px solid #2EA04A;
-  color: #004D20;
-  font-size: 14.5px;
   text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: var(--btn-transicion);
 }
 
+/* Los del login/registro ocupan todo el ancho y son un poco más altos. */
+.auth-btn,
+.auth-btn-secondary { width: 100%; margin: 0; display: flex; }
+.auth-btn { padding: 14px; appearance: none; }
+.auth-btn-secondary { padding: 13px; }
+
+/* Variantes */
+.btn-primary,
+.auth-btn { background: var(--btn-primario); border-color: var(--btn-primario); color: #fff; }
+
+.btn-secondary,
+.auth-btn-secondary { background: #fff; border-color: var(--btn-secundario-borde); color: var(--btn-secundario-texto); }
+
+.btn-add { background: var(--btn-secundario-hover); border-color: var(--btn-secundario-borde); color: var(--btn-secundario-texto); }
+
+/* Va aquí porque la regla base de arriba (border transparente) le quitaba el borde rojo. */
+.btn-danger-outline { background: var(--color-surface); border-color: var(--color-danger); color: var(--color-danger); }
+
+.btn-sm { font-size: var(--btn-font-size-sm); padding: 7px 14px; }
+
+/* Botones con aspecto de enlace (tablas de Gestión Humana): el navegador centra el
+   texto de los <button>, y un nombre de vacante largo quedaba centrado en dos líneas. */
+.hr-link-btn { text-align: left; }
+.vac-card__action .btn { font-size: var(--btn-font-size-sm); }
+
+/* Hover solo con mouse: en el celular el :hover se queda "pegado" tras tocar.
+   global.css define hovers sin esta condición; aquí se anulan en pantallas táctiles. */
 @media (hover: hover) and (pointer: fine) {
-  .auth-btn:hover:not(:disabled) { background: #004D20; border-color: #004D20; }
-  .auth-btn-secondary:hover { background: #EDF8EF; }
+  .btn-primary:hover:not(:disabled),
+  .auth-btn:hover:not(:disabled) { background: var(--btn-primario-hover); border-color: var(--btn-primario-hover); }
+  .btn-secondary:hover:not(:disabled),
+  .btn-add:hover:not(:disabled),
+  .auth-btn-secondary:hover { background: var(--btn-secundario-hover); }
+}
+@media (hover: none) {
+  .btn-primary:hover:not(:disabled) { background: var(--btn-primario); }
+  .btn-secondary:hover:not(:disabled) { background: #fff; }
+  .btn-add:hover:not(:disabled) { background: var(--btn-secundario-hover); }
+  .btn-danger-outline:hover:not(:disabled) { background: var(--color-surface); }
 }
 
 /* Respuesta al presionar: se hunde un poco. */
+.btn:active:not(:disabled),
 .auth-btn:active:not(:disabled),
 .auth-btn-secondary:active { transform: scale(0.98); }
 
-.auth-btn:disabled { opacity: 0.7; cursor: progress; }
+.btn:disabled,
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.auth-btn:disabled { cursor: progress; }
 
+.btn:focus-visible,
 .auth-btn:focus-visible,
-.auth-btn-secondary:focus-visible { outline: 2px solid #004D20; outline-offset: 2px; }
+.auth-btn-secondary:focus-visible { outline: 2px solid var(--btn-primario-hover); outline-offset: 2px; }
 
 /* Indicador de carga dentro del botón mientras se envía. */
 .auth-btn__spinner {
@@ -263,3 +302,110 @@ h1[tabindex='-1']:focus { outline: none; }
   }
   @keyframes auth-btn-pulso { 50% { opacity: 0.35; } }
 }
+
+/* ---------- Campos con el estilo del login (Mi perfil) ---------- */
+
+/* Mismo aspecto que login y registro: radio 10px, letra 16px (sin zoom en iOS),
+   ícono a la izquierda y borde + resplandor verde al enfocar. Con CSS (no con
+   estilos en línea por JS) para que sirva en cualquier página con .campo-auth.
+   El doble selector gana a los estilos generales de input de global.css. */
+.campo-auth { margin-bottom: 18px; }
+.campo-auth > label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2F3F35;
+  margin-bottom: 7px;
+}
+.campo-auth__wrap { position: relative; }
+.campo-auth__icono {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8FA79A;
+  pointer-events: none;
+  display: flex;
+}
+.campo-auth .campo-auth__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px 13px 40px;
+  background: #fff;
+  border: 1px solid #D8E7DC;
+  border-radius: 10px;
+  color: #1B2B22;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.3;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.campo-auth .campo-auth__input--con-boton { padding-right: 46px; }
+.campo-auth .campo-auth__input:focus,
+.campo-auth .campo-auth__input:focus-visible {
+  outline: none;
+  border-color: #2EA04A;
+  box-shadow: 0 0 0 3px rgba(46, 160, 74, 0.16);
+}
+.campo-auth .campo-auth__toggle {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #8FA79A;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+/* ---------- Foto de perfil ---------- */
+
+.avatar-circle { overflow: hidden; }
+.avatar-circle__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-upload__estado { font-size: 12.5px; color: var(--color-text-muted); text-align: center; margin: 0; max-width: 160px; }
+.avatar-upload__estado--error { color: var(--color-danger); }
+
+/* ---------- Usuario en el sidebar: foto o iniciales ---------- */
+
+/* Es un enlace a "Mi perfil". global.css le daba solo padding; aquí se arma la fila avatar + nombre. */
+.sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 10px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.sidebar__user:hover { background: rgba(255, 255, 255, 0.08); }
+.sidebar__user--colapsado { justify-content: center; padding: 6px 0 10px; }
+.sidebar__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.22);
+}
+.sidebar__avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sidebar__user-texto { display: flex; flex-direction: column; min-width: 0; }
+.sidebar__user-texto .sidebar__user-name,
+.sidebar__user-texto .sidebar__user-rol { display: block; }

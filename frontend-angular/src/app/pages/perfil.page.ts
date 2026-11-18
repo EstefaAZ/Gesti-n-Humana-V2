@@ -3,16 +3,10 @@ import { Router } from '@angular/router';
 import { DocHeader } from '../components/doc-header';
 import { Icon } from '../shared/icon';
 import { AuthService } from '../core/auth.service';
+import { FotoPerfilService, iniciales } from '../core/foto-perfil.service';
 import * as authApi from '../lib/api/authApi';
 import { ApiError } from '../lib/api/httpClient';
 
-function iniciales(nombre: string): string {
-  if (!nombre) return '';
-  const partes = nombre.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) return '';
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return (partes[0][0] + partes[1][0]).toUpperCase();
-}
 
 function calcularFuerza(password: string): { score: number; label: string; nivel: string } {
   if (!password) return { score: 0, label: '', nivel: '' };
@@ -35,21 +29,32 @@ const CRITERIOS_PASSWORD = [
   { label: 'Un carácter especial', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ];
 
-// Padding usado para igualar la altura con los inputs normales del formulario
-// (Nombre completo, Correo electrónico). Ajusta este valor si tu CSS base usa otro.
-const PASSWORD_INPUT_STYLE = {
-  width: '100%',
-  'box-sizing': 'border-box',
-  padding: '10px 44px 10px 14px',
-  'font-size': '14px',
-  'line-height': '1.4',
-};
+// La foto se reduce en el navegador antes de subirla: las fotos de celular pesan
+// varios MB y el avatar se muestra a 110 px. 512 px alcanza de sobra.
+const FOTO_LADO_MAX = 512;
+const FOTO_ARCHIVO_MAX = 15 * 1024 * 1024; // lo que se acepta del disco antes de reducir
+const FOTO_TIPOS = ['image/jpeg', 'image/png', 'image/webp'];
 
-import { CampoAccesible } from '../shared/campo-accesible';
+/** Reduce la imagen a FOTO_LADO_MAX y la devuelve como JPEG en base64 (sin el prefijo data:). */
+async function reducirFoto(archivo: File): Promise<string> {
+  const bitmap = await createImageBitmap(archivo);
+  const escala = Math.min(1, FOTO_LADO_MAX / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * escala);
+  canvas.height = Math.round(bitmap.height * escala);
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff'; // fondo blanco para PNG/WebP con transparencia (JPEG no tiene alfa)
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+  return dataUrl.split(',')[1];
+}
+
 
 @Component({
   selector: 'app-perfil-page',
-  imports: [CampoAccesible, DocHeader, Icon],
+  imports: [DocHeader, Icon],
   host: { style: 'display: contents' },
   template: `
     <app-doc-header title="Mi perfil" [showCode]="false" />
@@ -77,29 +82,71 @@ import { CampoAccesible } from '../shared/campo-accesible';
           <div class="profile-info-layout">
             <div class="profile-info-layout__avatar">
               <div class="avatar-upload">
-                <div class="avatar-circle">{{ iniciales(nombreCompleto()) || '?' }}</div>
-                <button type="button" class="btn btn-secondary btn-sm" disabled title="Próximamente">
-                  <app-icon name="camara" [size]="14" [strokeWidth]="2" /> Cambiar foto
+                <div class="avatar-circle">
+                  @if (fotoUrl()) {
+                    <img class="avatar-circle__img" [src]="fotoUrl()" alt="Tu foto de perfil" />
+                  } @else {
+                    <span aria-hidden="true">{{ iniciales(nombreCompleto()) || '?' }}</span>
+                  }
+                </div>
+                <!-- El input de archivo va oculto; lo abre el botón (más fácil de estilizar y de usar con teclado). -->
+                <input
+                  #inputFoto
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  class="sr-only"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  (change)="onFotoElegida($event)"
+                />
+                <button type="button" class="btn btn-secondary btn-sm" (click)="inputFoto.click()" [disabled]="procesandoFoto()">
+                  <app-icon name="camara" [size]="14" [strokeWidth]="2" />
+                  {{ procesandoFoto() ? 'Guardando…' : fotoUrl() ? 'Cambiar foto' : 'Subir foto' }}
                 </button>
+                @if (fotoUrl() && !procesandoFoto()) {
+                  <button type="button" class="hr-link-btn hr-link-btn--danger" (click)="onQuitarFoto()">Quitar foto</button>
+                }
+                <p
+                  class="avatar-upload__estado"
+                  [class.avatar-upload__estado--error]="errorFoto()"
+                  role="status"
+                  aria-live="polite"
+                >{{ errorFoto() || mensajeFoto() || 'JPG, PNG o WebP.' }}</p>
               </div>
             </div>
 
             <div class="profile-info-layout__fields">
-              <div class="field" style="margin-bottom: 14px">
+              <div class="campo-auth">
                 <label for="nombreCompleto">Nombre completo</label>
-                <input
-                  id="nombreCompleto"
-                  type="text"
-                  autocomplete="name"
-                  required
-                  minlength="3"
-                  [value]="nombreCompleto()"
-                  (input)="nombreCompleto.set($any($event.target).value)"
-                />
+                <div class="campo-auth__wrap">
+                  <span class="campo-auth__icono"><app-icon name="user" [size]="16" [strokeWidth]="1.6" /></span>
+                  <input
+                    id="nombreCompleto"
+                    class="campo-auth__input"
+                    type="text"
+                    autocomplete="name"
+                    required
+                    minlength="3"
+                    [value]="nombreCompleto()"
+                    (input)="nombreCompleto.set($any($event.target).value)"
+                  />
+                </div>
               </div>
-              <div class="field" style="margin-bottom: 16px">
+              <div class="campo-auth">
                 <label for="email">Correo electrónico</label>
-                <input id="email" type="email" required autocomplete="email" spellcheck="false" [value]="email()" (input)="email.set($any($event.target).value)" />
+                <div class="campo-auth__wrap">
+                  <span class="campo-auth__icono"><app-icon name="mail" [size]="16" [strokeWidth]="1.6" /></span>
+                  <input
+                    id="email"
+                    class="campo-auth__input"
+                    type="email"
+                    required
+                    autocomplete="email"
+                    spellcheck="false"
+                    [value]="email()"
+                    (input)="email.set($any($event.target).value)"
+                  />
+                </div>
               </div>
 
               <div class="notice notice--info">
@@ -134,51 +181,53 @@ import { CampoAccesible } from '../shared/campo-accesible';
         }
 
         <form (submit)="onCambiarPassword($event)">
-          <div class="field" style="margin-bottom: 14px">
+          <div class="campo-auth">
             <label for="passwordActual">Contraseña actual</label>
-            <div class="password-input" style="width: 100%; box-sizing: border-box; position: relative">
+            <div class="campo-auth__wrap">
+              <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
               <input
                 id="passwordActual"
+                class="campo-auth__input campo-auth__input--con-boton"
                 [type]="verActual() ? 'text' : 'password'"
                 required
                 autocomplete="current-password"
                 [value]="passwordActual()"
                 (input)="passwordActual.set($any($event.target).value)"
-                [style]="passwordInputStyle"
               />
               <button
                 type="button"
-                class="password-toggle"
+                class="campo-auth__toggle"
                 (click)="verActual.set(!verActual())"
                 [attr.aria-label]="verActual() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
                 [attr.aria-pressed]="verActual()"
               >
-                <app-icon [name]="verActual() ? 'ojoTachado' : 'eye'" [size]="16" [strokeWidth]="2" />
+                <app-icon [name]="verActual() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
               </button>
             </div>
           </div>
 
-          <div class="field" [style.margin-bottom.px]="passwordNueva() ? 4 : 14">
+          <div class="campo-auth" [style.margin-bottom.px]="passwordNueva() ? 6 : 18">
             <label for="passwordNueva">Nueva contraseña</label>
-            <div class="password-input" style="width: 100%; box-sizing: border-box; position: relative">
+            <div class="campo-auth__wrap">
+              <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
               <input
                 id="passwordNueva"
+                class="campo-auth__input campo-auth__input--con-boton"
                 [type]="verNueva() ? 'text' : 'password'"
                 required
                 minlength="8"
                 autocomplete="new-password"
                 [value]="passwordNueva()"
                 (input)="passwordNueva.set($any($event.target).value)"
-                [style]="passwordInputStyle"
               />
               <button
                 type="button"
-                class="password-toggle"
+                class="campo-auth__toggle"
                 (click)="verNueva.set(!verNueva())"
                 [attr.aria-label]="verNueva() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
                 [attr.aria-pressed]="verNueva()"
               >
-                <app-icon [name]="verNueva() ? 'ojoTachado' : 'eye'" [size]="16" [strokeWidth]="2" />
+                <app-icon [name]="verNueva() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
               </button>
             </div>
           </div>
@@ -212,26 +261,27 @@ import { CampoAccesible } from '../shared/campo-accesible';
             </div>
           }
 
-          <div class="field" style="margin-bottom: 14px">
+          <div class="campo-auth">
             <label for="passwordConfirmar">Confirmar nueva contraseña</label>
-            <div class="password-input" style="width: 100%; box-sizing: border-box; position: relative">
+            <div class="campo-auth__wrap">
+              <span class="campo-auth__icono"><app-icon name="lock" [size]="16" [strokeWidth]="1.6" /></span>
               <input
                 id="passwordConfirmar"
+                class="campo-auth__input campo-auth__input--con-boton"
                 [type]="verConfirmar() ? 'text' : 'password'"
                 required
                 autocomplete="new-password"
                 [value]="passwordConfirmar()"
                 (input)="passwordConfirmar.set($any($event.target).value)"
-                [style]="passwordInputStyle"
               />
               <button
                 type="button"
-                class="password-toggle"
+                class="campo-auth__toggle"
                 (click)="verConfirmar.set(!verConfirmar())"
                 [attr.aria-label]="verConfirmar() ? 'Ocultar contraseña' : 'Mostrar contraseña'"
                 [attr.aria-pressed]="verConfirmar()"
               >
-                <app-icon [name]="verConfirmar() ? 'ojoTachado' : 'eye'" [size]="16" [strokeWidth]="2" />
+                <app-icon [name]="verConfirmar() ? 'eyeOff' : 'eye'" [size]="17" [strokeWidth]="1.6" />
               </button>
             </div>
           </div>
@@ -289,7 +339,59 @@ export class PerfilPage {
 
   protected readonly iniciales = iniciales;
   protected readonly criterios = CRITERIOS_PASSWORD;
-  protected readonly passwordInputStyle = PASSWORD_INPUT_STYLE;
+
+  // ---- Foto de perfil (la misma que muestra el sidebar) ----
+  private readonly foto = inject(FotoPerfilService);
+  protected readonly fotoUrl = this.foto.url;
+  protected readonly procesandoFoto = signal(false);
+  protected readonly errorFoto = signal('');
+  protected readonly mensajeFoto = signal('');
+
+  protected async onFotoElegida(e: Event): Promise<void> {
+    const input = e.target as HTMLInputElement;
+    const archivo = input.files?.[0];
+    input.value = ''; // permite volver a elegir el mismo archivo
+    if (!archivo) return;
+
+    this.errorFoto.set('');
+    this.mensajeFoto.set('');
+    if (!FOTO_TIPOS.includes(archivo.type)) {
+      this.errorFoto.set('Elige una imagen JPG, PNG o WebP.');
+      return;
+    }
+    if (archivo.size > FOTO_ARCHIVO_MAX) {
+      this.errorFoto.set('La imagen es demasiado grande (máximo 15 MB).');
+      return;
+    }
+
+    this.procesandoFoto.set(true);
+    try {
+      const base64 = await reducirFoto(archivo);
+      const actualizado = await authApi.subirFoto(base64, 'image/jpeg', this.auth.token());
+      this.auth.actualizarUsuarioLocal(actualizado);
+      await this.foto.recargar(); // tieneFoto puede seguir en true: la imagen nueva hay que pedirla
+      this.mensajeFoto.set('Foto actualizada.');
+    } catch (err: any) {
+      this.errorFoto.set(err instanceof ApiError ? err.detail : 'No se pudo leer la imagen. Intenta con otra.');
+    } finally {
+      this.procesandoFoto.set(false);
+    }
+  }
+
+  protected async onQuitarFoto(): Promise<void> {
+    this.errorFoto.set('');
+    this.mensajeFoto.set('');
+    this.procesandoFoto.set(true);
+    try {
+      const actualizado = await authApi.eliminarFoto(this.auth.token());
+      this.auth.actualizarUsuarioLocal(actualizado); // tieneFoto: false → el servicio la quita
+      this.mensajeFoto.set('Foto eliminada.');
+    } catch (err: any) {
+      this.errorFoto.set(err instanceof ApiError ? err.detail : 'No se pudo quitar la foto.');
+    } finally {
+      this.procesandoFoto.set(false);
+    }
+  }
 
   // ---- Datos personales ----
   protected readonly nombreCompleto = signal<string>(this.auth.usuario()?.nombreCompleto || '');

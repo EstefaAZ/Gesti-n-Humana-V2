@@ -1,6 +1,7 @@
 import { Component, OnChanges, SimpleChanges, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { EvaluacionBadge } from '../../components/evaluacion-badge';
+import { Icon } from '../../shared/icon';
 import { EstadoPostulacionBadge } from '../../components/estado-postulacion-badge';
 import { Autofocus } from '../../shared/autofocus';
 import { PostulacionDetalle } from './postulacion-detalle';
@@ -14,11 +15,13 @@ import { formatearFecha } from '../../lib/formato';
 
 @Component({
   selector: 'app-vacante-detalle-gestion',
-  imports: [FormsModule, EvaluacionBadge, EstadoPostulacionBadge, Autofocus, PostulacionDetalle],
+  imports: [FormsModule, EvaluacionBadge, EstadoPostulacionBadge, Autofocus, PostulacionDetalle, Icon],
   host: { style: 'display: contents' },
   template: `
     <div>
-      <button type="button" class="hr-link-btn" (click)="volver.emit()" style="margin-bottom: 16px">← Volver a Vacantes</button>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="volver.emit()" style="margin-bottom: 16px">
+        <app-icon name="arrowLeft" [size]="15" [strokeWidth]="2" /> Volver a vacantes
+      </button>
 
       <div class="card" style="margin-bottom: 20px">
         <div class="hr-table-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 12px">
