@@ -50,7 +50,7 @@ import { formatearFecha } from '../lib/formato';
     } @else {
       <app-doc-header [title]="'Solicitud de Inscripción — ' + vacante().cargo" />
       <main class="page">
-        <div class="card">
+        <div class="card formulario-app">
           @if (!enviado()) {
             <div class="notice notice--info">
               Proceso {{ vacante().procesoNo }} — {{ vacante().cargo }}. El proceso y la fecha de cierre quedan tomados de esta
@@ -70,11 +70,12 @@ import { formatearFecha } from '../lib/formato';
               <app-hoja-i [datos]="datosConLock()" (setDatos)="setDatos($event)" [errors]="errors()" />
             }
             @case ('II') {
-              <app-hoja-ii [registros]="state().registrosII" (agregar)="addRegistro()" (quitar)="removeRegistro($event)" (cambiar)="changeRegistro($event)" />
+              <app-hoja-ii [registros]="state().registrosII" [errors]="errors()" (agregar)="addRegistro()" (quitar)="removeRegistro($event)" (cambiar)="changeRegistro($event)" />
             }
             @case ('VI') {
               <app-hoja-vi
                 [experiencias]="state().experiencias"
+                [errors]="errors()"
                 (agregar)="addExperiencia()"
                 (quitar)="removeExperiencia($event)"
                 (cambiar)="changeExperiencia($event)"

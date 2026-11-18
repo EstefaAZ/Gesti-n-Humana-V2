@@ -9,6 +9,8 @@ import { archivoABase64 } from '../lib/formState';
 import { etiquetaNivelIdioma, normalizarNivelIdioma } from '../data/catalogos';
 import { AuthService } from '../core/auth.service';
 import { ApiError } from '../lib/api/httpClient';
+import { Icon } from '../shared/icon';
+import { ZonaArchivos, pesoLegible, pesoDeBase64 } from '../components/zona-archivos';
 
 const CATEGORIAS_EXTRA = [
   { clave: 'certificadosLaborales', etiqueta: 'Certificados laborales adicionales' },
@@ -22,7 +24,7 @@ import { formatearFecha } from '../lib/formato';
 
 @Component({
   selector: 'app-vacante-detalle-page',
-  imports: [CampoAccesible, RouterLink, DocHeader],
+  imports: [CampoAccesible, RouterLink, DocHeader, Icon, ZonaArchivos],
   host: { style: 'display: contents' },
   template: `
     @if (error()) {
@@ -122,6 +124,15 @@ import { formatearFecha } from '../lib/formato';
                   <a routerLink="/completar-perfil">¿Necesitas actualizar tu perfil?</a>
                 </p>
 
+                @if (faltantesPerfil().length > 0) {
+                  <div class="notice notice--danger" role="alert">
+                    Para inscribirte debes agregar a tu perfil {{ faltantesPerfil().join(' y ') }}.
+                    <div style="margin-top: 10px">
+                      <a routerLink="/completar-perfil" class="btn btn-primary">Completar mi perfil</a>
+                    </div>
+                  </div>
+                }
+
                 <p class="text-muted" style="font-size: 12.5px; margin-top: 16px">
                   Si esta vacante requiere alguna certificación adicional que no subiste en tu perfil, puedes adjuntarla aquí (opcional):
                 </p>
@@ -129,22 +140,32 @@ import { formatearFecha } from '../lib/formato';
                   <div class="field" style="margin-bottom: 14px">
                     <label>{{ cat.etiqueta }}</label>
                     @if (documentosExtra()[cat.clave].length > 0) {
-                      <ul style="list-style: none; margin: 0 0 6px; padding: 0">
+                      <ul class="archivos-lista">
                         @for (doc of documentosExtra()[cat.clave]; track $index; let i = $index) {
-                          <li style="font-size: 12.5px; display: flex; align-items: center; gap: 8px">
-                            📄 {{ doc.nombre }}
-                            <button type="button" class="hr-link-btn hr-link-btn--danger" (click)="quitarArchivoExtra(cat.clave, i)">Quitar</button>
+                          <li class="archivo-item">
+                            <span class="archivo-item__icono" aria-hidden="true"><app-icon name="documento" [size]="16" [strokeWidth]="1.8" /></span>
+                            <span class="archivo-item__texto">
+                              <span class="archivo-item__nombre" [title]="doc.nombre">{{ doc.nombre }}</span>
+                              @if (peso(doc)) {<span class="archivo-item__detalle">{{ peso(doc) }}</span>}
+                            </span>
+                            <button type="button" class="hr-link-btn hr-link-btn--danger" [attr.aria-label]="'Quitar ' + doc.nombre" (click)="quitarArchivoExtra(cat.clave, i)">Quitar</button>
                           </li>
                         }
                       </ul>
                     }
-                    <input type="file" accept="application/pdf,image/*" (change)="onArchivoExtra(cat.clave, $event)" />
+                    <app-zona-archivos
+                      accept="application/pdf,image/*"
+                      textoTipos="solo se aceptan PDF o imágenes"
+                      [textoBoton]="documentosExtra()[cat.clave].length > 0 ? 'Agregar otro' : 'Elegir archivo'"
+                      [etiqueta]="cat.etiqueta"
+                      (archivos)="onArchivosExtra(cat.clave, $event)"
+                    />
                   </div>
                 }
 
                 <div class="wizard-actions">
                   <button type="button" class="btn btn-secondary" (click)="mostrarConfirmacion.set(false)" [disabled]="inscribiendo()">Cancelar</button>
-                  <button type="button" class="btn btn-primary" (click)="confirmarInscripcion()" [disabled]="inscribiendo()">
+                  <button type="button" class="btn btn-primary" (click)="confirmarInscripcion()" [disabled]="inscribiendo() || faltantesPerfil().length > 0">
                     {{ inscribiendo() ? 'Enviando…' : 'Confirmar inscripción' }}
                   </button>
                 </div>
@@ -210,6 +231,16 @@ export class VacanteDetallePage {
     });
   }
 
+  /** Lo que le falta al perfil para poder inscribirse (mínimo un estudio y una experiencia). */
+  protected faltantesPerfil(): string[] {
+    const p = this.perfil();
+    if (!p) return [];
+    const faltan: string[] = [];
+    if (!(p.registrosII?.length > 0)) faltan.push('al menos un estudio');
+    if (!(p.experiencia?.length > 0)) faltan.push('al menos una experiencia laboral');
+    return faltan;
+  }
+
   protected c(): any {
     return this.vacante()?.criterios || {};
   }
@@ -247,11 +278,12 @@ export class VacanteDetallePage {
     }
   }
 
-  protected onArchivoExtra(clave: string, e: Event): void {
-    const inputEl = e.target as HTMLInputElement;
-    const file = inputEl.files?.[0];
-    inputEl.value = '';
-    this.agregarArchivoExtra(clave, file);
+  protected onArchivosExtra(clave: string, archivos: File[]): void {
+    for (const file of archivos) this.agregarArchivoExtra(clave, file);
+  }
+
+  protected peso(doc: any): string {
+    return pesoLegible(pesoDeBase64(doc?.contenidoBase64));
   }
 
   private async agregarArchivoExtra(clave: string, file: File | undefined): Promise<void> {
@@ -265,6 +297,7 @@ export class VacanteDetallePage {
   }
 
   protected async confirmarInscripcion(): Promise<void> {
+    if (this.faltantesPerfil().length > 0) return;
     this.errorInscripcion.set('');
     this.faltaPerfil.set(false);
     this.inscribiendo.set(true);

@@ -49,6 +49,8 @@ def guardar_mi_perfil(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except perfil_candidato_service.DocumentoFaltanteError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except perfil_candidato_service.RegistrosMinimosError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
 
 @router.put("/me/borrador", response_model=PerfilCandidatoOut)

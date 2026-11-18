@@ -4,6 +4,8 @@ import { NIVELES_EDUCATIVOS, NIVELES_IDIOMA, IDIOMAS, TIPOS_VINCULACION, PUBLICO
 import { formatearMilesCOP } from '../../lib/formato';
 import { normalizarVacanteParaFormulario } from '../../lib/vacanteDefaults';
 import { SelectConOtro } from '../../components/select-con-otro';
+import { Icon } from '../../shared/icon';
+import { ZonaArchivos, pesoLegible } from '../../components/zona-archivos';
 
 const ESTADOS = [
   { valor: 'borrador', etiqueta: 'Borrador' },
@@ -19,7 +21,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
 
 @Component({
   selector: 'app-vacante-form',
-  imports: [CampoAccesible, FormsModule, SelectConOtro],
+  imports: [CampoAccesible, FormsModule, SelectConOtro, Icon, ZonaArchivos],
   host: { style: 'display: contents' },
   template: `
     @if (v(); as v) {
@@ -187,12 +189,36 @@ import { CampoAccesible } from '../../shared/campo-accesible';
         <fieldset style="border: 1px solid var(--color-border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px">
           <legend style="font-weight: 700; color: var(--color-primary-dark); padding: 0 6px">Formato oficial de la convocatoria (PDF)</legend>
           <p class="text-muted" style="font-size: 12.5px; margin-top: -4px">Opcional. Si lo subes, el candidato podra verlo.</p>
-          @if (v.tieneDocumentoPdf && !pdfFile()) {
-            <p style="font-size: 13px">📄 Ya hay un PDF para esta vacante. Elige otro archivo abajo si quieres reemplazarlo.</p>
-          }
-          <input type="file" accept="application/pdf" (change)="pdfFile.set($any($event.target).files?.[0] || null)" />
           @if (pdfFile(); as f) {
-            <p style="font-size: 12.5px">Se subirá: {{ f.name }} ({{ (f.size / 1024 / 1024).toFixed(2) }} MB)</p>
+            <ul class="archivos-lista">
+              <li class="archivo-item">
+                <span class="archivo-item__icono" aria-hidden="true"><app-icon name="documento" [size]="16" [strokeWidth]="1.8" /></span>
+                <span class="archivo-item__texto">
+                  <span class="archivo-item__nombre" [title]="f.name">{{ f.name }}</span>
+                  <span class="archivo-item__detalle">{{ pesoArchivo(f.size) }} · se subirá al guardar</span>
+                </span>
+                <button type="button" class="hr-link-btn hr-link-btn--danger" [attr.aria-label]="'Quitar ' + f.name" (click)="pdfFile.set(null)">Quitar</button>
+              </li>
+            </ul>
+          } @else {
+            @if (v.tieneDocumentoPdf) {
+              <ul class="archivos-lista">
+                <li class="archivo-item">
+                  <span class="archivo-item__icono" aria-hidden="true"><app-icon name="documento" [size]="16" [strokeWidth]="1.8" /></span>
+                  <span class="archivo-item__texto">
+                    <span class="archivo-item__nombre">PDF actual de la convocatoria</span>
+                    <span class="archivo-item__detalle">Elige otro abajo si quieres reemplazarlo</span>
+                  </span>
+                </li>
+              </ul>
+            }
+            <app-zona-archivos
+              accept="application/pdf,.pdf"
+              textoTipos="solo se acepta un PDF"
+              [textoBoton]="v.tieneDocumentoPdf ? 'Reemplazar PDF' : 'Elegir PDF'"
+              etiqueta="Formato oficial de la convocatoria"
+              (archivos)="pdfFile.set($event[0])"
+            />
           }
         </fieldset>
 
@@ -223,6 +249,7 @@ export class VacanteForm implements OnInit {
 
   protected readonly v = signal<any>(null);
   protected readonly pdfFile = signal<File | null>(null);
+  protected readonly pesoArchivo = pesoLegible;
   protected readonly guardando = signal(false);
 
   ngOnInit(): void {

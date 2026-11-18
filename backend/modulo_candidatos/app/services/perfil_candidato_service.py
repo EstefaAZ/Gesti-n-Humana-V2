@@ -24,6 +24,21 @@ class DocumentoFaltanteError(Exception):
     pass
 
 
+class RegistrosMinimosError(Exception):
+    """El perfil debe tener al menos un estudio (Hoja II) y una experiencia laboral (Hoja VI)."""
+    pass
+
+
+def faltantes_minimos(registros_ii, experiencia) -> list[str]:
+    """Lo que le falta al candidato para poder completar su perfil o inscribirse."""
+    faltan = []
+    if not registros_ii:
+        faltan.append("al menos un estudio")
+    if not experiencia:
+        faltan.append("al menos una experiencia laboral")
+    return faltan
+
+
 def _normalizar_nombre(nombre: str) -> str:
     # Flexible: ignora mayúsculas/minúsculas y espacios de más (al inicio, al
     # final, y dobles espacios entre palabras) — pero el texto debe ser el mismo.
@@ -118,6 +133,10 @@ def guardar_perfil(
         raise NombreNoCoincideError(
             f'El nombre en Autorización debe ser el mismo con el que te registraste ("{nombre_cuenta}").'
         )
+
+    faltan = faltantes_minimos(datos.registros_ii, datos.experiencia)
+    if faltan:
+        raise RegistrosMinimosError(f"Para completar tu perfil debes agregar {' y '.join(faltan)}.")
 
     perfil = obtener_perfil(db, usuario_id)
     if not perfil:

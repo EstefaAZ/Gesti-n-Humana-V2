@@ -53,6 +53,8 @@ def crear_solicitud(
 ):
     try:
         solicitud = solicitud_service.crear_solicitud(db, datos, usuario_id=usuario.id, token=token)
+    except solicitud_service.PerfilIncompletoError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except solicitud_service.VacanteNoEncontradaError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except solicitud_service.VacanteCerradaError as e:

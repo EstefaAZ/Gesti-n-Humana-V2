@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import {
   TIPO_REGISTRO_LABELS,
@@ -10,19 +10,45 @@ import {
 } from '../../data/catalogos';
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipiosPorDepartamento';
 import { SelectConOtro } from '../select-con-otro';
+import { Icon } from '../../shared/icon';
+import { anio, unir } from './lista-plegable';
 
 import { CampoAccesible } from '../../shared/campo-accesible';
 
 @Component({
   selector: 'app-registro-ii-card',
-  imports: [CampoAccesible, FormsModule, SelectConOtro],
+  imports: [CampoAccesible, FormsModule, SelectConOtro, Icon],
   host: { style: 'display: contents' },
   template: `
-    <div class="repeatable-block">
-      <div class="repeatable-block__header">
-        <span class="repeatable-block__title">Registro {{ index() + 1 }}</span>
-        <button type="button" class="repeatable-block__remove" (click)="quitar.emit(registro().id)">Eliminar</button>
+    <div class="reg" [class.is-abierto]="abierto()" [id]="'reg-' + registro().id">
+      <div class="reg__cab">
+        <span class="reg__icono" aria-hidden="true"><app-icon name="birrete" [size]="18" [strokeWidth]="1.8" /></span>
+        <button
+          type="button"
+          class="reg__resumen"
+          [attr.aria-expanded]="abierto()"
+          [attr.aria-controls]="abierto() ? 'reg-cuerpo-' + registro().id : null"
+          (click)="alternar.emit()"
+        >
+          <span class="reg__textos">
+            <span class="reg__titulo">{{ resumen().titulo }}</span>
+            <span class="reg__detalle">{{ resumen().detalle }}</span>
+          </span>
+          <span class="reg__chev" aria-hidden="true"><app-icon name="chevronAbajo" [size]="18" [strokeWidth]="2" /></span>
+        </button>
+        <button
+          type="button"
+          class="reg__quitar"
+          title="Eliminar"
+          [attr.aria-label]="'Eliminar ' + resumen().titulo"
+          (click)="quitar.emit(registro().id)"
+        >
+          <app-icon name="papelera" [size]="17" [strokeWidth]="1.8" />
+        </button>
       </div>
+
+      @if (abierto()) {
+      <div class="reg__cuerpo" [id]="'reg-cuerpo-' + registro().id">
 
       <div class="field" style="margin-bottom: 16px">
         <label>Tipo de registro</label>
@@ -163,6 +189,11 @@ import { CampoAccesible } from '../../shared/campo-accesible';
           </div>
         </div>
       }
+        <div class="reg__acciones">
+          <button type="button" class="btn btn-primary btn-sm" (click)="listo.emit()">Listo</button>
+        </div>
+      </div>
+      }
     </div>
   `,
 })
@@ -171,6 +202,39 @@ export class RegistroIICard {
   readonly index = input<number>(0);
   readonly cambiar = output<{ id: string; patch: any }>();
   readonly quitar = output<string>();
+  readonly abierto = input<boolean>(false);
+  readonly alternar = output<void>();
+  readonly listo = output<void>();
+
+  /** Lo que se ve con la tarjeta cerrada: "Derecho" · "Universitario · Universidad de Medellín · 2011–2016". */
+  protected readonly resumen = computed(() => {
+    const r = this.registro();
+    const tipo = TIPO_REGISTRO_LABELS[r.tipo] || 'Registro';
+    const rango = (a: string, b: string) => unir([anio(a), anio(b)], '–');
+    switch (r.tipo) {
+      case 'estudio':
+        return {
+          titulo: r.titulo || 'Estudio sin título',
+          detalle: unir([r.nivelEducativo, r.establecimiento, rango(r.inicio, r.terminacion), r.graduado === 'no' ? 'Sin graduarse' : '']) || 'Sin completar',
+        };
+      case 'educacionTrabajo':
+        return {
+          titulo: r.nombreEvento || 'Curso sin nombre',
+          detalle: unir([tipo, r.establecimiento, r.numHoras ? `${r.numHoras} horas` : '', anio(r.fechaCertificado)]),
+        };
+      case 'certificacion':
+        return { titulo: r.nombreNorma || 'Certificación sin nombre', detalle: unir([tipo, r.enteCertificador, anio(r.fechaCertificado)]) };
+      case 'idioma': {
+        const nivel = nivelDeRegistroIdioma(r);
+        return {
+          titulo: r.idioma || 'Idioma sin indicar',
+          detalle: unir(['Idioma', nivel ? `Nivel ${etiquetaNivelIdioma(nivel)}` : '', r.establecimiento]),
+        };
+      }
+      default:
+        return { titulo: 'Registro sin completar', detalle: tipo };
+    }
+  });
 
   protected readonly departamentos = DEPARTAMENTOS;
   protected readonly municipios = MUNICIPIOS_POR_DEPARTAMENTO;

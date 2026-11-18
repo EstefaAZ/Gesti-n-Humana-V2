@@ -8,7 +8,7 @@ import { HojaVI } from '../components/steps/hoja-vi';
 import { HojaVII } from '../components/steps/hoja-vii';
 import { HojaVIII } from '../components/steps/hoja-viii';
 import { HojaDocumentos } from '../components/steps/hoja-documentos';
-import { STEPS, initialSolicitudState } from '../lib/formState';
+import { STEPS, initialSolicitudState, conIdsUnicos } from '../lib/formState';
 import { WizardBase } from '../lib/wizard';
 import { AuthService } from '../core/auth.service';
 import * as perfilesApi from '../lib/api/perfilesApi';
@@ -31,16 +31,23 @@ function _estadoInicialConDatosDeRegistro(usuario: any): any {
   return estado;
 }
 
+function _conflictoConIds(conflicto: any): any {
+  return { ...conflicto, familiares: conIdsUnicos(conflicto?.familiares, 'fam') };
+}
+
 function _perfilAEstadoWizard(perfil: any): any {
   return {
     stepIndex: 0,
     urlLocked: false,
     datosPersonales: { proceso: '', fechaEntrega: '', ...perfil.datosPersonales },
-    registrosII: perfil.registrosII || [],
-    experiencias: perfil.experiencia || [],
-    conflicto: perfil.conflicto?.tieneVinculo
-      ? perfil.conflicto
-      : { tieneVinculo: 'no', familiares: [], tieneOtraInhabilidad: 'no', descripcionInhabilidad: '', ...perfil.conflicto },
+    // conIdsUnicos: cada registro necesita su propio id para editarlo, abrirlo o borrarlo sin tocar los demás.
+    registrosII: conIdsUnicos(perfil.registrosII, 'reg'),
+    experiencias: conIdsUnicos(perfil.experiencia, 'exp'),
+    conflicto: _conflictoConIds(
+      perfil.conflicto?.tieneVinculo
+        ? perfil.conflicto
+        : { tieneVinculo: 'no', familiares: [], tieneOtraInhabilidad: 'no', descripcionInhabilidad: '', ...perfil.conflicto },
+    ),
     autorizacion: { acepta: perfil.autorizacion?.acepta ?? false, nombreCompleto: perfil.autorizacion?.nombreCompleto || '' },
     documentos: {
       cedula: perfil.documentosAdjuntos?.cedula || [],
@@ -60,7 +67,7 @@ function _perfilAEstadoWizard(perfil: any): any {
     @if (!cargando() && state()) {
       <app-doc-header title="Completa tu perfil" [showCode]="false" />
       <main class="page">
-        <div class="card">
+        <div class="card formulario-app">
           <div class="notice notice--info">
             Este formulario se llena <strong>una sola vez</strong>. Tu progreso se guarda automáticamente mientras
             avanzas — si te cierran, te tienes que ausentar o cierras el navegador, puedes volver más tarde y
@@ -78,11 +85,12 @@ function _perfilAEstadoWizard(perfil: any): any {
               <app-hoja-i [datos]="state().datosPersonales" (setDatos)="setDatos($event)" [errors]="errors()" ocultarProceso />
             }
             @case ('II') {
-              <app-hoja-ii [registros]="state().registrosII" (agregar)="addRegistro()" (quitar)="removeRegistro($event)" (cambiar)="changeRegistro($event)" />
+              <app-hoja-ii [registros]="state().registrosII" [errors]="errors()" (agregar)="addRegistro()" (quitar)="removeRegistro($event)" (cambiar)="changeRegistro($event)" />
             }
             @case ('VI') {
               <app-hoja-vi
                 [experiencias]="state().experiencias"
+                [errors]="errors()"
                 (agregar)="addExperiencia()"
                 (quitar)="removeExperiencia($event)"
                 (cambiar)="changeExperiencia($event)"
@@ -221,6 +229,9 @@ export class CompletarPerfilPage extends WizardBase implements OnDestroy {
       if (e instanceof ApiError && e.status === 422 && typeof e.detail === 'string' && e.detail.includes('Autorización')) {
         this.errorEnvio.set(e.detail);
         this.stepIndex.set(STEPS.indexOf('VIII'));
+      } else if (e instanceof ApiError && e.status === 422 && typeof e.detail === 'string' && /al menos (un estudio|una experiencia)/.test(e.detail)) {
+        this.errorEnvio.set(e.detail);
+        this.stepIndex.set(STEPS.indexOf(state.registrosII.length === 0 ? 'II' : 'VI'));
       } else {
         this.errorEnvio.set('No se pudo guardar tu perfil. Intenta de nuevo.');
       }

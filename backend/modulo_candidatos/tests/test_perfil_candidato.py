@@ -24,8 +24,8 @@ PERFIL_VALIDO = {
         "celular": "3225989990",
         "municipio": "Medellín",
     },
-    "registros_ii": [],
-    "experiencia": [],
+    "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Secundarios", "graduado": "si", "titulo": "Bachiller"}],
+    "experiencia": [{"empresa": "Empresa X", "cargo": "Auxiliar", "fechaInicio": "2024-01-01", "fechaTerminacion": "2024-06-01"}],
     "conflicto": {"tieneVinculo": "no", "tieneOtraInhabilidad": "no"},
     "documentos_adjuntos": DOCUMENTOS_VALIDOS,
     "autorizacion": {"acepta": True, "nombre_completo": "Candidato Uno"},
@@ -95,6 +95,30 @@ def test_guardar_perfil_dos_veces_lo_reemplaza_no_lo_duplica():
 def test_inscribirme_sin_perfil_completado_es_rechazado():
     r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
     assert r.status_code == 409
+
+
+@pytest.mark.parametrize("campo", ["registros_ii", "experiencia"])
+def test_guardar_perfil_sin_estudios_o_sin_experiencia_es_rechazado(campo):
+    r = client.put("/api/v1/perfiles/me", json={**PERFIL_VALIDO, campo: []}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 422
+    assert "al menos" in r.json()["detail"]
+
+
+def test_inscribirme_con_perfil_completado_sin_experiencia_es_rechazado():
+    # Perfil marcado como completo antes de exigir los mínimos: se le quita la experiencia por debajo.
+    from tests.conftest import TestingSessionLocal
+    from app.models.perfil_candidato import PerfilCandidato
+
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    db = TestingSessionLocal()
+    perfil = db.query(PerfilCandidato).first()
+    perfil.experiencia = []
+    db.commit()
+    db.close()
+
+    r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+    assert "experiencia laboral" in r.json()["detail"]
 
 
 def test_inscribirme_con_perfil_completado_funciona():

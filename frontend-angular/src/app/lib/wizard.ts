@@ -77,6 +77,14 @@ export class WizardBase {
       });
     }
 
+    if (step === 'II' && state.registrosII.length === 0) {
+      nuevosErrores['registrosII'] = 'Debes agregar al menos un estudio para continuar.';
+    }
+
+    if (step === 'VI' && state.experiencias.length === 0) {
+      nuevosErrores['experiencias'] = 'Debes agregar al menos una experiencia laboral para continuar.';
+    }
+
     if (step === 'VII') {
       if (state.conflicto.tieneVinculo === 'si' && state.conflicto.familiares.length === 0) {
         nuevosErrores['familiares'] = 'Agregue al menos un familiar o cambie la respuesta a "No".';

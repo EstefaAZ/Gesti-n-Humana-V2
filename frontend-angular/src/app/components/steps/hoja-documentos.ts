@@ -1,5 +1,7 @@
 import { Component, input, output, signal } from '@angular/core';
-import { archivoABase64 } from '../../lib/formState';
+
+import { Icon } from '../../shared/icon';
+import { ZonaArchivos, pesoLegible, pesoDeBase64 } from '../zona-archivos';import { archivoABase64 } from '../../lib/formState';
 
 const CATEGORIAS = [
   { clave: 'cedula', etiqueta: 'Cédula de ciudadanía', max: 1, ayuda: 'Copia legible de tu cédula.' },
@@ -16,7 +18,7 @@ export type ActualizadorDocumentos = (prev: any) => any;
 import { CampoAccesible } from '../../shared/campo-accesible';
 
 @Component({
-  imports: [CampoAccesible],
+  imports: [CampoAccesible, Icon, ZonaArchivos],
   selector: 'app-hoja-documentos',
   host: { style: 'display: contents' },
   template: `
@@ -38,29 +40,30 @@ import { CampoAccesible } from '../../shared/campo-accesible';
           }
 
           @if (archivos(cat.clave).length > 0) {
-            <ul style="list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px">
+            <ul class="archivos-lista">
               @for (doc of archivos(cat.clave); track $index; let i = $index) {
-                <li
-                  style="display: flex; align-items: center; gap: 8px; font-size: 13px; background: var(--color-surface-sunken); padding: 6px 10px; border-radius: var(--radius)"
-                >
-                  📄 <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ doc.nombre }}</span>
-                  <button type="button" class="hr-link-btn hr-link-btn--danger" (click)="quitarArchivo(cat.clave, i)">Quitar</button>
+                <li class="archivo-item">
+                  <span class="archivo-item__icono" aria-hidden="true"><app-icon name="documento" [size]="16" [strokeWidth]="1.8" /></span>
+                  <span class="archivo-item__texto">
+                    <span class="archivo-item__nombre" [title]="doc.nombre">{{ doc.nombre }}</span>
+                    @if (peso(doc)) {<span class="archivo-item__detalle">{{ peso(doc) }}</span>}
+                  </span>
+                  <button type="button" class="hr-link-btn hr-link-btn--danger" [attr.aria-label]="'Quitar ' + doc.nombre" (click)="quitarArchivo(cat.clave, i)">Quitar</button>
                 </li>
               }
             </ul>
           }
 
           @if (archivos(cat.clave).length < cat.max) {
-            <input
-              type="file"
+            <app-zona-archivos
               accept="application/pdf,image/*"
+              textoTipos="solo se aceptan PDF o imágenes"
               [multiple]="cat.max > 1"
               [disabled]="cargando() === cat.clave"
-              (change)="onArchivos(cat.clave, cat.max, $event)"
+              [textoBoton]="cargando() === cat.clave ? 'Cargando…' : archivos(cat.clave).length > 0 ? 'Agregar otro' : 'Elegir archivo'"
+              [etiqueta]="cat.etiqueta"
+              (archivos)="agregarArchivos(cat.clave, cat.max, $event)"
             />
-          }
-          @if (cargando() === cat.clave) {
-            <p class="text-muted" style="font-size: 12px">Cargando…</p>
           }
         </div>
       }
@@ -80,14 +83,11 @@ export class HojaDocumentos {
     return this.documentos()[clave] || [];
   }
 
-  protected onArchivos(clave: string, max: number, e: Event): void {
-    const inputEl = e.target as HTMLInputElement;
-    const lista = Array.from(inputEl.files || []);
-    inputEl.value = ''; // permite volver a elegir el mismo archivo si lo quita y lo agrega de nuevo
-    this.agregarArchivos(clave, max, lista);
+  protected peso(doc: any): string {
+    return pesoLegible(pesoDeBase64(doc?.contenidoBase64));
   }
 
-  private async agregarArchivos(clave: string, max: number, fileList: File[]): Promise<void> {
+  protected async agregarArchivos(clave: string, max: number, fileList: File[]): Promise<void> {
     const actuales = this.documentos()[clave] || [];
     const espacioDisponible = max - actuales.length;
     if (espacioDisponible <= 0) return;

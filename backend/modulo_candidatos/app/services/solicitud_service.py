@@ -152,7 +152,18 @@ def _guardar_solicitud(
     return solicitud
 
 
+def _validar_registros_minimos(registros_ii, experiencia) -> None:
+    from app.services.perfil_candidato_service import faltantes_minimos
+
+    faltan = faltantes_minimos(registros_ii, experiencia)
+    if faltan:
+        raise PerfilIncompletoError(
+            f"Debes completar tu perfil antes de inscribirte: agrega {' y '.join(faltan)}."
+        )
+
+
 def crear_solicitud(db: Session, datos: SolicitudCrear, usuario_id: str, token: Optional[str] = None) -> Solicitud:
+    _validar_registros_minimos(datos.registros_ii, datos.experiencia)
     vacante = _validar_vacante_disponible(db, datos.vacante_id, usuario_id, token)
     return _guardar_solicitud(
         db, vacante, datos.vacante_id, usuario_id,
@@ -191,6 +202,8 @@ def inscribirse_con_perfil(
     perfil = perfil_candidato_service.obtener_perfil(db, usuario_id)
     if not perfil or not perfil.completado:
         raise PerfilIncompletoError("Debes completar tu perfil antes de poder inscribirte a una vacante.")
+    # Perfiles marcados como completos antes de exigir estos mínimos (o cargados por scripts).
+    _validar_registros_minimos(perfil.registros_ii, perfil.experiencia)
 
     vacante = _validar_vacante_disponible(db, vacante_id, usuario_id, token)
     documentos_combinados = _combinar_documentos(perfil.documentos_adjuntos or {}, documentos_extra)

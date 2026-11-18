@@ -3,9 +3,34 @@ import { TIPO_REGISTRO_LABELS } from "../data/catalogos";
 export const STEPS = ["I", "II", "VI", "VII", "DOCS", "VIII"];
 
 let seq = 0;
+/**
+ * Id único para un registro nuevo (estudio, experiencia, familiar). Antes era
+ * `reg-1`, `reg-2`… y el contador volvía a 1 en cada carga de página, así que un
+ * registro nuevo podía repetir el id de uno ya guardado. Con ids repetidos el
+ * formulario edita, abre o borra varios registros a la vez.
+ */
 export function nextId(prefix) {
   seq += 1;
-  return `${prefix}-${seq}`;
+  const aleatorio = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}-${aleatorio}-${seq}`;
+}
+
+/**
+ * Asegura que cada elemento tenga un id propio. Los datos que vienen del servidor
+ * pueden no traerlo (ej. los cargados por los scripts de datos de prueba) o traer
+ * ids repetidos de la versión anterior de nextId.
+ */
+export function conIdsUnicos<T extends { id?: string }>(lista: T[] | null | undefined, prefijo: string): T[] {
+  const vistos = new Set<string>();
+  return (lista || []).map((item) => {
+    if (item?.id && !vistos.has(item.id)) {
+      vistos.add(item.id);
+      return item;
+    }
+    const conId = { ...item, id: nextId(prefijo) };
+    vistos.add(conId.id as string);
+    return conId;
+  });
 }
 
 export function initialSolicitudState({ proceso = "", fechaEntrega = "", locked = false }: { proceso?: string; fechaEntrega?: string; locked?: boolean } = {}): any {

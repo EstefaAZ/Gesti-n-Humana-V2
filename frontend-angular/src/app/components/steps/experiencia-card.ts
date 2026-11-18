@@ -1,9 +1,11 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { calcularTiempoLaborado } from '../../lib/formState';
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipiosPorDepartamento';
 import { PAISES } from '../../data/paises';
 import { SelectConOtro } from '../select-con-otro';
+import { Icon } from '../../shared/icon';
+import { mesAnio, unir } from './lista-plegable';
 
 // La lista dependiente Departamento -> Ciudad solo existe para Colombia (es la
 // única fuente oficial —DIVIPOLA— que tiene el sistema). Para cualquier otro
@@ -16,14 +18,38 @@ import { CampoAccesible } from '../../shared/campo-accesible';
 
 @Component({
   selector: 'app-experiencia-card',
-  imports: [CampoAccesible, FormsModule, SelectConOtro],
+  imports: [CampoAccesible, FormsModule, SelectConOtro, Icon],
   host: { style: 'display: contents' },
   template: `
-    <div class="repeatable-block">
-      <div class="repeatable-block__header">
-        <span class="repeatable-block__title">Experiencia laboral {{ index() + 1 }}</span>
-        <button type="button" class="repeatable-block__remove" (click)="quitar.emit(experiencia().id)">Eliminar</button>
+    <div class="reg" [class.is-abierto]="abierto()" [id]="'reg-' + experiencia().id">
+      <div class="reg__cab">
+        <span class="reg__icono" aria-hidden="true"><app-icon name="briefcase" [size]="18" [strokeWidth]="1.8" /></span>
+        <button
+          type="button"
+          class="reg__resumen"
+          [attr.aria-expanded]="abierto()"
+          [attr.aria-controls]="abierto() ? 'reg-cuerpo-' + experiencia().id : null"
+          (click)="alternar.emit()"
+        >
+          <span class="reg__textos">
+            <span class="reg__titulo">{{ resumen().titulo }}</span>
+            <span class="reg__detalle">{{ resumen().detalle }}</span>
+          </span>
+          <span class="reg__chev" aria-hidden="true"><app-icon name="chevronAbajo" [size]="18" [strokeWidth]="2" /></span>
+        </button>
+        <button
+          type="button"
+          class="reg__quitar"
+          title="Eliminar"
+          [attr.aria-label]="'Eliminar ' + resumen().titulo"
+          (click)="quitar.emit(experiencia().id)"
+        >
+          <app-icon name="papelera" [size]="17" [strokeWidth]="1.8" />
+        </button>
       </div>
+
+      @if (abierto()) {
+      <div class="reg__cuerpo" [id]="'reg-cuerpo-' + experiencia().id">
 
       <div class="field-grid">
         <div class="field field--span2">
@@ -137,6 +163,11 @@ import { CampoAccesible } from '../../shared/campo-accesible';
           <input type="text" [value]="experiencia().motivoRetiro || ''" (input)="setCampo('motivoRetiro', $event)" />
         </div>
       </div>
+        <div class="reg__acciones">
+          <button type="button" class="btn btn-primary btn-sm" (click)="listo.emit()">Listo</button>
+        </div>
+      </div>
+      }
     </div>
   `,
 })
@@ -145,6 +176,22 @@ export class ExperienciaCard {
   readonly index = input<number>(0);
   readonly cambiar = output<{ id: string; patch: any }>();
   readonly quitar = output<string>();
+  readonly abierto = input<boolean>(false);
+  readonly alternar = output<void>();
+  readonly listo = output<void>();
+
+  /** Lo que se ve con la tarjeta cerrada: "Abogada Junior" · "Gómez & Asociados · feb. 2017 – ago. 2019 · 2 año(s), 6 mes(es)". */
+  protected readonly resumen = computed(() => {
+    const e = this.experiencia();
+    const fin = e.actual ? 'actualidad' : mesAnio(e.fechaTerminacion);
+    const periodo = e.fechaInicio ? `${mesAnio(e.fechaInicio)} – ${fin || '…'}` : '';
+    // "2 año(s), 6 mes(es), 30 día(s)" → sin los días, que en el resumen sobran.
+    const tiempo = (e.tiempoLaborado && e.tiempoLaborado !== '—' ? e.tiempoLaborado : '').replace(/,\s*\d+\s*día\(s\)/, '');
+    return {
+      titulo: e.cargo || e.empresa || 'Experiencia sin completar',
+      detalle: unir([e.cargo ? e.empresa : '', periodo, tiempo]) || 'Sin completar',
+    };
+  });
 
   protected readonly paises = PAISES;
   protected readonly departamentos = DEPARTAMENTOS;

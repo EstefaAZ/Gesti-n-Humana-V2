@@ -1,6 +1,7 @@
-import { Component, input, output } from '@angular/core';
+import { Component, effect, input, output, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { PARENTESCOS } from '../../data/catalogos';
+import { Icon } from '../../shared/icon';
 
 const MAX_FAMILIARES = 5;
 
@@ -8,7 +9,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
 
 @Component({
   selector: 'app-hoja-vii',
-  imports: [CampoAccesible, FormsModule],
+  imports: [CampoAccesible, FormsModule, Icon],
   host: { style: 'display: contents' },
   template: `
     <section>
@@ -31,53 +32,63 @@ import { CampoAccesible } from '../../shared/campo-accesible';
       </div>
 
       @if (conflicto().tieneVinculo === 'si') {
-        <div>
+        <!-- Panel de la respuesta "Sí": línea verde al costado para que se lea como parte de la pregunta. -->
+        <div class="panel-si">
           @if (conflicto().familiares.length === 0) {
-            <div class="empty-state">Aún no ha agregado ningún familiar.</div>
+            <div class="vacio">
+              <span class="vacio__icono" aria-hidden="true"><app-icon name="users" [size]="20" [strokeWidth]="1.8" /></span>
+              <div class="vacio__texto">
+                <p class="vacio__titulo">Agrega a la persona con quien tienes el vínculo</p>
+                <p class="vacio__ayuda">Su parentesco contigo, su nombre y su cargo en la empresa. Puedes agregar hasta {{ max }}.</p>
+              </div>
+              <button type="button" class="btn btn-primary" (click)="agregarFamiliar.emit()">
+                <app-icon name="mas" [size]="16" [strokeWidth]="2.2" /> Agregar familiar
+              </button>
+            </div>
+          } @else {
+            <ul class="lista-familiares">
+              @for (f of conflicto().familiares; track f.id; let i = $index) {
+                <li class="familiar" [id]="'familiar-' + f.id">
+                  <div class="field">
+                    <label>Parentesco</label>
+                    <select [ngModel]="f.parentesco" (ngModelChange)="cambiarFamiliar.emit({ id: f.id, patch: { parentesco: $event } })">
+                      <option value="">Seleccione…</option>
+                      @for (p of parentescos; track p) {
+                        <option [value]="p">{{ p }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Nombre del empleado</label>
+                    <input type="text" [value]="f.nombreEmpleado" (input)="cambiarFamiliar.emit({ id: f.id, patch: { nombreEmpleado: $any($event.target).value } })" />
+                  </div>
+                  <div class="field">
+                    <label>Cargo</label>
+                    <input type="text" [value]="f.cargo" (input)="cambiarFamiliar.emit({ id: f.id, patch: { cargo: $any($event.target).value } })" />
+                  </div>
+                  <button
+                    type="button"
+                    class="reg__quitar familiar__quitar"
+                    title="Eliminar"
+                    [attr.aria-label]="'Eliminar familiar ' + (i + 1) + (f.nombreEmpleado ? ': ' + f.nombreEmpleado : '')"
+                    (click)="quitarFamiliar.emit(f.id)"
+                  >
+                    <app-icon name="papelera" [size]="17" [strokeWidth]="1.8" />
+                  </button>
+                </li>
+              }
+            </ul>
+            <div class="pie-registros">
+              <button type="button" class="btn btn-secondary" [disabled]="conflicto().familiares.length >= max" (click)="agregarFamiliar.emit()">
+                <app-icon name="mas" [size]="16" [strokeWidth]="2.2" /> Agregar otro familiar
+              </button>
+              <span class="pie-registros__contador" [class.is-al-maximo]="conflicto().familiares.length >= max">
+                {{ conflicto().familiares.length >= max ? 'Llegaste al máximo de ' + max : conflicto().familiares.length + ' de ' + max }}
+              </span>
+            </div>
           }
-          @if (conflicto().familiares.length > 0) {
-            <table class="plain-table">
-              <thead>
-                <tr>
-                  <th>Parentesco / relación</th>
-                  <th>Nombre del empleado</th>
-                  <th>Cargo</th>
-                  <th><span class="sr-only">Acciones</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (f of conflicto().familiares; track f.id) {
-                  <tr>
-                    <td>
-                      <select aria-label="Parentesco o relación" [ngModel]="f.parentesco" (ngModelChange)="cambiarFamiliar.emit({ id: f.id, patch: { parentesco: $event } })">
-                        <option value="">Seleccione…</option>
-                        @for (p of parentescos; track p) {
-                          <option [value]="p">{{ p }}</option>
-                        }
-                      </select>
-                    </td>
-                    <td>
-                      <input type="text" aria-label="Nombre del empleado" [value]="f.nombreEmpleado" (input)="cambiarFamiliar.emit({ id: f.id, patch: { nombreEmpleado: $any($event.target).value } })" />
-                    </td>
-                    <td>
-                      <input type="text" aria-label="Cargo del empleado" [value]="f.cargo" (input)="cambiarFamiliar.emit({ id: f.id, patch: { cargo: $any($event.target).value } })" />
-                    </td>
-                    <td>
-                      <button type="button" class="repeatable-block__remove" (click)="quitarFamiliar.emit(f.id)">Eliminar</button>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          }
-          <button type="button" class="btn btn-add btn-block" [disabled]="conflicto().familiares.length >= max" (click)="agregarFamiliar.emit()">
-            + Agregar otro familiar
-          </button>
-          <p class="limit-note" [class.is-at-max]="conflicto().familiares.length >= max">
-            {{ conflicto().familiares.length }} de {{ max }} familiares agregados.
-          </p>
           @if (errors().familiares) {
-            <p class="field-error" style="display: block">{{ errors().familiares }}</p>
+            <p class="field-error" style="display: block; margin: 0">{{ errors().familiares }}</p>
           }
         </div>
       }
@@ -105,12 +116,14 @@ import { CampoAccesible } from '../../shared/campo-accesible';
       </div>
 
       @if (conflicto().tieneOtraInhabilidad === 'si') {
-        <div class="field" [class.is-invalid]="!!errors().descripcionInhabilidad">
+        <div class="panel-si">
+        <div class="field" [class.is-invalid]="!!errors().descripcionInhabilidad" style="margin: 0">
           <label>Describa la situación *</label>
           <textarea [value]="conflicto().descripcionInhabilidad" (input)="setConflicto.emit({ descripcionInhabilidad: $any($event.target).value })"></textarea>
           @if (errors().descripcionInhabilidad) {
             <span class="field-error">{{ errors().descripcionInhabilidad }}</span>
           }
+        </div>
         </div>
       }
     </section>
@@ -126,6 +139,21 @@ export class HojaVII {
 
   protected readonly parentescos = PARENTESCOS;
   protected readonly max = MAX_FAMILIARES;
+
+  // Al agregar un familiar, el foco va a su primer campo (Parentesco).
+  private conteoPrevio = -1;
+  constructor() {
+    effect(() => {
+      const lista = this.conflicto().familiares || [];
+      untracked(() => {
+        if (this.conteoPrevio >= 0 && lista.length > this.conteoPrevio) {
+          const nuevo = lista[lista.length - 1];
+          setTimeout(() => document.querySelector<HTMLElement>(`#familiar-${nuevo.id} select`)?.focus());
+        }
+        this.conteoPrevio = lista.length;
+      });
+    });
+  }
 
   protected setVinculo(val: string): void {
     if (val === 'si') {

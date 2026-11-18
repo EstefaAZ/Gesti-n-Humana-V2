@@ -41,8 +41,8 @@ SOLICITUD_VALIDA = {
         "celular": "3225989990",
         "municipio": "Medellín",
     },
-    "registros_ii": [],
-    "experiencia": [],
+    "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Secundarios", "graduado": "si", "titulo": "Bachiller"}],
+    "experiencia": [{"empresa": "Empresa X", "cargo": "Auxiliar", "fechaInicio": "2024-01-01", "fechaTerminacion": "2024-06-01"}],
     "conflicto": {"tieneVinculo": "no", "tieneOtraInhabilidad": "no"},
     "autorizacion": {"nombreCompleto": "Estefanía Delgado Bernal"},
     "documentos_adjuntos": DOCUMENTOS_VALIDOS,
@@ -52,6 +52,13 @@ SOLICITUD_VALIDA = {
 
 def test_health_check():
     assert client.get("/health").json()["estado"] == "saludable"
+
+
+@pytest.mark.parametrize("campo", ["registros_ii", "experiencia"])
+def test_crear_solicitud_sin_estudios_o_sin_experiencia_es_rechazada(campo):
+    r = client.post("/api/v1/solicitudes", json={**SOLICITUD_VALIDA, campo: []}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+    assert "al menos" in r.json()["detail"]
 
 
 def test_crear_solicitud_sin_token_rechazada():
@@ -77,7 +84,7 @@ def test_crear_solicitud_exitosa_y_evaluacion_no_cumple():
     data = r.json()
     assert data["radicado"].startswith("SOL-")
     assert data["estado"] == "Recibida"
-    # No registró estudios ni experiencia, así que NO cumple los criterios de la vacante.
+    # Su nivel educativo y su experiencia (5 meses) no alcanzan, así que NO cumple los criterios de la vacante.
     assert data["evaluacion"]["cumple"] is False
     assert len(data["evaluacion"]["motivos"]) == 2  # nivel educativo + experiencia mínima
 
