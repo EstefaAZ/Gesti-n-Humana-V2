@@ -66,14 +66,13 @@ export const authStyles: Record<string, Record<string, any>> = {
   field: {
     marginBottom: "18px",
   },
+  // 13px y sin mayúsculas: las etiquetas en versalitas de 11,5px costaban de leer.
   label: {
     display: "block",
-    fontSize: "11.5px",
+    fontSize: "13px",
     fontWeight: "600",
-    color: "#5B6B60",
+    color: "#2F3F35",
     marginBottom: "7px",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
   },
   inputWrap: {
     position: "relative",
@@ -113,13 +112,15 @@ export const authStyles: Record<string, Record<string, any>> = {
     borderColor: "#D8E7DC",
     borderRadius: "10px",
     color: "#1B2B22",
-    fontSize: "14.5px",
+    fontSize: "16px", // 16px: con menos, iOS hace zoom al enfocar el campo
     boxSizing: "border-box",
     transition: "border-color 0.2s, box-shadow 0.2s",
   },
   inputFocus: {
     borderColor: GREEN_ACCENT,
     boxShadow: `0 0 0 3px ${GREEN_ACCENT_GLOW}`,
+    // El borde + resplandor ya marcan el foco; sin esto se suma el outline global (doble anillo).
+    outline: "none",
   },
   optionsRow: {
     display: "flex",
@@ -275,7 +276,7 @@ export const authStyles: Record<string, Record<string, any>> = {
     borderColor: "#D8E7DC",
     borderRadius: "10px",
     color: "#1B2B22",
-    fontSize: "14.5px",
+    fontSize: "16px", // 16px: con menos, iOS hace zoom al enfocar el campo
     boxSizing: "border-box",
     appearance: "auto",
   },
@@ -302,8 +303,8 @@ export const authStyles: Record<string, Record<string, any>> = {
     margin: "4px 0 20px",
   },
   termsCheckbox: {
-    width: "15px",
-    height: "15px",
+    width: "18px",
+    height: "18px",
     marginTop: "2px",
     accentColor: GREEN_PRIMARY,
     cursor: "pointer",
@@ -370,6 +371,29 @@ export const authStyles: Record<string, Record<string, any>> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+  },
+  // Errores por campo (registro): texto rojo bajo el campo y borde rojo en el input.
+  fieldError: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "6px",
+    fontSize: "12.5px",
+    lineHeight: 1.45,
+    color: "#B23A34",
+    margin: "6px 0 0",
+  },
+  fieldHint: {
+    fontSize: "12px",
+    color: "#5B6B60",
+    margin: "6px 0 0",
+  },
+  inputInvalid: {
+    borderColor: "#B23A34",
+  },
+  inputInvalidFocus: {
+    borderColor: "#B23A34",
+    boxShadow: "0 0 0 3px rgba(178,58,52,0.15)",
+    outline: "none",
   },
   tipBox: {
     display: "flex",

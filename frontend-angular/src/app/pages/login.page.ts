@@ -28,6 +28,12 @@ import { authStyles } from './auth/auth-styles';
           @if (error()) {
             <div id="login-error" [ngStyle]="s.error" role="alert">{{ error() }}</div>
           }
+          @if (auth.sesionExpirada()) {
+            <div [ngStyle]="s.success" role="status">Tu sesión expiró. Vuelve a iniciar sesión para continuar donde ibas.</div>
+          }
+          @if (cuentaCreada) {
+            <div [ngStyle]="s.success" role="status">Tu cuenta se creó correctamente. Inicia sesión para continuar.</div>
+          }
           @if (restablecida) {
             <div [ngStyle]="s.success" role="status">Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión.</div>
           }
@@ -94,11 +100,12 @@ import { authStyles } from './auth/auth-styles';
 
           <button
             type="submit"
-            [ngStyle]="m(s.button, btnHover() && !cargando() ? s.buttonHover : null, cargando() ? s.buttonDisabled : null)"
-            (mouseenter)="btnHover.set(true)"
-            (mouseleave)="btnHover.set(false)"
+            class="auth-btn"
             [disabled]="cargando()"
           >
+            @if (cargando()) {
+              <span class="auth-btn__spinner" aria-hidden="true"></span>
+            }
             {{ cargando() ? 'Ingresando…' : 'Iniciar sesión' }}
             @if (!cargando()) {
               <app-icon name="arrow" [size]="17" [strokeWidth]="2" />
@@ -114,9 +121,7 @@ import { authStyles } from './auth/auth-styles';
 
           <a
             routerLink="/registro"
-            [ngStyle]="m(s.buttonSecondary, btn2Hover() ? s.buttonSecondaryHover : null)"
-            (mouseenter)="btn2Hover.set(true)"
-            (mouseleave)="btn2Hover.set(false)"
+            class="auth-btn-secondary"
           >
             <app-icon name="user" [size]="16" [strokeWidth]="1.6" /> Crear cuenta
           </a>
@@ -143,11 +148,12 @@ import { authStyles } from './auth/auth-styles';
   `,
 })
 export class LoginPage {
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly s = authStyles;
 
-  protected readonly email = signal('');
+  protected readonly cuentaCreada = !!history.state?.cuentaCreada;
+  protected readonly email = signal<string>(history.state?.email || '');
   protected readonly password = signal('');
   protected readonly recordar = signal(false);
   protected readonly mostrarPassword = signal(false);
@@ -156,8 +162,6 @@ export class LoginPage {
   private readonly from = history.state?.from;
   protected readonly cargando = signal(false);
   protected readonly focused = signal<string | null>(null);
-  protected readonly btnHover = signal(false);
-  protected readonly btn2Hover = signal(false);
 
   /** Combina varios objetos de estilo (igual que {...a, ...b} en React). */
   protected m(...estilos: any[]): Record<string, any> {

@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { Routes } from '@angular/router';
-import { authGuard, rolGuard, NivelAcceso } from './core/auth.guard';
+import { authGuard, invitadoGuard, rolGuard, NivelAcceso } from './core/auth.guard';
 import { AuthService } from './core/auth.service';
 import { Shell } from './shell';
 import { ListaVacantesPage } from './pages/lista-vacantes.page';
@@ -54,8 +54,8 @@ function protegida(path: string, component: any, nivel: NivelAcceso = 'cualquier
 }
 
 export const routes: Routes = [
-  { path: 'login', component: LoginPage },
-  { path: 'registro', component: RegistroPage },
+  { path: 'login', component: LoginPage, canActivate: [invitadoGuard] },
+  { path: 'registro', component: RegistroPage, canActivate: [invitadoGuard] },
   { path: 'olvide-password', component: OlvidePasswordPage },
   { path: 'restablecer-password', component: RestablecerPasswordPage },
   { path: 'politica-datos', component: PoliticaDatosPage },

@@ -100,7 +100,14 @@ import { formatearFecha } from '../lib/formato';
           }
 
           @if (errorInscripcion()) {
-            <div class="notice notice--danger">{{ errorInscripcion() }}</div>
+            <div class="notice notice--danger">
+              {{ errorInscripcion() }}
+              @if (faltaPerfil()) {
+                <div style="margin-top: 10px">
+                  <a routerLink="/completar-perfil" class="btn btn-primary">Completar mi perfil</a>
+                </div>
+              }
+            </div>
           }
 
           @if (mostrarConfirmacion() && !miPostulacion()) {
@@ -182,6 +189,8 @@ export class VacanteDetallePage {
   protected readonly documentosExtra = signal<any>({ cedula: [], certificadosLaborales: [], certificadosEstudio: [], tarjetaProfesional: [] });
   protected readonly inscribiendo = signal(false);
   protected readonly errorInscripcion = signal('');
+  /** El backend rechazó la inscripción porque el perfil no está completo (409). */
+  protected readonly faltaPerfil = signal(false);
   protected readonly categoriasExtra = CATEGORIAS_EXTRA;
 
   constructor() {
@@ -224,7 +233,17 @@ export class VacanteDetallePage {
       perfilesApi
         .obtenerMiPerfil(this.auth.token())
         .then((p) => this.perfil.set(p))
-        .catch(() => {});
+        .catch((e) => {
+          // Antes el error se ignoraba y el panel se quedaba en "Cargando tu perfil…" para siempre.
+          this.mostrarConfirmacion.set(false);
+          if (e instanceof ApiError && e.status === 404) {
+            // Sin perfil todavía (ej. entró mientras no se pudo consultar su estado): se le da la salida.
+            this.errorInscripcion.set('Para inscribirte a una vacante primero debes completar tu perfil.');
+            this.faltaPerfil.set(true);
+          } else {
+            this.errorInscripcion.set(e instanceof ApiError ? e.detail : 'No se pudo cargar tu perfil. Intenta de nuevo.');
+          }
+        });
     }
   }
 
@@ -247,6 +266,7 @@ export class VacanteDetallePage {
 
   protected async confirmarInscripcion(): Promise<void> {
     this.errorInscripcion.set('');
+    this.faltaPerfil.set(false);
     this.inscribiendo.set(true);
     try {
       const solicitud = await solicitudesApi.inscribirme(this.vacante().id, this.documentosExtra(), this.auth.token());
@@ -255,6 +275,8 @@ export class VacanteDetallePage {
     } catch (e: any) {
       if (e instanceof ApiError) {
         this.errorInscripcion.set(e.detail || 'No se pudo completar la inscripción.');
+        // Caso del candidato que entró mientras no se pudo consultar su perfil: se le da la salida.
+        this.faltaPerfil.set(e.status === 409 && /complet\w* tu perfil/i.test(e.detail));
       } else {
         this.errorInscripcion.set('No se pudo completar la inscripción. Intenta de nuevo.');
       }

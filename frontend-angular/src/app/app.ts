@@ -25,6 +25,29 @@ export class App {
    * las que de verdad se desplazan reciben tabindex="0" para que también se
    * puedan recorrer con el teclado (flechas).
    */
+  /**
+   * Al cambiar de página dentro de la app, el elemento que tenía el foco (botón,
+   * enlace) desaparece y el foco cae al <body>: quien usa teclado o lector de
+   * pantalla no se entera de que cambió la página. Se lleva el foco al <h1> nuevo.
+   * Si la página ya enfocó algo (ej. un campo con autofocus), no se toca.
+   */
+  private enfocarTituloSiSePerdioElFoco(): void {
+    // Algunas páginas pintan su <h1> cuando llegan los datos: se reintenta hasta ~1,5 s.
+    let intentos = 0;
+    const intentar = () => {
+      const activo = document.activeElement;
+      if (activo && activo !== document.body) return; // la página o la persona ya enfocó algo
+      const h1 = document.querySelector<HTMLElement>('main h1') ?? document.querySelector<HTMLElement>('h1');
+      if (!h1) {
+        if (++intentos < 15) setTimeout(intentar, 100);
+        return;
+      }
+      if (!h1.hasAttribute('tabindex')) h1.setAttribute('tabindex', '-1');
+      h1.focus({ preventScroll: true });
+    };
+    setTimeout(intentar);
+  }
+
   private hacerTablasEnfocables(): void {
     let pendiente = false;
     const revisar = () => {
@@ -51,7 +74,9 @@ export class App {
 
   constructor() {
     this.hacerTablasEnfocables();
+    let navegaciones = 0;
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd), takeUntilDestroyed()).subscribe(() => {
+      if (navegaciones++ > 0) this.enfocarTituloSiSePerdioElFoco();
       let snap: ActivatedRouteSnapshot = this.router.routerState.snapshot.root;
       while (snap.firstChild) snap = snap.firstChild;
       this.rutaActual.set({

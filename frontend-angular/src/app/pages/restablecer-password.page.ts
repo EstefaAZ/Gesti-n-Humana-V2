@@ -61,12 +61,13 @@ import { authStyles } from './auth/auth-styles';
           </div>
 
           <button
-            [ngStyle]="m(s.button, btnHover() && !cargando() ? s.buttonHover : null, cargando() ? s.buttonDisabled : null)"
+            class="auth-btn"
             (click)="handleRestablecer()"
-            (mouseenter)="btnHover.set(true)"
-            (mouseleave)="btnHover.set(false)"
             [disabled]="cargando()"
           >
+            @if (cargando()) {
+              <span class="auth-btn__spinner" aria-hidden="true"></span>
+            }
             {{ cargando() ? 'Guardando…' : 'Restablecer contraseña' }}
             @if (!cargando()) {
               <app-icon name="arrow" [size]="17" [strokeWidth]="2" />
@@ -92,7 +93,6 @@ export class RestablecerPasswordPage {
   protected readonly error = signal('');
   protected readonly cargando = signal(false);
   protected readonly focused = signal(false);
-  protected readonly btnHover = signal(false);
 
   protected m(...estilos: any[]): Record<string, any> {
     return Object.assign({}, ...estilos.filter(Boolean));
