@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password, crear_access_token
+import base64
+import binascii
+
 from app.models.usuario import Usuario, RolUsuario
+from app.models.foto_perfil import FotoPerfil
 from app.schemas.usuario import UsuarioRegistro, UsuarioCrearInterno, ActualizarPerfil, EditarUsuario
 
 
@@ -89,9 +93,13 @@ def autenticar_usuario(db: Session, email: str, password: str) -> Usuario:
 
 
 def generar_token_para_usuario(usuario: Usuario, recordar: bool = False) -> str:
-    expira = timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR if recordar else settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
+    if not recordar:
+        minutos = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    elif usuario.rol == RolUsuario.candidato:
+        minutos = settings.ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR
+    else:
+        minutos = settings.ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR_INTERNO
+    expira = timedelta(minutes=minutos)
     return crear_access_token(
         data={
             "sub": usuario.id,
@@ -150,6 +158,50 @@ def _otros_admins_activos(db: Session, usuario_id: str) -> int:
         .filter(Usuario.rol == RolUsuario.admin, Usuario.id != usuario_id, Usuario.activo.is_(True))
         .count()
     )
+
+
+class FotoInvalidaError(Exception):
+    pass
+
+
+FOTO_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
+# Firma de los primeros bytes de cada formato: el "tipo" lo manda el navegador
+# y se puede falsear, así que se comprueba que el archivo de verdad sea esa imagen.
+_FIRMAS_IMAGEN = {
+    "image/jpeg": lambda b: b[:3] == b"\xff\xd8\xff",
+    "image/png": lambda b: b[:8] == b"\x89PNG\r\n\x1a\n",
+    "image/webp": lambda b: b[:4] == b"RIFF" and b[8:12] == b"WEBP",
+}
+
+
+def guardar_foto_perfil(db: Session, usuario: Usuario, contenido_base64: str, tipo: str) -> Usuario:
+    if tipo not in _FIRMAS_IMAGEN:
+        raise FotoInvalidaError("La foto debe ser una imagen JPG, PNG o WebP.")
+    try:
+        contenido = base64.b64decode(contenido_base64, validate=True)
+    except (binascii.Error, ValueError):
+        raise FotoInvalidaError("No se pudo leer la imagen. Intenta con otro archivo.")
+    if len(contenido) > FOTO_MAX_BYTES:
+        raise FotoInvalidaError("La foto pesa más de 2 MB. Elige una imagen más liviana.")
+    if not _FIRMAS_IMAGEN[tipo](contenido):
+        raise FotoInvalidaError("El archivo no es una imagen JPG, PNG o WebP válida.")
+
+    if usuario.foto:
+        usuario.foto.contenido = contenido
+        usuario.foto.tipo = tipo
+    else:
+        usuario.foto = FotoPerfil(contenido=contenido, tipo=tipo)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+
+def eliminar_foto_perfil(db: Session, usuario: Usuario) -> Usuario:
+    if usuario.foto:
+        usuario.foto = None
+        db.commit()
+        db.refresh(usuario)
+    return usuario
 
 
 def eliminar_cuenta_propia(db: Session, usuario: Usuario) -> None:

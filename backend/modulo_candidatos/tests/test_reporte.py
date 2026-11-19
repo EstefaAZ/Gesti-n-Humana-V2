@@ -59,7 +59,7 @@ def test_reporte_encabezado_hoja_resultados_reclutamiento_concatena_con_la_etiqu
     contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, [_solicitud_fake()])
     wb = openpyxl.load_workbook(io.BytesIO(contenido))
     ws = wb["Resultados_reclutamiento"]
-    assert ws["D5"].value == "PROCESO DE SELECCIÓN Nº: 2026-1"
+    assert ws["A5"].value == "PROCESO DE SELECCIÓN Nº: 2026-1"
     assert ws["A6"].value == "CARGO: Analista de Prueba"
     assert ws["A7"].value == "SALARIO BASICO: 3.000.000"
 
@@ -113,7 +113,8 @@ def test_reporte_marca_x_en_columna_si_cuando_categoria_cumple():
         assert ws[f"C{fila}"].value == "X"  # Estudios - SI
         assert ws[f"D{fila}"].value is None
         assert ws[f"G{fila}"].value == "X"  # Experiencia - SI
-        assert ws[f"E{fila}"].value is None  # Conocimientos: sin criterio, blanco
+        assert ws[f"E{fila}"].value is None  # Conocimientos: sin criterio -> en blanco
+        assert ws[f"F{fila}"].value is None
 
 
 def test_reporte_marca_x_en_columna_no_cuando_categoria_no_cumple():
@@ -151,6 +152,19 @@ def test_reporte_sin_evaluacion_queda_todo_en_blanco():
     ws = wb["Aspirantes"]
     for col in ["C", "D", "E", "F", "G", "H"]:
         assert ws[f"{col}13"].value is None
+
+
+def test_reporte_vacante_sin_criterios_marca_si_en_estudios_y_experiencia_y_deja_conocimientos_en_blanco():
+    s = _solicitud_fake(evaluacion={"cumple": True, "motivos": [], "detalle": {
+        "estudios": {"cumple": None, "motivo": None},
+        "conocimientos": {"cumple": None, "motivo": None},
+        "experiencia": {"cumple": None, "motivo": None},
+    }})
+    contenido = reporte_service.generar_reporte_vacante({**VACANTE_INFO, "criterios": {}}, [s])
+    wb = openpyxl.load_workbook(io.BytesIO(contenido))
+    for hoja, fila in [("Aspirantes", 13), ("Resultados_reclutamiento", 16)]:
+        ws = wb[hoja]
+        assert [ws[f"{c}{fila}"].value for c in "CDEFGH"] == ["X", None, None, None, "X", None]
 
 
 def test_reporte_sin_criterios_configurados_describe_sin_requisito():
@@ -202,3 +216,40 @@ def test_descargar_reporte_devuelve_un_xlsx_valido():
     wb = openpyxl.load_workbook(io.BytesIO(r.content))
     ws = wb["Aspirantes"]
     assert ws["A13"].value == SOLICITUD_VALIDA["datos_personales"]["cedula"]
+
+
+def test_reporte_conserva_el_logo_en_ambas_hojas_y_a1_sin_error():
+    contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, [_solicitud_fake()])
+    wb = openpyxl.load_workbook(io.BytesIO(contenido))
+    for hoja in ("Aspirantes", "Resultados_reclutamiento"):
+        ws = wb[hoja]
+        assert len(ws._images) == 1
+        assert ws["A1"].value is None  # antes quedaba "#VALUE!"
+
+
+def test_reporte_total_cuenta_desde_el_primer_aspirante():
+    contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, [])
+    ws = openpyxl.load_workbook(io.BytesIO(contenido))["Aspirantes"]
+    assert ws["I59"].value == '=COUNTIF(I13:I58,"X")'
+    assert ws["J59"].value == '=COUNTIF(J13:J58,"X")'
+
+
+def test_reporte_resultados_no_escribe_en_la_fila_separadora():
+    solicitudes = [_solicitud_fake(datos_personales={"cedula": str(i), "nombreCompleto": f"A{i}"}) for i in range(20)]
+    contenido = reporte_service.generar_reporte_vacante(VACANTE_INFO, solicitudes)
+    ws = openpyxl.load_workbook(io.BytesIO(contenido))["Resultados_reclutamiento"]
+    assert ws["A28"].value == "12"
+    assert ws["A29"].value is None
+
+
+def test_reporte_escribe_el_aviso_de_sobrecalificado_en_observaciones():
+    aviso = "Sobrecalificado: registra nivel Universitario y el cargo pide Tecnólogo."
+    s = _solicitud_fake(evaluacion={"cumple": True, "motivos": [], "avisos": [aviso], "detalle": {
+        "estudios": {"cumple": True, "motivo": None, "aviso": aviso},
+        "conocimientos": {"cumple": None, "motivo": None},
+        "experiencia": {"cumple": True, "motivo": None},
+    }})
+    wb = openpyxl.load_workbook(io.BytesIO(reporte_service.generar_reporte_vacante(VACANTE_INFO, [s])))
+    for hoja, fila in [("Aspirantes", 13), ("Resultados_reclutamiento", 16)]:
+        assert wb[hoja][f"C{fila}"].value == "X"  # Estudios SÍ
+        assert wb[hoja][f"K{fila}"].value == aviso

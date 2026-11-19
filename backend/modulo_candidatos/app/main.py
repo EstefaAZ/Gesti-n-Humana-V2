@@ -49,6 +49,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
+    # Para que el navegador pueda leer el nombre del archivo en las descargas (PDF, ZIP, Excel).
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(solicitudes_router, prefix="/api/v1")

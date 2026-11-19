@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import DocHeader from "../components/DocHeader";
 import EstadoPostulacionBadge from "../components/EstadoPostulacionBadge";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,9 @@ import * as solicitudesApi from "../lib/api/solicitudesApi";
 
 export default function MisPostulacionesPage() {
   const { token } = useAuth();
+  const [searchParams] = useSearchParams();
+  const radicadoDestacado = searchParams.get("radicado");
+  const filaDestacada = useRef(null);
   const [postulaciones, setPostulaciones] = useState(null);
   const [error, setError] = useState("");
 
@@ -16,6 +19,10 @@ export default function MisPostulacionesPage() {
       .then(setPostulaciones)
       .catch(() => setError("No se pudieron cargar tus postulaciones."));
   }, [token]);
+
+  useEffect(() => {
+    filaDestacada.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [postulaciones, radicadoDestacado]);
 
   async function retirarPostulacion(radicado) {
     if (!window.confirm("¿Retirarte de este proceso de selección? Tus datos se conservan, solo queda marcado que ya no sigues en el proceso.")) return;

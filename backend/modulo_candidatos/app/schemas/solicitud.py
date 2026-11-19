@@ -8,10 +8,10 @@
 # enviar. Aquí solo se exige lo mínimo para poder evaluar y generar el PDF.
 # ==============================================================
 
-from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+from app.schemas.tipos import FechaUTC
 
 MAX_TAMANO_ARCHIVO_BYTES = 5 * 1024 * 1024  # 5 MB por archivo
 
@@ -100,6 +100,7 @@ class DocumentosAdjuntosOut(BaseModel):
 class DetalleCategoriaEvaluacion(BaseModel):
     cumple: Optional[bool] = None  # None = esta vacante no tiene ese criterio configurado
     motivo: Optional[str] = None
+    aviso: Optional[str] = None  # informativo, no afecta "cumple" (p. ej. sobrecalificado)
 
 
 class DetalleEvaluacion(BaseModel):
@@ -111,6 +112,7 @@ class DetalleEvaluacion(BaseModel):
 class EvaluacionOut(BaseModel):
     cumple: bool
     motivos: list[str] = []
+    avisos: list[str] = []
     detalle: DetalleEvaluacion = DetalleEvaluacion()
 
 
@@ -144,9 +146,23 @@ class SolicitudOut(BaseModel):
     estado: str
     historial_estados: list[dict[str, Any]]
     anonimizada: bool = False
-    fecha_solicitud: Optional[datetime] = None
+    fecha_solicitud: Optional[FechaUTC] = None
+    # Solo en "Mis postulaciones": estado ACTUAL de la convocatoria (puede haber
+    # cambiado después de postularse). None si no se pudo consultar.
+    convocatoria: Optional["EstadoConvocatoria"] = None
 
     model_config = {"from_attributes": True}
+
+
+class EstadoConvocatoria(BaseModel):
+    estado: Optional[str] = None          # publicada, en_proceso, cerrada, cancelada_desierta, borrador
+    esta_cerrada: bool = False
+    fecha_cierre: Optional[str] = None
+    hora_cierre: Optional[str] = None
+    eliminada: bool = False               # la vacante ya no existe
+
+
+SolicitudOut.model_rebuild()  # resuelve la referencia a EstadoConvocatoria (definida después)
 
 
 class SolicitudResumen(BaseModel):
@@ -159,7 +175,7 @@ class SolicitudResumen(BaseModel):
     celular: Optional[str] = None
     estado: str
     evaluacion: Optional[EvaluacionOut] = None
-    fecha_solicitud: Optional[datetime] = None
+    fecha_solicitud: Optional[FechaUTC] = None
 
 
 class PuntoMes(BaseModel):
@@ -172,7 +188,7 @@ class SolicitudActividadReciente(BaseModel):
     vacante_id: str
     nombre_completo: Optional[str] = None
     estado: str
-    fecha_solicitud: Optional[datetime] = None
+    fecha_solicitud: Optional[FechaUTC] = None
 
 
 class EstadisticasSolicitudes(BaseModel):
@@ -190,6 +206,6 @@ class EventoAuditoriaOut(BaseModel):
     actor_rol: Optional[str] = None
     entidad_tipo: Optional[str] = None
     entidad_id: Optional[str] = None
-    fecha: Optional[datetime] = None
+    fecha: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}

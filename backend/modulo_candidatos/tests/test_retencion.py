@@ -48,6 +48,8 @@ def _crear_solicitud(usuario_id, radicado_esperado_prefix="SOL"):
         json={
             "vacante_id": "vac-1",
             "datos_personales": {"nombreCompleto": "Ana Pérez", "cedula": "123", "correo": "ana@example.com"},
+            "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Universitario"}],
+            "experiencia": [{"fechaInicio": "2020-01-01", "fechaTerminacion": "2022-01-01"}],
             "autorizacion": {"nombreCompleto": "Ana Pérez"},
             "documentos_adjuntos": DOCUMENTOS_VALIDOS,
         },

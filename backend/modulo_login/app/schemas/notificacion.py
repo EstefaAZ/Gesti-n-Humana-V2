@@ -2,10 +2,10 @@
 # modulo_login / app/schemas/notificacion.py
 # ==============================================================
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
+from app.schemas.tipos import FechaUTC
 
 
 class NotificacionOut(BaseModel):
@@ -14,7 +14,7 @@ class NotificacionOut(BaseModel):
     titulo: str
     mensaje: str
     leida: bool
-    fecha_creacion: Optional[datetime] = None
+    fecha_creacion: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
 

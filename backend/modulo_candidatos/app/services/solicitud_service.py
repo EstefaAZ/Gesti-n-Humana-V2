@@ -44,16 +44,32 @@ class PostulacionActivaError(Exception):
 
 ESTADOS_VACANTE_EN_CURSO = ("publicada", "en_proceso")
 
+# Estados en los que el candidato YA NO sigue participando en ese proceso —
+# si se retiró o lo rechazaron, esa solicitud no debe seguir contando como
+# "postulación activa", sin importar que la vacante en sí siga publicada.
+ESTADOS_SOLICITUD_INACTIVOS = ("Retirada", "Rechazada")
+
 
 def _tiene_postulacion_activa_en_otra_vacante(db: Session, usuario_id: str, token: Optional[str]) -> bool:
-    """Revisa TODAS las solicitudes previas del candidato y consulta el estado
-    ACTUAL de cada vacante asociada (puede haber cambiado desde que se postuló).
-    Si alguna sigue "publicada" o "en_proceso", el candidato no puede postularse
-    a una vacante nueva hasta que esa se cierre o se cancele."""
-    solicitudes_previas = db.query(Solicitud).filter(Solicitud.usuario_id == usuario_id).all()
+    """Revisa las solicitudes previas del candidato que todavía siguen en pie
+    (ni retiradas ni rechazadas) y consulta el estado ACTUAL de cada vacante
+    asociada (puede haber cambiado desde que se postuló). Si alguna sigue
+    "publicada" o "en_proceso", el candidato no puede postularse a una
+    vacante nueva hasta que esa se cierre, se cancele, o él se retire de ella."""
+    solicitudes_previas = (
+        db.query(Solicitud)
+        .filter(Solicitud.usuario_id == usuario_id, Solicitud.estado.notin_(ESTADOS_SOLICITUD_INACTIVOS))
+        .all()
+    )
     for sol in solicitudes_previas:
-        vacante = vacantes_client.obtener_vacante(sol.vacante_id, token=token)
-        if vacante and vacante.get("estado") in ESTADOS_VACANTE_EN_CURSO:
+        # obtener_estado_proceso (no obtener_vacante): ve también las vacantes ocultas
+        # para candidatos, como "en_proceso", que antes no se contaban.
+        vacante = vacantes_client.obtener_estado_proceso(sol.vacante_id, token=token)
+        # "publicada" con la fecha de cierre vencida ya no está en curso (el módulo de
+        # Vacantes la pasa a "cerrada"; esta_cerrada cubre el caso por si acaso).
+        if vacante and vacante.get("estado") in ESTADOS_VACANTE_EN_CURSO and not (
+            vacante.get("estado") == "publicada" and vacante.get("esta_cerrada")
+        ):
             return True
     return False
 
@@ -136,7 +152,18 @@ def _guardar_solicitud(
     return solicitud
 
 
+def _validar_registros_minimos(registros_ii, experiencia) -> None:
+    from app.services.perfil_candidato_service import faltantes_minimos
+
+    faltan = faltantes_minimos(registros_ii, experiencia)
+    if faltan:
+        raise PerfilIncompletoError(
+            f"Debes completar tu perfil antes de inscribirte: agrega {' y '.join(faltan)}."
+        )
+
+
 def crear_solicitud(db: Session, datos: SolicitudCrear, usuario_id: str, token: Optional[str] = None) -> Solicitud:
+    _validar_registros_minimos(datos.registros_ii, datos.experiencia)
     vacante = _validar_vacante_disponible(db, datos.vacante_id, usuario_id, token)
     return _guardar_solicitud(
         db, vacante, datos.vacante_id, usuario_id,
@@ -175,6 +202,8 @@ def inscribirse_con_perfil(
     perfil = perfil_candidato_service.obtener_perfil(db, usuario_id)
     if not perfil or not perfil.completado:
         raise PerfilIncompletoError("Debes completar tu perfil antes de poder inscribirte a una vacante.")
+    # Perfiles marcados como completos antes de exigir estos mínimos (o cargados por scripts).
+    _validar_registros_minimos(perfil.registros_ii, perfil.experiencia)
 
     vacante = _validar_vacante_disponible(db, vacante_id, usuario_id, token)
     documentos_combinados = _combinar_documentos(perfil.documentos_adjuntos or {}, documentos_extra)
@@ -203,6 +232,56 @@ def listar_por_usuario(db: Session, usuario_id: str) -> list[Solicitud]:
         .order_by(Solicitud.fecha_solicitud.desc())
         .all()
     )
+
+
+def estado_de_convocatorias(vacante_ids, token: Optional[str]) -> dict:
+    """{vacante_id: {...estado actual...}} para mostrar en "Mis postulaciones" si la
+    convocatoria sigue abierta, se cerró o se canceló. Se consulta una vez por
+    vacante. Si el servicio de Vacantes no responde, esa vacante queda sin dato
+    (la lista de postulaciones se muestra igual)."""
+    resultado = {}
+    for vacante_id in dict.fromkeys(vacante_ids):
+        try:
+            info = vacantes_client.obtener_estado_proceso(vacante_id, token=token)
+        except vacantes_client.VacantesServiceError:
+            continue
+        if info is None:
+            resultado[vacante_id] = {"eliminada": True, "esta_cerrada": True}
+        else:
+            resultado[vacante_id] = {
+                "estado": info.get("estado"),
+                "esta_cerrada": bool(info.get("esta_cerrada")),
+                "fecha_cierre": info.get("fecha_cierre"),
+                "hora_cierre": info.get("hora_cierre"),
+            }
+    return resultado
+
+
+def reevaluar_con_criterios_actuales(db: Session, solicitudes: list[Solicitud], vacante: dict) -> int:
+    """
+    Recalcula la evaluación automática con los criterios ACTUALES de la vacante
+    y guarda las que cambiaron. La evaluación se calcula al postularse; si
+    Gestión Humana edita los criterios después, sin esto el panel y el reporte
+    seguirían mostrando la evaluación con los criterios viejos.
+    Las solicitudes anonimizadas se dejan como están (ya no tienen los datos
+    con que se evaluaron). Devuelve cuántas cambiaron.
+    """
+    if not vacante:
+        return 0
+    cambiadas = 0
+    for s in solicitudes:
+        if s.anonimizada:
+            continue
+        nueva = evaluar_postulacion(
+            {"datos_personales": s.datos_personales, "registros_ii": s.registros_ii, "experiencia": s.experiencia},
+            vacante,
+        )
+        if nueva != s.evaluacion:
+            s.evaluacion = nueva
+            cambiadas += 1
+    if cambiadas:
+        db.commit()
+    return cambiadas
 
 
 def listar_por_vacante(db: Session, vacante_id: str) -> list[Solicitud]:

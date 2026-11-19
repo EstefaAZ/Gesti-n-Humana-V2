@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import requerir_roles, UsuarioToken
+from app.api.deps import requerir_roles, obtener_usuario_actual, UsuarioToken
 from app.schemas.vacante import (
     VacanteCrear, VacanteActualizar, VacanteOut, EstadisticasVacantes,
     EventoAuditoriaOut, CambiarEstadoVacante,
@@ -24,9 +24,19 @@ ROLES_GESTION = ("gestor_humano", "admin")
 # Rutas públicas — las usa el candidato, sin autenticación
 # ---------------------------------------------------------------
 
+# Nombre que ve la gente para cada estado (el valor interno no cambia).
+ETIQUETA_ESTADO = {
+    "borrador": "Borrador",
+    "publicada": "Abierta",
+    "en_proceso": "En proceso",
+    "cerrada": "Cerrada",
+    "cancelada_desierta": "Cancelada/Desierta",
+}
+
+
 @router.get("", response_model=list[VacanteOut])
 def listar_vacantes_publicas(db: Session = Depends(get_db)):
-    """Solo vacantes activas — lo que ve un candidato navegando el sitio."""
+    """Solo convocatorias publicadas y abiertas — lo que ve un candidato navegando el sitio."""
     return vacante_service.listar_vacantes(db, solo_visibles=True)
 
 
@@ -36,6 +46,33 @@ def obtener_vacante_publica(vacante_id: str, db: Session = Depends(get_db)):
     if not vacante or vacante.estado not in ESTADOS_VISIBLES_CANDIDATO:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vacante no encontrada.")
     return vacante
+
+
+@router.get("/{vacante_id}/estado-proceso")
+def estado_proceso_vacante(
+    vacante_id: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """
+    Solo el estado de una vacante, AUNQUE esté oculta para candidatos
+    ("en_proceso", "cancelada_desierta"…). La usa el módulo de candidatos, con
+    el token del candidato, para saber si una postulación anterior sigue en
+    curso: la ruta pública devuelve 404 para "en_proceso" y por eso esas
+    postulaciones no se contaban y se podía uno inscribir en dos procesos a la vez.
+    No expone nada más de la vacante.
+    """
+    vacante = vacante_service.obtener_vacante(db, vacante_id)
+    if not vacante:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vacante no encontrada.")
+    return {
+        "id": vacante.id,
+        "estado": vacante.estado,
+        "esta_cerrada": vacante.esta_cerrada,
+        # Datos públicos de la convocatoria, para que "Mis postulaciones" diga cuándo cierra.
+        "fecha_cierre": vacante.fecha_cierre,
+        "hora_cierre": vacante.hora_cierre,
+    }
 
 
 # ---------------------------------------------------------------
@@ -124,7 +161,7 @@ def cambiar_estado(
 
     auditoria_service.registrar_evento(
         db, tipo="vacante_cambio_estado",
-        descripcion=f"{usuario.nombre or usuario.id} cambió el estado de \"{actualizada.cargo}\" a \"{datos.estado}\".",
+        descripcion=f"{usuario.nombre or usuario.id} cambió el estado de \"{actualizada.cargo}\" a \"{ETIQUETA_ESTADO.get(datos.estado, datos.estado)}\".",
         actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
         entidad_tipo="vacante", entidad_id=actualizada.id,
     )

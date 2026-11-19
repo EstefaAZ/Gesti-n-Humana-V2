@@ -24,8 +24,8 @@ PERFIL_VALIDO = {
         "celular": "3225989990",
         "municipio": "Medellín",
     },
-    "registros_ii": [],
-    "experiencia": [],
+    "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Secundarios", "graduado": "si", "titulo": "Bachiller"}],
+    "experiencia": [{"empresa": "Empresa X", "cargo": "Auxiliar", "fechaInicio": "2024-01-01", "fechaTerminacion": "2024-06-01"}],
     "conflicto": {"tieneVinculo": "no", "tieneOtraInhabilidad": "no"},
     "documentos_adjuntos": DOCUMENTOS_VALIDOS,
     "autorizacion": {"acepta": True, "nombre_completo": "Candidato Uno"},
@@ -95,6 +95,30 @@ def test_guardar_perfil_dos_veces_lo_reemplaza_no_lo_duplica():
 def test_inscribirme_sin_perfil_completado_es_rechazado():
     r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
     assert r.status_code == 409
+
+
+@pytest.mark.parametrize("campo", ["registros_ii", "experiencia"])
+def test_guardar_perfil_sin_estudios_o_sin_experiencia_es_rechazado(campo):
+    r = client.put("/api/v1/perfiles/me", json={**PERFIL_VALIDO, campo: []}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 422
+    assert "al menos" in r.json()["detail"]
+
+
+def test_inscribirme_con_perfil_completado_sin_experiencia_es_rechazado():
+    # Perfil marcado como completo antes de exigir los mínimos: se le quita la experiencia por debajo.
+    from tests.conftest import TestingSessionLocal
+    from app.models.perfil_candidato import PerfilCandidato
+
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    db = TestingSessionLocal()
+    perfil = db.query(PerfilCandidato).first()
+    perfil.experiencia = []
+    db.commit()
+    db.close()
+
+    r = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+    assert "experiencia laboral" in r.json()["detail"]
 
 
 def test_inscribirme_con_perfil_completado_funciona():
@@ -260,6 +284,50 @@ def test_si_puede_postularse_a_otra_vacante_una_vez_la_primera_paso_a_cancelada(
     assert r2.status_code == 201  # ahora sí puede, porque la primera ya no está "en curso"
 
 
+def test_no_puede_postularse_a_otra_mientras_la_primera_esta_en_proceso_aunque_este_oculta(monkeypatch):
+    """Una vacante "en_proceso" no es visible para candidatos (la ruta pública da 404),
+    pero el proceso sigue en curso: debe contar como postulación activa."""
+    from app.clients import vacantes_client as vc
+    from tests.conftest import VACANTES_MOCK
+
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    assert client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO).status_code == 201
+
+    # Con el token del candidato, "vac-1" ya no se ve (en_proceso)…
+    monkeypatch.setattr(vc, "obtener_vacante", lambda vacante_id, token=None: None if vacante_id == "vac-1" else VACANTES_MOCK.get(vacante_id))
+    # …pero el estado del proceso sí se consulta.
+    monkeypatch.setattr(vc, "obtener_estado_proceso", lambda vacante_id, token=None: {"id": vacante_id, "estado": "en_proceso", "esta_cerrada": True} if vacante_id == "vac-1" else None)
+
+    r2 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO)
+    assert r2.status_code == 409
+
+
+def test_si_puede_postularse_a_otra_si_la_primera_vencio_su_fecha_de_cierre(monkeypatch):
+    from app.clients import vacantes_client as vc
+
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    assert client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO).status_code == 201
+
+    # Sigue "publicada" pero ya pasó su fecha de cierre.
+    monkeypatch.setattr(vc, "obtener_estado_proceso", lambda vacante_id, token=None: {"id": vacante_id, "estado": "publicada", "esta_cerrada": True})
+
+    r2 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO)
+    assert r2.status_code == 201
+
+
+def test_si_puede_postularse_a_otra_si_lo_rechazaron_en_la_primera():
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r1 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    assert r1.status_code == 201
+    radicado = r1.json()["radicado"]
+
+    assert client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO).status_code == 409
+    assert client.patch(f"/api/v1/solicitudes/{radicado}/estado", json={"estado": "Rechazada"}, headers=HEADERS_GESTOR).status_code == 200
+
+    r2 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO)
+    assert r2.status_code == 201
+
+
 def test_una_sola_postulacion_activa_tambien_aplica_al_endpoint_viejo_crear_solicitud():
     client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
     client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
@@ -339,6 +407,21 @@ def test_retirar_postulacion_no_borra_nada_solo_cambia_el_estado():
     r_get = client.get(f"/api/v1/solicitudes/{radicado}", headers=HEADERS_GESTOR)
     assert r_get.status_code == 200
     assert r_get.json()["estado"] == "Retirada"
+
+
+def test_retirarse_de_una_postulacion_permite_postularse_a_otra_vacante():
+    # Bug reportado: el candidato se retira de "vac-1" (que sigue publicada) y
+    # queda bloqueado para postularse a "vac-2" — el retiro no debe generar
+    # ninguna restricción sobre el resto de vacantes.
+    client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
+    r_crear = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-1"}, headers=HEADERS_CANDIDATO)
+    radicado = r_crear.json()["radicado"]
+
+    r_retirar = client.patch(f"/api/v1/solicitudes/{radicado}/retirar", headers=HEADERS_CANDIDATO)
+    assert r_retirar.status_code == 200
+
+    r2 = client.post("/api/v1/solicitudes/inscribirme", json={"vacante_id": "vac-2"}, headers=HEADERS_CANDIDATO)
+    assert r2.status_code == 201
 
 
 def test_no_se_puede_retirar_la_postulacion_de_otro_candidato():

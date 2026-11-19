@@ -1,0 +1,58 @@
+/* ==========================================================================
+   GTH-FOR-03 — Sistema de diseño institucional
+   Aguas Nacionales EPM — Solicitud de Inscripción a Proceso de Selección
+   ========================================================================== */
+
+:root {
+  /* Paleta de marca — Verde Primario de Aguas Nacionales */
+  --green-900: #004D20; /* Nav sidebar */
+  --green-800: #006228; /* Header hover */
+  --green-700: #0A7A30; /* Texto sobre fondo claro */
+  --green-600: #1B8A3A; /* Botón primario */
+  --green-500: #2EA04A; /* CTA principal */
+  --green-400: #4CB865; /* Tono alternativo */
+  --green-300: #72CC84; /* Chart positivo */
+  --green-200: #A3DFB0; /* Fondo suave */
+  --green-100: #D4F0DA; /* Estado activo */
+  --green-50:  #EDF8EF; /* Fondo sutil */
+
+  --color-bg: #F7FAF8;
+  --color-surface: #FFFFFF;
+  --color-surface-sunken: var(--green-50);
+  --color-primary: var(--green-800);
+  --color-primary-dark: var(--green-900);
+  --color-primary-tint: var(--green-50);
+  --color-accent: var(--green-500);
+  --color-accent-tint: var(--green-100);
+  --color-text: #1B2B22;
+  --color-text-muted: #5B6B60;
+  --color-border: var(--green-100);
+  --color-border-strong: var(--green-200);
+  --color-success: var(--green-600);
+  --color-success-tint: var(--green-100);
+  --color-warning: #B5790A;
+  --color-warning-tint: #FBF0DD;
+  --color-danger: #B23A34;
+  --color-danger-tint: #FAEAE9;
+
+  --font-display: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --radius: 3px;
+  --shadow-card: 0 1px 2px rgba(0, 77, 32, 0.06), 0 4px 16px rgba(0, 77, 32, 0.06);
+  --max-width: 880px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--color-primary); }

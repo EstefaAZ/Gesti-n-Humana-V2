@@ -20,7 +20,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "CAMBIAR-ESTA-CLAVE-EN-PRODUCCION"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 horas
-    ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR: int = 60 * 24 * 30  # 30 días — cuando el usuario marca "Recordarme"
+    ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR: int = 60 * 24 * 30  # 30 días — candidato que marca "Recordarme"
+    # Gestión Humana y admin ven datos de todos los candidatos: con "Recordarme" duran menos.
+    ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR_INTERNO: int = 60 * 24 * 7  # 7 días
     RESET_PASSWORD_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Correo (SMTP) — si SMTP_HOST queda vacío, los correos NO se envían de
@@ -35,7 +37,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"  # para armar enlaces dentro de los correos
 
     # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:4200"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -64,6 +66,11 @@ def validar_configuracion_produccion() -> None:
         errores.append("ALLOWED_ORIGINS no debe contener '*' en producción.")
     if "localhost" in settings.ALLOWED_ORIGINS or "127.0.0.1" in settings.ALLOWED_ORIGINS:
         errores.append("ALLOWED_ORIGINS contiene 'localhost' — configúralo con el dominio real de producción.")
+    if settings.DATABASE_URL.startswith("sqlite"):
+        errores.append(
+            "DATABASE_URL sigue apuntando a SQLite. En producción usa PostgreSQL (ver README): un archivo "
+            "SQLite dentro de un contenedor sin volumen persistente se pierde por completo en cada redeploy."
+        )
 
     if errores:
         mensaje = "Configuración insegura para ENVIRONMENT=production:\n- " + "\n- ".join(errores)

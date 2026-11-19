@@ -1,4 +1,14 @@
 import { calcularTiempoLaborado } from "../../lib/formState";
+import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from "../../data/municipiosPorDepartamento";
+import { PAISES } from "../../data/paises";
+import SelectConOtro from "../SelectConOtro";
+
+// La lista dependiente Departamento -> Ciudad solo existe para Colombia (es la
+// única fuente oficial —DIVIPOLA— que tiene el sistema). Para cualquier otro
+// país esos dos campos quedan como texto libre, igual que antes de este cambio.
+function _esColombia(pais) {
+  return (pais || "").trim().toLowerCase() === "colombia";
+}
 
 export default function ExperienciaCard({ experiencia, onChange, onRemove, index }) {
   const set = (patch) => {
@@ -6,6 +16,7 @@ export default function ExperienciaCard({ experiencia, onChange, onRemove, index
     merged.tiempoLaborado = calcularTiempoLaborado(merged.fechaInicio, merged.actual ? null : merged.fechaTerminacion);
     onChange(experiencia.id, { ...patch, tiempoLaborado: merged.tiempoLaborado });
   };
+  const esColombia = _esColombia(experiencia.pais);
 
   return (
     <div className="repeatable-block">
@@ -22,16 +33,52 @@ export default function ExperienciaCard({ experiencia, onChange, onRemove, index
           <input type="text" value={experiencia.empresa || ""} onChange={(e) => set({ empresa: e.target.value })} />
         </div>
         <div className="field">
-          <label>Ciudad</label>
-          <input type="text" value={experiencia.ciudad || ""} onChange={(e) => set({ ciudad: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>Departamento</label>
-          <input type="text" value={experiencia.departamento || ""} onChange={(e) => set({ departamento: e.target.value })} />
-        </div>
-        <div className="field">
           <label>País</label>
-          <input type="text" value={experiencia.pais || ""} onChange={(e) => set({ pais: e.target.value })} />
+          <select
+            value={experiencia.pais || ""}
+            onChange={(e) => set({ pais: e.target.value, departamento: "", ciudad: "" })}
+          >
+            <option value="">Seleccione…</option>
+            {PAISES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label>{esColombia ? "Departamento" : "Departamento/Estado/Provincia"}</label>
+          {esColombia ? (
+            <SelectConOtro
+              value={experiencia.departamento || ""}
+              opciones={DEPARTAMENTOS}
+              onChange={(v) => set({ departamento: v, ciudad: "" })}
+            />
+          ) : (
+            <input
+              type="text"
+              value={experiencia.departamento || ""}
+              onChange={(e) => set({ departamento: e.target.value })}
+              disabled={!experiencia.pais}
+              placeholder={experiencia.pais ? "" : "Elige primero el país"}
+            />
+          )}
+        </div>
+        <div className="field">
+          <label>Ciudad</label>
+          {esColombia ? (
+            <SelectConOtro
+              key={experiencia.departamento}
+              value={experiencia.ciudad || ""}
+              opciones={MUNICIPIOS_POR_DEPARTAMENTO[experiencia.departamento] || []}
+              onChange={(v) => set({ ciudad: v })}
+              placeholder={experiencia.departamento ? "Seleccione…" : "Elige primero el departamento"}
+            />
+          ) : (
+            <input
+              type="text"
+              value={experiencia.ciudad || ""}
+              onChange={(e) => set({ ciudad: e.target.value })}
+              disabled={!experiencia.pais}
+              placeholder={experiencia.pais ? "" : "Elige primero el país"}
+            />
+          )}
         </div>
         <div className="field">
           <label>Tipo de empresa</label>

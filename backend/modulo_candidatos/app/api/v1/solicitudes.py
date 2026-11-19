@@ -13,6 +13,7 @@ from app.clients.vacantes_client import VacantesServiceError
 from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
 from app.services import solicitud_service, retencion_service, auditoria_service, email_service, notificacion_service, reporte_service
 from app.services.pdf_service import generar_pdf_solicitud
+from app.services import zip_documentos_service
 
 router = APIRouter(prefix="/solicitudes", tags=["Solicitudes"])
 
@@ -53,6 +54,8 @@ def crear_solicitud(
 ):
     try:
         solicitud = solicitud_service.crear_solicitud(db, datos, usuario_id=usuario.id, token=token)
+    except solicitud_service.PerfilIncompletoError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except solicitud_service.VacanteNoEncontradaError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except solicitud_service.VacanteCerradaError as e:
@@ -117,8 +120,17 @@ def inscribirme_con_perfil(
 
 
 @router.get("/mias", response_model=list[SolicitudOut])
-def mis_solicitudes(db: Session = Depends(get_db), usuario: UsuarioToken = Depends(obtener_usuario_actual)):
-    return solicitud_service.listar_por_usuario(db, usuario.id)
+def mis_solicitudes(
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+    token: str = Depends(oauth2_scheme),
+):
+    solicitudes = solicitud_service.listar_por_usuario(db, usuario.id)
+    convocatorias = solicitud_service.estado_de_convocatorias([s.vacante_id for s in solicitudes], token)
+    return [
+        SolicitudOut.model_validate(s).model_copy(update={"convocatoria": convocatorias.get(s.vacante_id)})
+        for s in solicitudes
+    ]
 
 
 @router.get("/vacante/{vacante_id}", response_model=list[SolicitudOut])
@@ -126,9 +138,17 @@ def postulaciones_de_vacante(
     vacante_id: str,
     db: Session = Depends(get_db),
     usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+    token: str = Depends(oauth2_scheme),
 ):
-    """Panel de Gestión Humana: todas las postulaciones de una vacante."""
-    return solicitud_service.listar_por_vacante(db, vacante_id)
+    """Panel de Gestión Humana: todas las postulaciones de una vacante, con la
+    evaluación recalculada según los criterios actuales de la vacante."""
+    solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    try:
+        vacante = vacantes_client.obtener_vacante(vacante_id, token=token)
+    except VacantesServiceError:
+        vacante = None  # sin el módulo de vacantes se muestra la última evaluación guardada
+    solicitud_service.reevaluar_con_criterios_actuales(db, solicitudes, vacante)
+    return solicitudes
 
 
 @router.get("/admin/reporte/{vacante_id}")
@@ -144,6 +164,7 @@ def descargar_reporte_vacante(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe una vacante con ese id.")
 
     solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    solicitud_service.reevaluar_con_criterios_actuales(db, solicitudes, vacante)
     contenido = reporte_service.generar_reporte_vacante(vacante, solicitudes)
 
     nombre_archivo = f"GTH-FOR-03_{vacante.get('proceso_no', vacante_id)}.xlsx".replace("/", "-")
@@ -248,10 +269,38 @@ def descargar_pdf(
     _verificar_acceso(solicitud, usuario)
 
     pdf_bytes = generar_pdf_solicitud(_solicitud_a_dict(solicitud))
+    # "ID del proceso - Nombre candidato.pdf"; si falta alguno de los dos, se usa el radicado.
+    proceso = solicitud.vacante_proceso_no or (solicitud.datos_personales or {}).get("proceso")
+    nombre = (solicitud.datos_personales or {}).get("nombreCompleto")
+    nombre_pdf = f"{proceso} - {nombre}.pdf" if proceso and nombre else f"{radicado}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{radicado}.pdf"'},
+        headers={"Content-Disposition": zip_documentos_service.content_disposition(nombre_pdf, f"{radicado}.pdf")},
+    )
+
+
+@router.get("/{radicado}/documentos/zip")
+def descargar_documentos_zip(
+    radicado: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """Todos los documentos adjuntos de una postulación en un .zip. Mismo control
+    de acceso que cada documento: dueño de la solicitud o Gestión Humana."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    _verificar_acceso(solicitud, usuario)
+    try:
+        contenido = zip_documentos_service.armar_zip(solicitud.documentos_adjuntos or {})
+    except zip_documentos_service.SinDocumentosError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    nombre = (solicitud.datos_personales or {}).get("nombreCompleto") or "candidato"
+    return Response(
+        content=contenido,
+        media_type="application/zip",
+        headers=zip_documentos_service.respuesta_zip_headers(f"{radicado} - {nombre}.zip"),
     )
 
 

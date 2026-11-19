@@ -2,10 +2,10 @@
 # modulo_candidatos / app/schemas/notificacion.py
 # ==============================================================
 
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
+from app.schemas.tipos import FechaUTC
 
 
 class NotificacionOut(BaseModel):
@@ -16,7 +16,7 @@ class NotificacionOut(BaseModel):
     entidad_tipo: Optional[str] = None
     entidad_id: Optional[str] = None
     leida: bool
-    fecha_creacion: Optional[datetime] = None
+    fecha_creacion: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
 

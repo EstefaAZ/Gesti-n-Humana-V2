@@ -15,6 +15,23 @@ import { useAuth } from "../context/AuthContext";
 import * as perfilesApi from "../lib/api/perfilesApi";
 import { ApiError } from "../lib/api/httpClient";
 
+/**
+ * Estado inicial para quien todavía no tiene perfil guardado: arranca en
+ * blanco pero con lo que ya quedó en la cuenta al registrarse (nombre,
+ * cédula, correo) — así no se le vuelve a pedir algo que ya escribió, y
+ * puede corregirlo aquí si lo necesita.
+ */
+function _estadoInicialConDatosDeRegistro(usuario) {
+  const estado = initialSolicitudState();
+  estado.datosPersonales = {
+    ...estado.datosPersonales,
+    nombreCompleto: usuario?.nombreCompleto || "",
+    cedula: usuario?.cedula || "",
+    correo: usuario?.email || "",
+  };
+  return estado;
+}
+
 function _perfilAEstadoWizard(perfil) {
   return {
     stepIndex: 0,
@@ -37,7 +54,7 @@ function _perfilAEstadoWizard(perfil) {
 }
 
 export default function CompletarPerfilPage() {
-  const { token, refrescarEstadoPerfil } = useAuth();
+  const { token, usuario, refrescarEstadoPerfil } = useAuth();
   const navigate = useNavigate();
 
   const [state, setState] = useState(null);
@@ -53,8 +70,9 @@ export default function CompletarPerfilPage() {
     perfilesApi
       .obtenerMiPerfil(token)
       .then((perfil) => setState(_perfilAEstadoWizard(perfil)))
-      .catch(() => setState(initialSolicitudState()))
+      .catch(() => setState(_estadoInicialConDatosDeRegistro(usuario)))
       .finally(() => setCargando(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // Guardado automático mientras el candidato avanza — así, si cierra el

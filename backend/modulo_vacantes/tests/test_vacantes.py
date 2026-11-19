@@ -113,20 +113,34 @@ def test_vacante_en_borrador_no_aparece_en_listado_publico_pero_si_en_admin():
     assert r_detalle_publico.status_code == 404
 
 
-def test_solo_publicada_y_cerrada_son_visibles_para_candidatos():
+def test_solo_las_publicadas_abiertas_aparecen_en_el_listado_de_candidatos():
     ids_ocultos = []
-    for estado in ("borrador", "en_proceso", "cancelada_desierta"):
+    for estado in ("borrador", "en_proceso", "cancelada_desierta", "cerrada"):
         r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": estado}, headers=HEADERS_GESTOR)
         ids_ocultos.append(r.json()["id"])
 
     r_publicada = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "publicada"}, headers=HEADERS_GESTOR)
-    r_cerrada = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "cerrada"}, headers=HEADERS_GESTOR)
 
     ids_publico = {v["id"] for v in client.get("/api/v1/vacantes").json()}
     assert r_publicada.json()["id"] in ids_publico
-    assert r_cerrada.json()["id"] in ids_publico
     for id_oculto in ids_ocultos:
         assert id_oculto not in ids_publico
+
+
+def test_publicada_con_fecha_de_cierre_vencida_no_aparece_en_el_listado():
+    r = client.post(
+        "/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "publicada", "fecha_cierre": "2020-01-01"}, headers=HEADERS_GESTOR
+    )
+    ids_publico = {v["id"] for v in client.get("/api/v1/vacantes").json()}
+    assert r.json()["id"] not in ids_publico
+
+
+def test_vacante_cerrada_sigue_abriendo_por_enlace_directo():
+    # Quien tenga el enlace (o una notificación) ve el detalle con su aviso de cierre.
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "cerrada"}, headers=HEADERS_GESTOR)
+    detalle = client.get(f"/api/v1/vacantes/{r.json()['id']}")
+    assert detalle.status_code == 200
+    assert detalle.json()["esta_cerrada"] is True
 
 
 def test_admin_todas_requiere_rol_gestion():
@@ -267,17 +281,18 @@ def test_estadisticas_devuelve_conteos_reales():
     assert r.status_code == 200
     data = r.json()
     assert data["total"] == 6
-    assert data["activas"] == 3  # publicada (las 3 que no son "borrador"/en_proceso/cancelada)
-    assert data["ocultas"] == 3
+    # La del "ayer" ya no cuenta como publicada: al consultar se guarda como "cerrada".
+    assert data["activas"] == 2  # publicadas y vigentes
+    assert data["ocultas"] == 4
     assert data["cerradas"] == 2  # la del "ayer" + la "cancelada_desierta" (también cuenta como cerrada)
     assert data["abiertas"] == 4
     assert len(data["recientes"]) <= 5
 
-    assert data["por_estado"]["publicada"] == 3
+    assert data["por_estado"]["publicada"] == 2
     assert data["por_estado"]["borrador"] == 1
     assert data["por_estado"]["en_proceso"] == 1
     assert data["por_estado"]["cancelada_desierta"] == 1
-    assert data["por_estado"]["cerrada"] == 0  # ninguna tiene estado="cerrada" explícito, solo por fecha
+    assert data["por_estado"]["cerrada"] == 1  # la del "ayer": venció su fecha de cierre
     assert sum(data["por_estado"].values()) == 6
 
 
@@ -314,7 +329,8 @@ def test_auditoria_describe_el_estado_nuevo():
 
     r_auditoria = client.get("/api/v1/vacantes/admin/auditoria/eventos", headers=HEADERS_ADMIN)
     evento = next(e for e in r_auditoria.json() if e["tipo"] == "vacante_cambio_estado")
-    assert "cancelada_desierta" in evento["descripcion"]
+    # La descripción usa el nombre legible del estado, no el valor interno.
+    assert "Cancelada/Desierta" in evento["descripcion"]
 
 
 def test_permite_hasta_5_certificaciones_requeridas():
@@ -389,3 +405,75 @@ def test_descargar_documento_sin_subir_da_404():
     vacante_id = r.json()["id"]
     r_descarga = client.get(f"/api/v1/vacantes/{vacante_id}/documento")
     assert r_descarga.status_code == 404
+
+
+# ---------------------------------------------------------------
+# Cierre automático por fecha y estado del proceso (para Candidatos)
+# ---------------------------------------------------------------
+
+def test_publicada_con_fecha_vencida_queda_guardada_como_cerrada():
+    ayer = (date.today() - timedelta(days=1)).isoformat()
+    vid = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_cierre": ayer}, headers=HEADERS_GESTOR).json()["id"]
+
+    # Al consultarla (admin, pública o estadísticas) ya figura como "cerrada", no "publicada".
+    assert client.get(f"/api/v1/vacantes/admin/{vid}", headers=HEADERS_GESTOR).json()["estado"] == "cerrada"
+    assert client.get(f"/api/v1/vacantes/{vid}").json()["estado"] == "cerrada"
+    stats = client.get("/api/v1/vacantes/admin/estadisticas", headers=HEADERS_GESTOR).json()
+    assert stats["por_estado"]["cerrada"] == 1
+    assert stats["por_estado"]["publicada"] == 0
+
+
+def test_publicada_vigente_y_en_proceso_vencida_no_cambian_solas():
+    manana = (date.today() + timedelta(days=1)).isoformat()
+    ayer = (date.today() - timedelta(days=1)).isoformat()
+    vigente = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_cierre": manana}, headers=HEADERS_GESTOR).json()["id"]
+    en_proceso = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "fecha_cierre": ayer, "estado": "en_proceso"}, headers=HEADERS_GESTOR).json()["id"]
+
+    assert client.get(f"/api/v1/vacantes/admin/{vigente}", headers=HEADERS_GESTOR).json()["estado"] == "publicada"
+    # "en_proceso" lo maneja Gestión Humana: el vencimiento no la cambia.
+    assert client.get(f"/api/v1/vacantes/admin/{en_proceso}", headers=HEADERS_GESTOR).json()["estado"] == "en_proceso"
+
+
+def test_estado_proceso_incluye_vacantes_ocultas_para_candidatos():
+    vid = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "estado": "en_proceso"}, headers=HEADERS_GESTOR).json()["id"]
+
+    # La ruta pública no la muestra…
+    assert client.get(f"/api/v1/vacantes/{vid}").status_code == 404
+    # …pero el estado del proceso sí, con cualquier sesión válida (Candidatos lo usa con el token del candidato).
+    r = client.get(f"/api/v1/vacantes/{vid}/estado-proceso", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    datos = r.json()
+    assert {k: datos[k] for k in ("id", "estado", "esta_cerrada")} == {"id": vid, "estado": "en_proceso", "esta_cerrada": False}
+    # Fecha y hora de cierre: datos públicos que "Mis postulaciones" muestra al candidato.
+    assert set(datos) == {"id", "estado", "esta_cerrada", "fecha_cierre", "hora_cierre"}
+
+
+def test_estado_proceso_requiere_sesion_y_404_si_no_existe():
+    assert client.get("/api/v1/vacantes/no-existe/estado-proceso").status_code == 401
+    assert client.get("/api/v1/vacantes/no-existe/estado-proceso", headers=HEADERS_CANDIDATO).status_code == 404
+
+
+
+# Toda vacante exige estudios y experiencia; los conocimientos son opcionales.
+def test_crear_vacante_sin_nivel_educativo_es_rechazado():
+    datos = {**VACANTE_VALIDA, "criterios": {**VACANTE_VALIDA["criterios"], "nivel_educativo_min": ""}}
+    r = client.post("/api/v1/vacantes", json=datos, headers=HEADERS_GESTOR)
+    assert r.status_code == 422
+    assert "nivel educativo" in r.text
+
+
+def test_crear_vacante_sin_experiencia_minima_es_rechazado():
+    criterios = {k: v for k, v in VACANTE_VALIDA["criterios"].items() if k != "experiencia_min_anios"}
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "criterios": criterios}, headers=HEADERS_GESTOR)
+    assert r.status_code == 422
+    assert "experiencia" in r.text
+
+
+def test_crear_vacante_con_cero_anios_de_experiencia_es_valido():
+    datos = {**VACANTE_VALIDA, "criterios": {**VACANTE_VALIDA["criterios"], "experiencia_min_anios": 0}}
+    assert client.post("/api/v1/vacantes", json=datos, headers=HEADERS_GESTOR).status_code == 201
+
+
+def test_crear_vacante_sin_conocimientos_complementarios_es_valido():
+    # VACANTE_VALIDA no pide idioma, certificaciones ni profesión.
+    assert client.post("/api/v1/vacantes", json=VACANTE_VALIDA, headers=HEADERS_GESTOR).status_code == 201
