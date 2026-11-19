@@ -8,6 +8,25 @@ import { Icon } from '../shared/icon';
 import { Autofocus } from '../shared/autofocus';
 import { authStyles } from './auth/auth-styles';
 
+const CLAVE_CORREO = 'login_correo_recordado';
+
+function leerCorreoRecordado(): string {
+  try {
+    return localStorage.getItem(CLAVE_CORREO) || '';
+  } catch {
+    return '';
+  }
+}
+
+function guardarCorreoRecordado(correo: string): void {
+  try {
+    if (correo) localStorage.setItem(CLAVE_CORREO, correo);
+    else localStorage.removeItem(CLAVE_CORREO);
+  } catch {
+    // Sin almacenamiento disponible (modo privado estricto): simplemente no se recuerda.
+  }
+}
+
 @Component({
   selector: 'app-login-page',
   imports: [NgStyle, FormsModule, RouterLink, Icon, Autofocus],
@@ -153,9 +172,11 @@ export class LoginPage {
   protected readonly s = authStyles;
 
   protected readonly cuentaCreada = !!history.state?.cuentaCreada;
-  protected readonly email = signal<string>(history.state?.email || '');
+  /** Correo guardado con "Recordarme" (la contraseña la guarda el navegador, nunca la app). */
+  private readonly correoRecordado = leerCorreoRecordado();
+  protected readonly email = signal<string>(history.state?.email || this.correoRecordado);
   protected readonly password = signal('');
-  protected readonly recordar = signal(false);
+  protected readonly recordar = signal(!!this.correoRecordado);
   protected readonly mostrarPassword = signal(false);
   protected readonly error = signal('');
   protected readonly restablecida = !!history.state?.restablecida;
@@ -177,6 +198,7 @@ export class LoginPage {
     this.cargando.set(true);
     try {
       await this.auth.login(this.email().trim(), this.password(), this.recordar());
+      guardarCorreoRecordado(this.recordar() ? this.email().trim() : '');
       const destino = this.from?.pathname || '/';
       this.router.navigateByUrl(destino, { replaceUrl: true });
     } catch (err: any) {
