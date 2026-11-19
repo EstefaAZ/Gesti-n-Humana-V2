@@ -24,7 +24,7 @@ const ALTO_EJE_X = 30;
           <line [attr.x1]="x0()" [attr.x2]="xFin()" [attr.y1]="y0()" [attr.y2]="y0()" [attr.stroke]="color()" />
           @for (d of datos(); track $index; let i = $index) {
             @if (hover() === i) {
-              <rect [attr.x]="x0() + i * banda()" [attr.y]="MARGEN.top" [attr.width]="banda()" [attr.height]="y0() - MARGEN.top" fill="#ccc" opacity="0.5" />
+              <rect [attr.x]="x0() + i * banda()" [attr.y]="MARGEN.top" [attr.width]="banda()" [attr.height]="y0() - MARGEN.top" fill="#EDF8EF" />
             }
             <path [attr.d]="barra(i, d[valor()])" [attr.fill]="relleno()" />
             <line [attr.x1]="centro(i)" [attr.x2]="centro(i)" [attr.y1]="y0()" [attr.y2]="y0() + 6" [attr.stroke]="color()" />
@@ -42,8 +42,8 @@ const ALTO_EJE_X = 30;
         </svg>
         @if (hover() !== null) {
           <div class="grafico-tooltip" [style.left.px]="centro(hover()!) + 12" [style.top.px]="40">
-            <div>{{ datos()[hover()!][etiqueta()] }}</div>
-            <div class="grafico-texto">{{ valor() }} : {{ datos()[hover()!][valor()] }}</div>
+            <div class="grafico-tooltip__titulo">{{ datos()[hover()!][etiqueta()] }}</div>
+            <div class="grafico-texto"><strong>{{ datos()[hover()!][valor()] }}</strong> {{ unidad() || valor() }}</div>
           </div>
         }
       }
@@ -54,10 +54,19 @@ const ALTO_EJE_X = 30;
       position: absolute;
       pointer-events: none;
       background: #fff;
-      border: 1px solid #ccc;
-      padding: 10px;
-      font-size: 14px;
+      border: 1px solid var(--color-border-strong);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 40, 16, 0.12);
+      padding: 8px 12px;
+      font-size: 13px;
       white-space: nowrap;
+    }
+    .grafico-tooltip__titulo {
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--color-text-muted);
     }
   `,
 })
@@ -67,6 +76,8 @@ export class GraficoBarras {
   readonly valor = input<string>('total');
   readonly relleno = input<string>('#2EA04A');
   readonly color = input<string>('#5B6B60');
+  /** Texto tras el número en el tooltip (ej. "postulaciones"). */
+  readonly unidad = input<string>('');
 
   protected readonly MARGEN = MARGEN;
   protected readonly alto = ALTO;

@@ -1333,3 +1333,165 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
   .mp-campos { grid-template-columns: 1fr; }
   .mp-riesgo .btn { width: 100%; }
 }
+
+/* ==========================================================================
+   Dashboard (admin) — saludo, indicadores enlazados, gráfico mensual,
+   procesos y postulaciones por estado, actividad reciente. Prefijo db-.
+   ========================================================================== */
+
+.db-pagina { max-width: 1100px; }
+.db-atajos { display: flex; flex-wrap: wrap; gap: 8px; }
+.db-atajos .btn { text-decoration: none; }
+
+.db-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+.db-kpi { position: relative; display: flex; flex-direction: column; padding: 16px 18px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow-card); color: inherit; text-decoration: none; transition: border-color 140ms ease, transform 140ms ease; }
+.db-kpi:hover { border-color: var(--color-border-strong); transform: translateY(-1px); }
+.db-kpi:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.db-kpi__icono { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary-tint); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; }
+.db-kpi--alerta .db-kpi__icono { background: var(--color-warning-tint); color: var(--color-warning); }
+.db-kpi__etiqueta { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--color-text-muted); padding-right: 40px; }
+.db-kpi__valor { margin-top: 6px; font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1.05; color: var(--color-primary-dark); font-variant-numeric: tabular-nums; }
+.db-kpi--alerta .db-kpi__valor { color: var(--color-warning); }
+.db-kpi__de { font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--color-text-muted); }
+.db-kpi__sub { margin-top: 4px; font-size: 12.5px; color: var(--color-text-muted); }
+
+.db-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.db-panel { padding: 18px 20px 20px; min-width: 0; }
+.db-panel__cabecera { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.db-panel__titulo { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--color-primary-dark); }
+.db-panel__sub { font-size: 12.5px; color: var(--color-text-muted); }
+.db-panel__enlace { font-size: 13px; font-weight: 600; color: var(--color-primary); text-decoration: none; white-space: nowrap; }
+.db-panel__enlace:hover { text-decoration: underline; }
+.db-vacio { margin: 0; padding: 48px 0; text-align: center; font-size: 13.5px; color: var(--color-text-muted); }
+
+.db-barras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.db-barra { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; }
+.db-barra__etiqueta { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--color-text); }
+.db-barra__valor { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-primary-dark); }
+.db-barra__pista { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--color-surface-sunken); overflow: hidden; }
+.db-barra__relleno { display: block; height: 100%; border-radius: inherit; background: var(--color-text-muted); }
+.db-barra__relleno--publicada { background: var(--color-accent); }
+.db-barra__relleno--en_proceso { background: #C99A00; }
+.db-barra__relleno--cerrada { background: var(--color-danger); }
+.db-barra__relleno--borrador { background: #9AA79F; }
+.db-barra__relleno--cancelada_desierta { background: #2F6FC0; }
+
+.db-actividad { list-style: none; margin: 0; padding: 0; }
+.db-actividad__item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--color-border); }
+.db-actividad__item:first-child { border-top: none; padding-top: 0; }
+.db-actividad__icono { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--color-primary-tint); color: var(--color-primary); }
+.db-actividad__icono--postulacion { background: #E3EEFC; color: #1D5DAD; }
+.db-actividad__icono--usuario { background: #F0E6FA; color: #6B3FA0; }
+.db-actividad__texto { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.db-actividad__titulo { font-size: 13.5px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-actividad__detalle { font-size: 12.5px; color: var(--color-text-muted); }
+.db-actividad__fecha { flex: 0 0 auto; font-size: 12px; color: var(--color-text-muted); white-space: nowrap; }
+
+.db-estados { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.db-estado { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.db-estado__valor { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--color-primary-dark); font-variant-numeric: tabular-nums; }
+.db-estado.is-cero .estado-badge { opacity: 0.55; }
+.db-estado.is-cero .db-estado__valor { color: var(--color-text-muted); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .db-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .db-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .db-kpis { grid-template-columns: minmax(0, 1fr); }
+  .db-atajos { width: 100%; }
+  .db-atajos .btn { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .db-kpi { transition: none; }
+  .db-kpi:hover { transform: none; }
+}
+
+/* ==========================================================================
+   Usuarios (admin) — buscador, filtros por rol, tabla con avatar y
+   formulario de cuenta interna. Prefijo us-.
+   ========================================================================== */
+
+.notice--success { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.notice:has(.us-aviso__cerrar) { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.us-aviso__cerrar { flex: 0 0 auto; padding: 2px; color: inherit; display: inline-flex; }
+
+.us-form { margin-bottom: 16px; }
+.us-roles { border: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.us-roles__leyenda { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--color-text); }
+.us-rol { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 12px 40px; border: 1px solid var(--color-border-strong); border-radius: 10px; cursor: pointer; transition: border-color 140ms ease, background-color 140ms ease; }
+.us-rol:hover { background: #FAFCFA; }
+.us-rol.is-activo { border-color: var(--color-primary); background: var(--color-primary-tint); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.us-rol input { position: absolute; left: 14px; top: 14px; margin: 0; width: 16px; height: 16px; accent-color: var(--color-primary); }
+.us-rol:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.us-rol__titulo { font-size: 14px; font-weight: 600; color: var(--color-text); }
+.us-rol__texto { font-size: 12.5px; color: var(--color-text-muted); line-height: 1.4; }
+.us-form .field-grid { margin-bottom: 16px; }
+
+.us-usuario { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.us-usuario__texto { min-width: 0; display: flex; flex-direction: column; }
+.us-avatar { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 13px; font-weight: 700; background: var(--color-surface-sunken); color: var(--color-text-muted); }
+.us-avatar--gestor_humano { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.us-avatar--admin { background: var(--color-primary-dark); color: #fff; }
+.us-correo { font-size: 12.5px; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.us-tu { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--color-primary-tint); border: 1px solid var(--color-border-strong); font-size: 11px; font-weight: 700; color: var(--color-primary); vertical-align: 1px; }
+
+.us-editar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 4px; }
+.us-editar input { width: 200px; max-width: 100%; padding: 6px 8px; font-size: 13.5px; }
+
+.us-rol-pill { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: var(--color-surface-sunken); color: var(--color-text-muted); }
+.us-rol-pill--gestor_humano { background: var(--color-accent-tint); color: var(--color-primary-dark); }
+.us-rol-pill--admin { background: var(--color-primary-dark); color: #fff; }
+.us-select-rol { width: auto; padding: 5px 8px; font-size: 13px; }
+
+.us-estado { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--color-danger); white-space: nowrap; }
+.us-estado__punto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.us-estado.is-activo { color: var(--color-primary); }
+.us-fecha { font-size: 13px; color: var(--color-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.us-tabla tr.is-inactivo .us-avatar,
+.us-tabla tr.is-inactivo .ps-aspirante { opacity: 0.6; }
+
+.us-pie { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+@media (max-width: 640px) {
+  .us-roles { grid-template-columns: 1fr; }
+  /* Tarjeta: usuario arriba; rol, estado, fecha y menú en una fila. */
+  .us-tabla tr { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+  .us-tabla .us-fecha { text-align: right; font-size: 12px; }
+}
+
+/* ==========================================================================
+   Auditoría (admin) — resumen, filtros y línea de tiempo agrupada por día.
+   Prefijo au-.
+   ========================================================================== */
+
+.au-controles { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.au-controles .ps-buscador { flex: 1 1 280px; }
+.au-periodo { width: auto; min-width: 170px; }
+
+.au-dia + .au-dia { border-top: 1px solid var(--color-border); }
+.au-dia__titulo { position: sticky; top: 0; z-index: 1; margin: 0; padding: 10px 18px; display: flex; align-items: center; gap: 8px; background: #FAFCFA; border-bottom: 1px solid var(--color-border); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); }
+.au-dia__conteo { font-variant-numeric: tabular-nums; font-weight: 600; opacity: 0.8; }
+
+.au-lista { list-style: none; margin: 0; padding: 4px 0; }
+.au-evento { display: grid; grid-template-columns: 72px 32px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 18px; }
+.au-evento + .au-evento { border-top: 1px dashed var(--color-border); }
+.au-evento.is-sensible { background: #FFFAFA; }
+.au-evento__hora { padding-top: 7px; font-size: 12.5px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.au-evento__icono { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--color-primary-tint); color: var(--color-primary); }
+.au-evento__icono--login { background: #F0E6FA; color: #6B3FA0; }
+.au-evento__icono--candidatos { background: #E3EEFC; color: #1D5DAD; }
+.au-evento.is-sensible .au-evento__icono { background: var(--color-danger-tint); color: var(--color-danger); }
+.au-evento__cuerpo { min-width: 0; padding-top: 2px; }
+.au-evento__descripcion { margin: 0; font-size: 14px; color: var(--color-text); line-height: 1.45; overflow-wrap: anywhere; }
+.au-evento__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 12.5px; color: var(--color-text-muted); }
+.au-evento__meta strong { color: var(--color-text); font-weight: 600; }
+.au-tipo { display: inline-flex; padding: 1px 8px; border-radius: 6px; background: var(--color-surface-sunken); font-size: 11.5px; font-weight: 600; color: var(--color-primary-dark); }
+.au-evento.is-sensible .au-tipo { background: var(--color-danger-tint); color: var(--color-danger); }
+
+@media (max-width: 640px) {
+  .au-periodo { flex: 1 1 100%; }
+  .au-evento { grid-template-columns: 32px minmax(0, 1fr); padding: 12px 16px; }
+  .au-evento__hora { grid-column: 2; grid-row: 2; padding-top: 0; font-size: 12px; }
+  .au-evento__icono { grid-row: 1 / span 2; }
+}
