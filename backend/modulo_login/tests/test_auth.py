@@ -780,6 +780,30 @@ def test_login_con_recordar_da_token_de_larga_duracion():
     assert dias_de_vida > 20  # ~30 días configurados, con margen
 
 
+def test_login_con_recordar_de_cuenta_interna_dura_7_dias():
+    from app.core.security import hash_password
+    from app.models.usuario import Usuario, RolUsuario as R
+
+    db = TestingSessionLocal()
+    db.add(Usuario(nombre_completo="Gestora Semilla", email="gestora.recordar@example.com",
+                   password_hash=hash_password("ClaveGestora123"), rol=R.gestor_humano))
+    db.commit()
+    db.close()
+
+    r = client.post("/api/v1/auth/login", json={"email": "gestora.recordar@example.com", "password": "ClaveGestora123", "recordar": True})
+    payload = _decodificar(r.json()["access_token"])
+    dias_de_vida = (payload["exp"] - payload_iat_o_ahora(payload)) / 86400
+    assert 6 < dias_de_vida <= 7.01
+
+
+def test_login_sin_recordar_dura_8_horas():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    payload = _decodificar(r.json()["access_token"])
+    horas_de_vida = (payload["exp"] - payload_iat_o_ahora(payload)) / 3600
+    assert 7 < horas_de_vida <= 8.01
+
+
 def test_olvide_password_responde_igual_exista_o_no_el_correo():
     r_existe = client.post("/api/v1/auth/olvide-password", json={"email": "nadie-existe@example.com"})
     assert r_existe.status_code == 200

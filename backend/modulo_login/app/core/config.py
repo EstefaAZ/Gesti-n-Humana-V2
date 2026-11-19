@@ -20,7 +20,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "CAMBIAR-ESTA-CLAVE-EN-PRODUCCION"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 horas
-    ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR: int = 60 * 24 * 30  # 30 días — cuando el usuario marca "Recordarme"
+    ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR: int = 60 * 24 * 30  # 30 días — candidato que marca "Recordarme"
+    # Gestión Humana y admin ven datos de todos los candidatos: con "Recordarme" duran menos.
+    ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR_INTERNO: int = 60 * 24 * 7  # 7 días
     RESET_PASSWORD_TOKEN_EXPIRE_MINUTES: int = 30
 
     # Correo (SMTP) — si SMTP_HOST queda vacío, los correos NO se envían de

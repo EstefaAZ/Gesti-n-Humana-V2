@@ -93,9 +93,13 @@ def autenticar_usuario(db: Session, email: str, password: str) -> Usuario:
 
 
 def generar_token_para_usuario(usuario: Usuario, recordar: bool = False) -> str:
-    expira = timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR if recordar else settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
+    if not recordar:
+        minutos = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    elif usuario.rol == RolUsuario.candidato:
+        minutos = settings.ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR
+    else:
+        minutos = settings.ACCESS_TOKEN_EXPIRE_MINUTES_RECORDAR_INTERNO
+    expira = timedelta(minutes=minutos)
     return crear_access_token(
         data={
             "sub": usuario.id,

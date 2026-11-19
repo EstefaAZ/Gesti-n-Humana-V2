@@ -4,6 +4,25 @@ import * as perfilesApi from '../lib/api/perfilesApi';
 import { ApiError, alExpirarSesion } from '../lib/api/httpClient';
 
 const STORAGE_KEY = 'auth_session';
+
+// El almacenamiento puede no estar disponible (modo privado estricto, sitio bloqueado).
+function leer(almacen: Storage): string | null {
+  try {
+    return almacen.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+function escribir(almacen: Storage, valor: string): void {
+  try {
+    almacen.setItem(STORAGE_KEY, valor);
+  } catch {}
+}
+function borrar(almacen: Storage): void {
+  try {
+    almacen.removeItem(STORAGE_KEY);
+  } catch {}
+}
 // Si la consulta del estado del perfil falla, se reintenta una vez tras este tiempo.
 const REINTENTO_ESTADO_MS = 4000;
 
@@ -51,15 +70,20 @@ export class AuthService {
     // el efecto de app.ts manda al login (recordando a dónde iba).
     alExpirarSesion(() => this._cerrarPorSesionExpirada());
 
-    const guardado = localStorage.getItem(STORAGE_KEY);
-    if (guardado) {
+    // Con "Recordarme" la sesión vive en localStorage (sobrevive al cerrar el
+    // navegador); sin él, en sessionStorage (se borra al cerrar el navegador).
+    for (const almacen of [localStorage, sessionStorage]) {
+      const guardado = leer(almacen);
+      if (!guardado) continue;
       try {
         const { token: t, usuario: u } = JSON.parse(guardado);
+        this.almacen = almacen;
         this.token.set(t);
         this.usuario.set(u);
         this._consultarEstadoPerfil(t, u);
+        break;
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        borrar(almacen);
       }
     }
   }
@@ -134,23 +158,29 @@ export class AuthService {
     this.sesionExpirada.set(true);
   }
 
-  private _guardarSesion(t: string, u: any): void {
+  /** Dónde está guardada la sesión actual (según "Recordarme"). */
+  private almacen: Storage = sessionStorage;
+
+  private _guardarSesion(t: string, u: any, recordar: boolean): void {
     this.sesionExpirada.set(false);
     this.estadoEnDuda = false;
     this.token.set(t);
     this.usuario.set(u);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: t, usuario: u }));
+    // Una sola copia: se quita la del otro almacén por si quedó de una sesión anterior.
+    borrar(recordar ? sessionStorage : localStorage);
+    this.almacen = recordar ? localStorage : sessionStorage;
+    escribir(this.almacen, JSON.stringify({ token: t, usuario: u }));
     this._consultarEstadoPerfil(t, u);
   }
 
   actualizarUsuarioLocal(nuevoUsuario: any): void {
     this.usuario.set(nuevoUsuario);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: this.token(), usuario: nuevoUsuario }));
+    escribir(this.almacen, JSON.stringify({ token: this.token(), usuario: nuevoUsuario }));
   }
 
   async login(email: string, password: string, recordar = false): Promise<any> {
     const { token: t, usuario: u } = await authApi.login(email, password, recordar);
-    this._guardarSesion(t, u);
+    this._guardarSesion(t, u, recordar);
     return u;
   }
 
@@ -178,6 +208,7 @@ export class AuthService {
       clearTimeout(this.reintentoProgramado);
       this.reintentoProgramado = null;
     }
-    localStorage.removeItem(STORAGE_KEY);
+    borrar(localStorage);
+    borrar(sessionStorage);
   }
 }
