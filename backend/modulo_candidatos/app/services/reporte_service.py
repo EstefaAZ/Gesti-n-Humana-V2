@@ -69,18 +69,28 @@ def _describir_conocimientos(criterios: dict) -> str:
     return "; ".join(partes) if partes else "Sin requisito específico configurado."
 
 
+# Columnas que quedan vacías cuando la vacante no pide ese tipo de requisito.
+CATEGORIAS_EN_BLANCO_SIN_CRITERIO = {"conocimientos"}
+
+
 def _marcas_evaluacion(solicitud) -> dict:
-    """{columna: 'X'} a partir de evaluar_postulacion().detalle — solo se marca
-    cuando la vacante SÍ tenía ese criterio configurado."""
-    detalle = ((getattr(solicitud, "evaluacion", None) or {}).get("detalle")) or {}
+    """{columna: 'X'} a partir de evaluar_postulacion().detalle.
+    Cuando la vacante no tiene configurado un criterio (cumple: None):
+    - Estudios y Experiencia se marcan SÍ (no hay nada que incumplir).
+    - Conocimientos complementarios queda en blanco: si la vacante no pide
+      idioma ni certificaciones, esa columna no aplica.
+    Una postulación sin evaluación guardada queda toda en blanco."""
+    evaluacion = getattr(solicitud, "evaluacion", None) or {}
+    if "detalle" not in evaluacion:
+        return {}
+    detalle = evaluacion.get("detalle") or {}
     mapa = {"estudios": ("C", "D"), "conocimientos": ("E", "F"), "experiencia": ("G", "H")}
     marcas = {}
     for categoria, (col_si, col_no) in mapa.items():
         cumple = (detalle.get(categoria) or {}).get("cumple")
-        if cumple is True:
-            marcas[col_si] = "X"
-        elif cumple is False:
-            marcas[col_no] = "X"
+        if cumple is None and categoria in CATEGORIAS_EN_BLANCO_SIN_CRITERIO:
+            continue
+        marcas[col_no if cumple is False else col_si] = "X"
     return marcas
 
 

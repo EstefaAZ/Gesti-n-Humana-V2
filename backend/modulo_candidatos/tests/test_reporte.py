@@ -113,7 +113,8 @@ def test_reporte_marca_x_en_columna_si_cuando_categoria_cumple():
         assert ws[f"C{fila}"].value == "X"  # Estudios - SI
         assert ws[f"D{fila}"].value is None
         assert ws[f"G{fila}"].value == "X"  # Experiencia - SI
-        assert ws[f"E{fila}"].value is None  # Conocimientos: sin criterio, blanco
+        assert ws[f"E{fila}"].value is None  # Conocimientos: sin criterio -> en blanco
+        assert ws[f"F{fila}"].value is None
 
 
 def test_reporte_marca_x_en_columna_no_cuando_categoria_no_cumple():
@@ -151,6 +152,19 @@ def test_reporte_sin_evaluacion_queda_todo_en_blanco():
     ws = wb["Aspirantes"]
     for col in ["C", "D", "E", "F", "G", "H"]:
         assert ws[f"{col}13"].value is None
+
+
+def test_reporte_vacante_sin_criterios_marca_si_en_estudios_y_experiencia_y_deja_conocimientos_en_blanco():
+    s = _solicitud_fake(evaluacion={"cumple": True, "motivos": [], "detalle": {
+        "estudios": {"cumple": None, "motivo": None},
+        "conocimientos": {"cumple": None, "motivo": None},
+        "experiencia": {"cumple": None, "motivo": None},
+    }})
+    contenido = reporte_service.generar_reporte_vacante({**VACANTE_INFO, "criterios": {}}, [s])
+    wb = openpyxl.load_workbook(io.BytesIO(contenido))
+    for hoja, fila in [("Aspirantes", 13), ("Resultados_reclutamiento", 16)]:
+        ws = wb[hoja]
+        assert [ws[f"{c}{fila}"].value for c in "CDEFGH"] == ["X", None, None, None, "X", None]
 
 
 def test_reporte_sin_criterios_configurados_describe_sin_requisito():
