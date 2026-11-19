@@ -129,6 +129,20 @@ def obtener_mi_foto(usuario: Usuario = Depends(obtener_usuario_actual)):
     return Response(content=usuario.foto.contenido, media_type=usuario.foto.tipo, headers={"Cache-Control": "private, no-store"})
 
 
+@router.get("/usuarios/{usuario_id}/foto")
+def obtener_foto_de_usuario(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(requerir_roles(RolUsuario.gestor_humano, RolUsuario.admin)),
+):
+    """Foto de perfil de otro usuario (p. ej. el candidato en el panel de su
+    postulación). Solo Gestión Humana y admin; un candidato no ve la de otros."""
+    objetivo = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not objetivo or not objetivo.foto:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Este usuario no tiene foto de perfil.")
+    return Response(content=objetivo.foto.contenido, media_type=objetivo.foto.tipo, headers={"Cache-Control": "private, no-store"})
+
+
 @router.put("/me/foto", response_model=UsuarioOut)
 def subir_mi_foto(
     datos: SubirFotoPerfil,

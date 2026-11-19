@@ -1126,3 +1126,27 @@ def test_eliminar_cuenta_borra_tambien_la_foto():
 
     db = next(override_get_db())
     assert db.query(FotoPerfil).count() == 0
+
+
+def test_gestion_humana_ve_la_foto_del_candidato_y_otro_candidato_no():
+    from app.core.security import hash_password
+    from app.models.usuario import Usuario, RolUsuario as R
+
+    h_candidato = _headers_registrado()
+    client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h_candidato)
+    candidato_id = client.get("/api/v1/auth/me", headers=h_candidato).json()["id"]
+
+    db = TestingSessionLocal()
+    db.add(Usuario(nombre_completo="Gestora Fotos", email="gestora.fotos@example.com",
+                   password_hash=hash_password("ClaveGestora123"), rol=R.gestor_humano))
+    db.commit()
+    db.close()
+    h_gestora = {"Authorization": f"Bearer {_token_de('gestora.fotos@example.com', 'ClaveGestora123')}"}
+
+    r = client.get(f"/api/v1/auth/usuarios/{candidato_id}/foto", headers=h_gestora)
+    assert r.status_code == 200
+    assert r.content == _b64.b64decode(PNG_1x1)
+
+    # Un candidato no puede ver la foto de otra persona (ni la suya por esta ruta).
+    assert client.get(f"/api/v1/auth/usuarios/{candidato_id}/foto", headers=h_candidato).status_code == 403
+    assert client.get("/api/v1/auth/usuarios/no-existe/foto", headers=h_gestora).status_code == 404

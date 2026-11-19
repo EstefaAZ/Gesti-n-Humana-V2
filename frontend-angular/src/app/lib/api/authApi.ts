@@ -62,6 +62,17 @@ export async function obtenerFoto(token): Promise<Blob | null> {
   }
 }
 
+/** Foto de otro usuario (solo Gestión Humana / admin), o null si no tiene. */
+export async function obtenerFotoDeUsuario(usuarioId, token): Promise<Blob | null> {
+  try {
+    const res = await apiFetch(`${BASE}/usuarios/${encodeURIComponent(usuarioId)}/foto`, { token, raw: true });
+    return await res.blob();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}
+
 export async function subirFoto(contenidoBase64: string, tipo: string, token) {
   const usuario = await apiFetch(`${BASE}/me/foto`, { method: "PUT", token, body: { contenido_base64: contenidoBase64, tipo } });
   return _usuarioACamel(usuario);

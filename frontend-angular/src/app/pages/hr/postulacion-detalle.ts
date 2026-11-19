@@ -4,6 +4,7 @@ import { Icon } from '../../shared/icon';
 import { BotonDescargarTodos } from '../../components/boton-descargar-todos';
 import { AuthService } from '../../core/auth.service';
 import { TIPO_REGISTRO_LABELS, detalleRegistroII } from '../../data/catalogos';
+import * as authApi from '../../lib/api/authApi';
 import * as solicitudesApi from '../../lib/api/solicitudesApi';
 import { CATEGORIAS_DOCUMENTOS } from '../../lib/api/solicitudesApi';
 import { formatearFecha } from '../../lib/formato';
@@ -38,7 +39,13 @@ const CRITERIOS = [
     <aside class="pd-panel" role="dialog" aria-modal="true" aria-labelledby="pd-nombre" (keydown.escape)="cerrar.emit()">
       <header class="pd-cabecera">
         <div class="pd-cabecera__fila">
-          <span class="pd-avatar" aria-hidden="true">{{ iniciales() }}</span>
+          <span class="pd-avatar" aria-hidden="true">
+            @if (fotoUrl()) {
+              <img [src]="fotoUrl()" alt="" />
+            } @else {
+              {{ iniciales() }}
+            }
+          </span>
           <div class="pd-cabecera__texto">
             <h2 class="pd-nombre" id="pd-nombre">{{ dp().nombreCompleto || 'Aspirante' }}</h2>
             <p class="pd-sub">
@@ -311,7 +318,31 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
       this.estado.set(this.solicitud().estado);
       this.nuevoEstado.set(this.solicitud().estado);
       this.historial.set([...(this.solicitud().historialEstados || [])].reverse());
+      this.cargarFoto(this.solicitud().usuarioId);
     }
+  }
+
+  /** Foto de perfil del candidato; si no tiene o falla, quedan las iniciales. */
+  protected readonly fotoUrl = signal<string | null>(null);
+  private consultaFoto = 0;
+
+  private async cargarFoto(usuarioId: string | undefined): Promise<void> {
+    const consulta = ++this.consultaFoto;
+    this.liberarFoto();
+    if (!usuarioId) return;
+    try {
+      const blob = await authApi.obtenerFotoDeUsuario(usuarioId, this.auth.token());
+      // Si mientras tanto se abrió otra postulación (o se cerró el panel), se descarta.
+      if (blob && consulta === this.consultaFoto) this.fotoUrl.set(URL.createObjectURL(blob));
+    } catch {
+      // Sin foto: se muestran las iniciales.
+    }
+  }
+
+  private liberarFoto(): void {
+    const url = this.fotoUrl();
+    if (url) URL.revokeObjectURL(url);
+    this.fotoUrl.set(null);
   }
 
   ngAfterViewInit(): void {
@@ -323,6 +354,8 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.consultaFoto++;
+    this.liberarFoto();
     document.body.style.overflow = '';
     this.focoAnterior?.focus?.();
   }
