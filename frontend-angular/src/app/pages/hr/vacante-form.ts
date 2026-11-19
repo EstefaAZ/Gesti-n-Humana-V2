@@ -157,12 +157,13 @@ import { CampoAccesible } from '../../shared/campo-accesible';
               <h3 class="section-title">Criterios de evaluación automática</h3>
               <p class="section-intro">
                 Solo priorizan y advierten a Gestión Humana; nunca bloquean la solicitud del aspirante. Todos son
-                <strong>mínimos</strong>: un nivel superior al pedido también cumple. Deja en blanco lo que no quieras evaluar.
+                <strong>mínimos</strong>: un nivel superior al pedido también cumple. Estudios y experiencia son obligatorios;
+                los conocimientos complementarios (profesión, idioma y certificaciones) son opcionales.
               </p>
               <div class="field-grid">
-                <app-field label="Nivel educativo mínimo" hint='Ej. "Técnico" también lo cumple un Universitario.'>
+                <app-field label="Nivel educativo mínimo *" hint='Ej. "Técnico" también lo cumple un Universitario.' [error]="errors().nivelEducativoMin">
                   <select [ngModel]="v.criterios.nivelEducativoMin" (ngModelChange)="setCriterio({ nivelEducativoMin: $event })">
-                    <option value="">Sin requisito</option>
+                    <option value="" disabled>Selecciona un nivel</option>
                     @for (n of nivelesEducativos; track n) {
                       <option [value]="n">{{ n }}</option>
                     }
@@ -177,7 +178,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
                 <app-field label="Palabra clave de profesión o título">
                   <input type="text" [value]="v.criterios.profesionKeyword" (input)="setCriterioCampo('profesionKeyword', $event)" placeholder="Ej: Ingeniería civil" />
                 </app-field>
-                <app-field label="Años mínimos de experiencia">
+                <app-field label="Años mínimos de experiencia *" hint="Usa 0 si el cargo no exige experiencia (p. ej. practicantes)." [error]="errors().experienciaMinAnios">
                   <input type="number" min="0" step="0.5" [value]="v.criterios.experienciaMinAnios" (input)="setCriterioCampo('experienciaMinAnios', $event)" />
                 </app-field>
                 <app-field label="Idioma requerido">
@@ -389,6 +390,15 @@ export class VacanteForm implements OnInit {
       if (!String(v.procesoNo || '').trim()) errores['procesoNo'] = 'Este campo es obligatorio.';
       if (!String(v.cargo || '').trim()) errores['cargo'] = 'Este campo es obligatorio.';
     }
+    if (paso === 'CRIT') {
+      if (!v.criterios.nivelEducativoMin) errores['nivelEducativoMin'] = 'Indica el nivel educativo mínimo.';
+      const anios = v.criterios.experienciaMinAnios;
+      if (anios === '' || anios == null || Number.isNaN(Number(anios))) {
+        errores['experienciaMinAnios'] = 'Indica los años mínimos de experiencia (0 si no se exige).';
+      } else if (Number(anios) < 0) {
+        errores['experienciaMinAnios'] = 'Los años no pueden ser negativos.';
+      }
+    }
     if (paso === 'FECHAS' && v.fechaApertura && v.fechaCierre && v.fechaCierre < v.fechaApertura) {
       errores['fechaCierre'] = 'La fecha de cierre no puede ser anterior a la de apertura.';
     }
@@ -428,7 +438,9 @@ export class VacanteForm implements OnInit {
     const lista: { nombre: string; valor: string }[] = [];
     if (c.nivelEducativoMin) lista.push({ nombre: 'Estudios', valor: `${c.nivelEducativoMin} o superior${c.graduadoRequerido ? ', graduado' : ''}` });
     if (String(c.profesionKeyword || '').trim()) lista.push({ nombre: 'Profesión', valor: c.profesionKeyword.trim() });
-    if (c.experienciaMinAnios !== '' && c.experienciaMinAnios != null && Number(c.experienciaMinAnios) > 0) {
+    if (c.experienciaMinAnios !== '' && c.experienciaMinAnios != null && Number(c.experienciaMinAnios) === 0) {
+      lista.push({ nombre: 'Experiencia', valor: 'No exige experiencia previa' });
+    } else if (c.experienciaMinAnios !== '' && c.experienciaMinAnios != null && Number(c.experienciaMinAnios) > 0) {
       lista.push({ nombre: 'Experiencia', valor: `${c.experienciaMinAnios} ${Number(c.experienciaMinAnios) === 1 ? 'año' : 'años'} mínimo` });
     }
     if (c.idiomaRequerido) lista.push({ nombre: c.idiomaRequerido, valor: `${etiquetaNivelIdioma(c.idiomaNivelMin)} o superior` });

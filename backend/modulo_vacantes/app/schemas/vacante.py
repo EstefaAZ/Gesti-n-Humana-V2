@@ -6,13 +6,14 @@
 from datetime import date
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from app.schemas.tipos import FechaUTC
 
 EstadoVacante = Literal["borrador", "publicada", "en_proceso", "cerrada", "cancelada_desierta"]
 
 # Escala única de dominio del idioma (equivalencias MCER: A1–A2 / B1 / B2–C1 / C2).
 NIVELES_IDIOMA = ("Básico", "Intermedio", "Avanzado", "Experto")
+NIVELES_EDUCATIVOS = ("Secundarios", "Técnico", "Tecnólogo", "Universitario", "Postgrado")
 
 # Escala anterior, por habilidad. Solo para poder LEER vacantes creadas antes
 # del cambio: se traducen al vuelo y al guardar quedan ya con la escala nueva.
@@ -72,11 +73,29 @@ class VacanteBase(BaseModel):
     criterios: CriteriosEvaluacion = Field(default_factory=CriteriosEvaluacion)
 
 
-class VacanteCrear(VacanteBase):
+class _VacanteConRequisitosObligatorios(VacanteBase):
+    """
+    Toda vacante exige estudios y experiencia; solo los conocimientos
+    complementarios (idioma, certificaciones, profesión) son opcionales.
+    Se valida al crear o editar — no en VacanteOut, para que las vacantes
+    guardadas antes de esta regla se sigan pudiendo leer.
+    """
+
+    @model_validator(mode="after")
+    def exigir_estudios_y_experiencia(self):
+        c = self.criterios
+        if c.nivel_educativo_min not in NIVELES_EDUCATIVOS:
+            raise ValueError("Indica el nivel educativo mínimo de la vacante.")
+        if c.experiencia_min_anios is None or c.experiencia_min_anios < 0:
+            raise ValueError("Indica los años mínimos de experiencia (0 si el cargo no exige experiencia).")
+        return self
+
+
+class VacanteCrear(_VacanteConRequisitosObligatorios):
     pass
 
 
-class VacanteActualizar(VacanteBase):
+class VacanteActualizar(_VacanteConRequisitosObligatorios):
     pass
 
 

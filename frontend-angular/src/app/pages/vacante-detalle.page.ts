@@ -74,7 +74,9 @@ import { formatearFecha } from '../lib/formato';
             @if (c().profesionKeyword) {
               <li>Profesión / título relacionado con: "{{ c().profesionKeyword }}"</li>
             }
-            @if (c().experienciaMinAnios) {
+            @if (c().experienciaMinAnios === 0) {
+              <li>No se exige experiencia previa</li>
+            } @else if (c().experienciaMinAnios) {
               <li>Experiencia mínima: {{ c().experienciaMinAnios }} años</li>
             }
             @if (c().idiomaRequerido) {
@@ -83,7 +85,7 @@ import { formatearFecha } from '../lib/formato';
             @for (cert of c().certificacionesKeywords || []; track $index) {
               <li>Certificación relacionada con: "{{ cert }}"</li>
             }
-            @if (!c().nivelEducativoMin && !c().profesionKeyword && !c().experienciaMinAnios && !c().idiomaRequerido && (c().certificacionesKeywords || []).length === 0) {
+            @if (!c().nivelEducativoMin && !c().profesionKeyword && c().experienciaMinAnios == null && !c().idiomaRequerido && (c().certificacionesKeywords || []).length === 0) {
               <li class="text-muted">Esta vacante no tiene requisitos específicos configurados.</li>
             }
           </ul>

@@ -297,7 +297,8 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         detalle["conocimientos"] = {"cumple": cumple, "motivo": None if cumple else motivo}
 
     exp_min = criterios.get("experiencia_min_anios")
-    if exp_min:
+    # 0 es un requisito válido (p. ej. practicantes): se evalúa y siempre cumple.
+    if exp_min is not None and exp_min != "":
         total = _total_experiencia_anios(experiencia)
         cumple_exp = total >= float(exp_min)
         if not cumple_exp:

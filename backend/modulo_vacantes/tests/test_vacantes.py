@@ -451,3 +451,29 @@ def test_estado_proceso_incluye_vacantes_ocultas_para_candidatos():
 def test_estado_proceso_requiere_sesion_y_404_si_no_existe():
     assert client.get("/api/v1/vacantes/no-existe/estado-proceso").status_code == 401
     assert client.get("/api/v1/vacantes/no-existe/estado-proceso", headers=HEADERS_CANDIDATO).status_code == 404
+
+
+
+# Toda vacante exige estudios y experiencia; los conocimientos son opcionales.
+def test_crear_vacante_sin_nivel_educativo_es_rechazado():
+    datos = {**VACANTE_VALIDA, "criterios": {**VACANTE_VALIDA["criterios"], "nivel_educativo_min": ""}}
+    r = client.post("/api/v1/vacantes", json=datos, headers=HEADERS_GESTOR)
+    assert r.status_code == 422
+    assert "nivel educativo" in r.text
+
+
+def test_crear_vacante_sin_experiencia_minima_es_rechazado():
+    criterios = {k: v for k, v in VACANTE_VALIDA["criterios"].items() if k != "experiencia_min_anios"}
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "criterios": criterios}, headers=HEADERS_GESTOR)
+    assert r.status_code == 422
+    assert "experiencia" in r.text
+
+
+def test_crear_vacante_con_cero_anios_de_experiencia_es_valido():
+    datos = {**VACANTE_VALIDA, "criterios": {**VACANTE_VALIDA["criterios"], "experiencia_min_anios": 0}}
+    assert client.post("/api/v1/vacantes", json=datos, headers=HEADERS_GESTOR).status_code == 201
+
+
+def test_crear_vacante_sin_conocimientos_complementarios_es_valido():
+    # VACANTE_VALIDA no pide idioma, certificaciones ni profesión.
+    assert client.post("/api/v1/vacantes", json=VACANTE_VALIDA, headers=HEADERS_GESTOR).status_code == 201

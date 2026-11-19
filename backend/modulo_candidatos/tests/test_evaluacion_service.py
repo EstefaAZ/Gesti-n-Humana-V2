@@ -566,3 +566,9 @@ def test_estudios_cumple_solo_si_nivel_y_profesion_cumplen():
     solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Contaduría Pública", "Universitario")]}
     vacante = {"criterios": {"nivel_educativo_min": "Universitario", "profesion_keyword": "Contaduría"}}
     assert evaluar_postulacion(solicitud, vacante)["detalle"]["estudios"]["cumple"] is True
+
+
+
+def test_experiencia_minima_cero_es_un_requisito_que_siempre_cumple():
+    resultado = evaluar_postulacion(SOLICITUD_BASE, {"criterios": {"experiencia_min_anios": 0}})
+    assert resultado["detalle"]["experiencia"]["cumple"] is True

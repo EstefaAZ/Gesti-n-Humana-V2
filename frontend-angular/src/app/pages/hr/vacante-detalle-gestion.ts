@@ -105,12 +105,14 @@ import { formatearFecha } from '../../lib/formato';
 
         <div class="ps-criterios">
           <h3 class="ps-subtitulo">Criterios de evaluación automática</h3>
-          @if (c().nivelEducativoMin || c().experienciaMinAnios || c().idiomaRequerido || (c().certificacionesKeywords || []).length > 0) {
+          @if (c().nivelEducativoMin || c().experienciaMinAnios != null || c().idiomaRequerido || (c().certificacionesKeywords || []).length > 0) {
             <ul class="ps-etiquetas">
               @if (c().nivelEducativoMin) {
                 <li class="ps-etiqueta">Estudios: <strong>{{ c().nivelEducativoMin }} o superior{{ c().graduadoRequerido ? ', graduado' : '' }}</strong></li>
               }
-              @if (c().experienciaMinAnios) {
+              @if (c().experienciaMinAnios === 0) {
+                <li class="ps-etiqueta">Experiencia: <strong>no exige experiencia previa</strong></li>
+              } @else if (c().experienciaMinAnios) {
                 <li class="ps-etiqueta">Experiencia: <strong>{{ c().experienciaMinAnios }} {{ c().experienciaMinAnios == 1 ? 'año' : 'años' }} mínimo</strong></li>
               }
               @if (c().idiomaRequerido) {

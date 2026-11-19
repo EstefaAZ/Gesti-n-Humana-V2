@@ -52,8 +52,10 @@ def _describir_estudios(criterios: dict) -> str:
 
 def _describir_experiencia(criterios: dict) -> str:
     anios = criterios.get("experiencia_min_anios")
-    if not anios:
+    if anios is None or anios == "":
         return "Sin requisito específico configurado."
+    if float(anios) == 0:
+        return "No se exige experiencia previa."
     return f"Mínimo {anios} año(s)."
 
 
