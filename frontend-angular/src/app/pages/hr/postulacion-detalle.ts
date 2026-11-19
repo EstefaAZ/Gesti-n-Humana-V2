@@ -102,6 +102,9 @@ const CRITERIOS = [
                       <span class="pd-criterio__detalle">
                         {{ d.cumple === true ? 'Cumple' : d.cumple === false ? (d.motivo || 'No cumple') : 'Sin requisito configurado' }}
                       </span>
+                      @if (d.aviso) {
+                        <span class="pd-criterio__aviso"><app-icon name="bell" [size]="13" [strokeWidth]="2" />{{ d.aviso }}</span>
+                      }
                     </div>
                   </li>
                 }

@@ -100,6 +100,7 @@ class DocumentosAdjuntosOut(BaseModel):
 class DetalleCategoriaEvaluacion(BaseModel):
     cumple: Optional[bool] = None  # None = esta vacante no tiene ese criterio configurado
     motivo: Optional[str] = None
+    aviso: Optional[str] = None  # informativo, no afecta "cumple" (p. ej. sobrecalificado)
 
 
 class DetalleEvaluacion(BaseModel):
@@ -111,6 +112,7 @@ class DetalleEvaluacion(BaseModel):
 class EvaluacionOut(BaseModel):
     cumple: bool
     motivos: list[str] = []
+    avisos: list[str] = []
     detalle: DetalleEvaluacion = DetalleEvaluacion()
 
 

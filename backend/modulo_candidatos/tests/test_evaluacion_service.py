@@ -572,3 +572,39 @@ def test_estudios_cumple_solo_si_nivel_y_profesion_cumplen():
 def test_experiencia_minima_cero_es_un_requisito_que_siempre_cumple():
     resultado = evaluar_postulacion(SOLICITUD_BASE, {"criterios": {"experiencia_min_anios": 0}})
     assert resultado["detalle"]["experiencia"]["cumple"] is True
+
+
+# Sobrecalificación: cumple (el nivel es un mínimo), pero queda un aviso.
+def test_nivel_superior_cumple_con_aviso_de_sobrecalificado():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Ingeniería Civil", "Universitario")]}
+    resultado = evaluar_postulacion(solicitud, {"criterios": {"nivel_educativo_min": "Tecnólogo"}})
+    assert resultado["cumple"] is True
+    assert resultado["detalle"]["estudios"]["cumple"] is True
+    aviso = resultado["detalle"]["estudios"]["aviso"]
+    assert "Sobrecalificado" in aviso and "Universitario" in aviso and "Tecnólogo" in aviso
+    assert resultado["avisos"] == [aviso]
+
+
+def test_nivel_exacto_no_tiene_aviso():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Tecnología en obras civiles", "Tecnólogo")]}
+    resultado = evaluar_postulacion(solicitud, {"criterios": {"nivel_educativo_min": "Tecnólogo"}})
+    assert resultado["detalle"]["estudios"]["aviso"] is None
+    assert resultado["avisos"] == []
+
+
+def test_estudio_superior_sin_graduar_no_cuenta_como_sobrecalificado():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [
+        _estudio("Tecnología en obras civiles", "Tecnólogo"),
+        _estudio("Ingeniería Civil", "Universitario", graduado="no"),
+    ]}
+    resultado = evaluar_postulacion(solicitud, {"criterios": {"nivel_educativo_min": "Tecnólogo", "graduado_requerido": True}})
+    assert resultado["detalle"]["estudios"]["aviso"] is None
+
+
+def test_la_api_conserva_el_aviso_de_sobrecalificado():
+    from app.schemas.solicitud import EvaluacionOut
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Ingeniería Civil", "Postgrado")]}
+    evaluacion = evaluar_postulacion(solicitud, {"criterios": {"nivel_educativo_min": "Técnico"}})
+    salida = EvaluacionOut.model_validate(evaluacion).model_dump()
+    assert salida["detalle"]["estudios"]["aviso"].startswith("Sobrecalificado")
+    assert salida["avisos"] == evaluacion["avisos"]

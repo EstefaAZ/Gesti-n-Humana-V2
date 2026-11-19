@@ -19,6 +19,7 @@ from typing import Any
 # siempre es "ordinal del candidato >= ordinal exigido". Un Universitario cumple
 # un requisito de Técnico; un nivel Experto cumple uno de Intermedio.
 NIVEL_EDUCATIVO_ORDEN = {"": 0, "Secundarios": 1, "Técnico": 2, "Tecnólogo": 3, "Universitario": 4, "Postgrado": 5}
+_NOMBRE_NIVEL_EDUCATIVO = {orden: nombre for nombre, orden in NIVEL_EDUCATIVO_ORDEN.items()}
 NIVEL_IDIOMA_ORDEN = {"": 0, "Básico": 1, "Intermedio": 2, "Avanzado": 3, "Experto": 4}
 
 # Sinónimos frecuentes que el aspirante puede haber escrito (o que quedaron en
@@ -245,6 +246,7 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
     criterio configurado", no que el candidato haya fallado en algo.
     """
     motivos: list[str] = []
+    avisos: list[str] = []  # informativos: no cambian "cumple"
     criterios = (vacante or {}).get("criterios") or {}
     dp = solicitud.get("datos_personales") or solicitud.get("datosPersonales") or {}
     registros = solicitud.get("registros_ii") or solicitud.get("registrosII") or []
@@ -259,6 +261,7 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
     # --- Estudios: nivel educativo mínimo y profesión/título (los dos van en la
     # misma columna del GTH-FOR-04). Basta con que uno falle para marcar NO.
     motivos_estudios: list[str] = []
+    aviso_estudios: str | None = None
     nivel_min = criterios.get("nivel_educativo_min")
     if nivel_min:
         graduado_requerido = criterios.get("graduado_requerido", True)
@@ -269,9 +272,16 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
                 nivel = _nivel_educativo_ordinal(r.get("nivelEducativo"))
                 if graduado_ok and nivel > max_nivel:
                     max_nivel = nivel
-        if max_nivel < _nivel_educativo_ordinal(nivel_min):
+        nivel_pedido = _nivel_educativo_ordinal(nivel_min)
+        if max_nivel < nivel_pedido:
             sufijo = " con graduación confirmada" if graduado_requerido else ""
             motivos_estudios.append(f'No registra nivel educativo "{nivel_min}" o superior{sufijo}.')
+        elif max_nivel > nivel_pedido:
+            # Cumple (el nivel es un mínimo), pero Gestión Humana debe saberlo.
+            aviso_estudios = (
+                f"Sobrecalificado: registra nivel {_NOMBRE_NIVEL_EDUCATIVO[max_nivel]} "
+                f"y el cargo pide {_NOMBRE_NIVEL_EDUCATIVO[nivel_pedido]}."
+            )
 
     profesion_kw = criterios.get("profesion_keyword")
     if profesion_kw:
@@ -286,7 +296,10 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         detalle["estudios"] = {
             "cumple": not motivos_estudios,
             "motivo": " ".join(motivos_estudios) or None,
+            "aviso": aviso_estudios,
         }
+        if aviso_estudios:
+            avisos.append(aviso_estudios)
 
     def _marcar_conocimientos(cumple: bool, motivo: str):
         actual = detalle["conocimientos"]
@@ -348,4 +361,4 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
             motivos.append(motivo)
         _marcar_conocimientos(tiene_cert, motivo)
 
-    return {"cumple": len(motivos) == 0, "motivos": motivos, "detalle": detalle}
+    return {"cumple": len(motivos) == 0, "motivos": motivos, "avisos": avisos, "detalle": detalle}

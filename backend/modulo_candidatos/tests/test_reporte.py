@@ -240,3 +240,16 @@ def test_reporte_resultados_no_escribe_en_la_fila_separadora():
     ws = openpyxl.load_workbook(io.BytesIO(contenido))["Resultados_reclutamiento"]
     assert ws["A28"].value == "12"
     assert ws["A29"].value is None
+
+
+def test_reporte_escribe_el_aviso_de_sobrecalificado_en_observaciones():
+    aviso = "Sobrecalificado: registra nivel Universitario y el cargo pide Tecnólogo."
+    s = _solicitud_fake(evaluacion={"cumple": True, "motivos": [], "avisos": [aviso], "detalle": {
+        "estudios": {"cumple": True, "motivo": None, "aviso": aviso},
+        "conocimientos": {"cumple": None, "motivo": None},
+        "experiencia": {"cumple": True, "motivo": None},
+    }})
+    wb = openpyxl.load_workbook(io.BytesIO(reporte_service.generar_reporte_vacante(VACANTE_INFO, [s])))
+    for hoja, fila in [("Aspirantes", 13), ("Resultados_reclutamiento", 16)]:
+        assert wb[hoja][f"C{fila}"].value == "X"  # Estudios SÍ
+        assert wb[hoja][f"K{fila}"].value == aviso

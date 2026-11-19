@@ -96,6 +96,13 @@ def _marcas_evaluacion(solicitud) -> dict:
     return marcas
 
 
+def _observaciones(solicitud) -> str | None:
+    """Avisos informativos de la evaluación (p. ej. sobrecalificado) para la
+    columna OBSERVACIONES; Gestión Humana puede completarla a mano."""
+    avisos = (getattr(solicitud, "evaluacion", None) or {}).get("avisos") or []
+    return " ".join(avisos) or None
+
+
 def _logo_de_la_plantilla() -> bytes | None:
     """En la plantilla el logo está "colocado en la celda" A1 (imagen dentro de la
     celda de Excel). openpyxl no conserva ese tipo de imagen: al guardar, A1 queda
@@ -211,7 +218,8 @@ def generar_reporte_vacante(vacante_info: dict, solicitudes: list) -> bytes:
     for i, solicitud in enumerate(solicitudes[:MAX_FILAS_ASPIRANTES]):
         fila_num = FILA_INICIO_ASPIRANTES + i
         dp = solicitud.datos_personales or {}
-        fila = {"A": dp.get("cedula"), "B": dp.get("nombreCompleto"), "L": dp.get("correo"), "M": dp.get("celular")}
+        fila = {"A": dp.get("cedula"), "B": dp.get("nombreCompleto"), "K": _observaciones(solicitud),
+                "L": dp.get("correo"), "M": dp.get("celular")}
         fila.update(_marcas_evaluacion(solicitud))
         _escribir_fila(ws1, fila_num, fila)
 
@@ -227,7 +235,7 @@ def generar_reporte_vacante(vacante_info: dict, solicitudes: list) -> bytes:
     for i, solicitud in enumerate(solicitudes[:MAX_FILAS_RECLUTAMIENTO]):
         fila_num = FILA_INICIO_RECLUTAMIENTO + i
         dp = solicitud.datos_personales or {}
-        fila = {"A": dp.get("cedula"), "B": dp.get("nombreCompleto")}
+        fila = {"A": dp.get("cedula"), "B": dp.get("nombreCompleto"), "K": _observaciones(solicitud)}
         fila.update(_marcas_evaluacion(solicitud))
         _escribir_fila(ws2, fila_num, fila)
 
