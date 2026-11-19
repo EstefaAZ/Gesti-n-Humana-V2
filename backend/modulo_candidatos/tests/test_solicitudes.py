@@ -418,3 +418,34 @@ def test_el_navegador_puede_leer_el_nombre_de_las_descargas():
     radicado = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO).json()["radicado"]
     r = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers={**HEADERS_CANDIDATO, "Origin": origen})
     assert "content-disposition" in r.headers.get("access-control-expose-headers", "").lower()
+
+
+
+# (6) Si Gestión Humana edita los criterios después, la evaluación se recalcula al consultarla.
+def test_evaluacion_se_recalcula_si_cambian_los_criterios_de_la_vacante(monkeypatch):
+    from app.clients import vacantes_client
+    r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 201
+    radicado = r.json()["radicado"]
+
+    original = vacantes_client.obtener_vacante
+    def vacante_con_criterio_imposible(vacante_id, token=None):
+        v = original(vacante_id, token=token)
+        return {**v, "criterios": {**v["criterios"], "experiencia_min_anios": 80}} if v else v
+    monkeypatch.setattr(vacantes_client, "obtener_vacante", vacante_con_criterio_imposible)
+
+    lista = client.get(f"/api/v1/solicitudes/vacante/{SOLICITUD_VALIDA['vacante_id']}", headers=HEADERS_GESTOR).json()
+    evaluacion = next(s for s in lista if s["radicado"] == radicado)["evaluacion"]
+    assert evaluacion["detalle"]["experiencia"]["cumple"] is False
+    assert "80 años" in evaluacion["detalle"]["experiencia"]["motivo"]
+
+
+def test_listar_postulaciones_funciona_aunque_vacantes_no_responda(monkeypatch):
+    from app.clients import vacantes_client
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    def falla(vacante_id, token=None):
+        raise vacantes_client.VacantesServiceError("caído")
+    monkeypatch.setattr(vacantes_client, "obtener_vacante", falla)
+    r = client.get(f"/api/v1/solicitudes/vacante/{SOLICITUD_VALIDA['vacante_id']}", headers=HEADERS_GESTOR)
+    assert r.status_code == 200
+    assert len(r.json()) == 1

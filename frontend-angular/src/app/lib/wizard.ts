@@ -1,6 +1,27 @@
 import { signal } from '@angular/core';
 import { STEPS, nuevoRegistroII, nuevaExperiencia, nuevoFamiliar } from './formState';
 
+/** Fecha de hoy como "AAAA-MM-DD" en hora local (igual que la guarda un <input type="date">). */
+export function hoyISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Qué le falta o sobra a las fechas de una experiencia laboral, o '' si están bien.
+ * Sin estas fechas la evaluación automática no puede contar el tiempo trabajado.
+ */
+export function problemaFechasExperiencia(e: any): string {
+  const hoy = hoyISO();
+  if (!e.fechaInicio) return 'falta la fecha de inicio.';
+  if (e.fechaInicio > hoy) return 'la fecha de inicio no puede ser futura.';
+  if (e.actual) return '';
+  if (!e.fechaTerminacion) return 'falta la fecha de terminación (o marca "Trabajo actualmente aquí").';
+  if (e.fechaTerminacion > hoy) return 'la fecha de terminación no puede ser futura; si sigues trabajando ahí, marca "Trabajo actualmente aquí".';
+  if (e.fechaTerminacion < e.fechaInicio) return 'la fecha de terminación es anterior a la de inicio.';
+  return '';
+}
+
 /**
  * Lógica compartida del formulario por hojas (GTH-FOR-03) que usan
  * SolicitudPage y CompletarPerfilPage. En React estas funciones estaban
@@ -81,8 +102,18 @@ export class WizardBase {
       nuevosErrores['registrosII'] = 'Debes agregar al menos un estudio para continuar.';
     }
 
-    if (step === 'VI' && state.experiencias.length === 0) {
-      nuevosErrores['experiencias'] = 'Debes agregar al menos una experiencia laboral para continuar.';
+    if (step === 'VI') {
+      if (state.experiencias.length === 0) {
+        nuevosErrores['experiencias'] = 'Debes agregar al menos una experiencia laboral para continuar.';
+      } else {
+        const problemas = state.experiencias
+          .map((e: any, i: number) => {
+            const p = problemaFechasExperiencia(e);
+            return p ? `${e.empresa?.trim() || `Experiencia ${i + 1}`}: ${p}` : '';
+          })
+          .filter(Boolean);
+        if (problemas.length) nuevosErrores['experiencias'] = 'Revisa las fechas. ' + problemas.join(' ');
+      }
     }
 
     if (step === 'VII') {

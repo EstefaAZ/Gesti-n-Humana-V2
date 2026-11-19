@@ -1,6 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { calcularTiempoLaborado } from '../../lib/formState';
+import { hoyISO } from '../../lib/wizard';
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipiosPorDepartamento';
 import { PAISES } from '../../data/paises';
 import { SelectConOtro } from '../select-con-otro';
@@ -130,12 +131,14 @@ import { CampoAccesible } from '../../shared/campo-accesible';
         </div>
         <div class="field">
           <label>Fecha inicio</label>
-          <input type="date" [value]="experiencia().fechaInicio || ''" (input)="setCampo('fechaInicio', $event)" />
+          <input type="date" [attr.max]="hoy" [value]="experiencia().fechaInicio || ''" (input)="setCampo('fechaInicio', $event)" />
         </div>
         <div class="field">
           <label>Fecha terminación</label>
           <input
             type="date"
+            [attr.max]="hoy"
+            [attr.min]="experiencia().fechaInicio || null"
             [value]="experiencia().fechaTerminacion || ''"
             [disabled]="experiencia().actual"
             (input)="setCampo('fechaTerminacion', $event)"
@@ -173,6 +176,8 @@ import { CampoAccesible } from '../../shared/campo-accesible';
 })
 export class ExperienciaCard {
   readonly experiencia = input.required<any>();
+  /** Límite de los selectores de fecha: no se aceptan fechas futuras. */
+  protected readonly hoy = hoyISO();
   readonly index = input<number>(0);
   readonly cambiar = output<{ id: string; patch: any }>();
   readonly quitar = output<string>();

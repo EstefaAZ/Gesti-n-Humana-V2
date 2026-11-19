@@ -138,9 +138,17 @@ def postulaciones_de_vacante(
     vacante_id: str,
     db: Session = Depends(get_db),
     usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+    token: str = Depends(oauth2_scheme),
 ):
-    """Panel de Gestión Humana: todas las postulaciones de una vacante."""
-    return solicitud_service.listar_por_vacante(db, vacante_id)
+    """Panel de Gestión Humana: todas las postulaciones de una vacante, con la
+    evaluación recalculada según los criterios actuales de la vacante."""
+    solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    try:
+        vacante = vacantes_client.obtener_vacante(vacante_id, token=token)
+    except VacantesServiceError:
+        vacante = None  # sin el módulo de vacantes se muestra la última evaluación guardada
+    solicitud_service.reevaluar_con_criterios_actuales(db, solicitudes, vacante)
+    return solicitudes
 
 
 @router.get("/admin/reporte/{vacante_id}")
@@ -156,6 +164,7 @@ def descargar_reporte_vacante(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe una vacante con ese id.")
 
     solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    solicitud_service.reevaluar_con_criterios_actuales(db, solicitudes, vacante)
     contenido = reporte_service.generar_reporte_vacante(vacante, solicitudes)
 
     nombre_archivo = f"GTH-FOR-03_{vacante.get('proceso_no', vacante_id)}.xlsx".replace("/", "-")

@@ -257,6 +257,33 @@ def estado_de_convocatorias(vacante_ids, token: Optional[str]) -> dict:
     return resultado
 
 
+def reevaluar_con_criterios_actuales(db: Session, solicitudes: list[Solicitud], vacante: dict) -> int:
+    """
+    Recalcula la evaluación automática con los criterios ACTUALES de la vacante
+    y guarda las que cambiaron. La evaluación se calcula al postularse; si
+    Gestión Humana edita los criterios después, sin esto el panel y el reporte
+    seguirían mostrando la evaluación con los criterios viejos.
+    Las solicitudes anonimizadas se dejan como están (ya no tienen los datos
+    con que se evaluaron). Devuelve cuántas cambiaron.
+    """
+    if not vacante:
+        return 0
+    cambiadas = 0
+    for s in solicitudes:
+        if s.anonimizada:
+            continue
+        nueva = evaluar_postulacion(
+            {"datos_personales": s.datos_personales, "registros_ii": s.registros_ii, "experiencia": s.experiencia},
+            vacante,
+        )
+        if nueva != s.evaluacion:
+            s.evaluacion = nueva
+            cambiadas += 1
+    if cambiadas:
+        db.commit()
+    return cambiadas
+
+
 def listar_por_vacante(db: Session, vacante_id: str) -> list[Solicitud]:
     return (
         db.query(Solicitud)

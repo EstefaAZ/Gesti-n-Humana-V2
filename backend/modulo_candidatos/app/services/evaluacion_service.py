@@ -69,24 +69,29 @@ def _raiz(palabra) -> str:
     return clave
 
 
+# Palabras de enlace que no cambian el sentido de un título o curso: así
+# "Ingeniería de Sistemas" y "Ingeniero en Sistemas" se comparan igual.
+_PALABRAS_VACIAS = {"de", "del", "la", "las", "el", "los", "en", "y", "e", "para", "con", "a", "al"}
+
+
 def _tokens(texto) -> list[str]:
-    """Palabras de `texto` separando por espacio, guion o guion bajo — así
-    "Power-BI" y "Power_BI" se tokenizan igual que "Power BI"."""
-    return [t for t in re.split(r"[\s\-_]+", _clave(texto)) if t]
+    """Palabras de `texto` sin tildes ni mayúsculas, separando por cualquier signo
+    (espacio, guion, coma, paréntesis…) y sin palabras de enlace. "Power-BI" y
+    "Power BI" dan los mismos tokens."""
+    return [t for t in re.split(r"[^a-z0-9]+", _clave(texto)) if t and t not in _PALABRAS_VACIAS]
+
+
+def _misma_palabra(a: str, b: str) -> bool:
+    """Igual, o igual salvo la terminación de género/número (ingeniero / ingeniería)."""
+    return a == b or _raiz(a) == _raiz(b)
 
 
 def _coincide_por_ventaneo(texto_tokens, kw_tokens) -> bool:
     """
     True si alguna secuencia de tokens consecutivos de `texto_tokens`, unida
     sin separador, es EXACTAMENTE igual al keyword unido sin separador. Así
-    "Power BI" (keyword) reconoce "PowerBI" o "Power-BI" (texto) sin importar
-    de qué lado falta el espacio.
-
-    Usa igualdad exacta de la ventana completa, no un substring dentro de un
-    texto compactado entero — eso es lo que evita falsos positivos por
-    coincidencias accidentales en el borde de dos palabras no relacionadas
-    (y, en el mismo espíritu, por qué "ISO 9001" nunca confunde con "ISO
-    14001": los dígitos siguen siendo parte de la comparación exacta).
+    "Power BI" (keyword) reconoce "PowerBI" (texto) y al revés. Es igualdad
+    exacta de la ventana completa: "ISO 9001" nunca confunde con "ISO 14001".
     """
     kw_compacto = "".join(kw_tokens)
     if not kw_compacto:
@@ -104,25 +109,22 @@ def _coincide_por_ventaneo(texto_tokens, kw_tokens) -> bool:
 
 def _texto_incluye_keyword(texto, keyword) -> bool:
     """
-    True si `keyword` aparece en `texto`, tolerante a tildes/mayúsculas, a
-    variaciones de género/número ("ingeniero"/"ingeniera" vs. un criterio
-    escrito como "ingenieria"), y a que el espacio entre palabras de un
-    keyword compuesto se haya escrito distinto ("Power BI" / "PowerBI" /
-    "Power-BI"). Primero intenta substring exacto (así siguen funcionando
-    keywords de varias palabras con el mismo espaciado, p. ej. "analista
-    financiero"); si no aparece, intenta por ventaneo de tokens compactados;
-    si tampoco, compara palabra por palabra por raíz.
+    True si las palabras de `keyword` aparecen seguidas, como palabras completas,
+    en `texto`. Tolera tildes, mayúsculas, palabras de enlace y la terminación de
+    género/número de CADA palabra ("Ingeniero Civil" cumple "Ingeniería Civil").
+    No acepta pedazos de palabra: "Excel" no coincide con "Excelencia", ni
+    "Java" con "JavaScript". Como último recurso compara sin espacios
+    ("PowerBI" cumple "Power BI").
     """
-    texto_norm = _clave(texto)
-    kw_norm = _clave(keyword)
-    if not kw_norm:
+    kw = _tokens(keyword)
+    if not kw:
         return False
-    if kw_norm in texto_norm:
-        return True
-    if _coincide_por_ventaneo(_tokens(texto), _tokens(keyword)):
-        return True
-    raiz_kw = _raiz(kw_norm)
-    return any(_raiz(palabra) == raiz_kw for palabra in texto_norm.split())
+    palabras = _tokens(texto)
+    n = len(kw)
+    for i in range(len(palabras) - n + 1):
+        if all(_misma_palabra(palabras[i + k], kw[k]) for k in range(n)):
+            return True
+    return _coincide_por_ventaneo(palabras, kw)
 
 
 def _nivel_educativo_ordinal(valor) -> int:
@@ -165,30 +167,30 @@ def _parsear_fecha(valor) -> datetime | None:
         return None
 
 
-def _anios_entre_fechas(inicio_str, fin_str) -> float:
-    inicio = _parsear_fecha(inicio_str)
-    if inicio is None:
-        return 0.0
-    fin = _parsear_fecha(fin_str) or datetime.now()
-    if fin < inicio:
-        return 0.0
-    return (fin - inicio).days / 365.25
-
-
 def _total_experiencia_anios(experiencia: list[dict[str, Any]]) -> float:
     """
     Años de experiencia = tiempo real transcurrido, no la suma nominal de cada
     registro. Dos experiencias que se solapan (empleos simultáneos, o un error
     de digitación en las fechas) se fusionan en un solo intervalo antes de
-    sumar — así no se cuenta dos veces el mismo período.
+    sumar — así no se cuenta dos veces el mismo período. Solo cuenta tiempo
+    ya transcurrido y con fechas completas.
     """
+    hoy = datetime.now()
     intervalos = []
     for e in experiencia:
         inicio = _parsear_fecha(e.get("fechaInicio"))
-        if inicio is None:
+        if inicio is None or inicio > hoy:
             continue
-        fin = None if e.get("actual") else e.get("fechaTerminacion")
-        fin = _parsear_fecha(fin) or datetime.now()
+        if e.get("actual"):
+            fin = hoy
+        else:
+            # Sin fecha de terminación (y sin marcar "trabajo actual") no se puede
+            # saber cuánto duró: no suma, en vez de contarse hasta hoy.
+            fin = _parsear_fecha(e.get("fechaTerminacion"))
+            if fin is None:
+                continue
+        # Una fecha futura (error de digitación) no suma tiempo que aún no pasó.
+        fin = min(fin, hoy)
         if fin < inicio:
             continue
         intervalos.append((inicio, fin))
@@ -254,6 +256,9 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         "experiencia": {"cumple": None, "motivo": None},
     }
 
+    # --- Estudios: nivel educativo mínimo y profesión/título (los dos van en la
+    # misma columna del GTH-FOR-04). Basta con que uno falle para marcar NO.
+    motivos_estudios: list[str] = []
     nivel_min = criterios.get("nivel_educativo_min")
     if nivel_min:
         graduado_requerido = criterios.get("graduado_requerido", True)
@@ -266,11 +271,22 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
                     max_nivel = nivel
         if max_nivel < _nivel_educativo_ordinal(nivel_min):
             sufijo = " con graduación confirmada" if graduado_requerido else ""
-            motivo = f'No registra nivel educativo "{nivel_min}" o superior{sufijo}.'
-            motivos.append(motivo)
-            detalle["estudios"] = {"cumple": False, "motivo": motivo}
-        else:
-            detalle["estudios"] = {"cumple": True, "motivo": None}
+            motivos_estudios.append(f'No registra nivel educativo "{nivel_min}" o superior{sufijo}.')
+
+    profesion_kw = criterios.get("profesion_keyword")
+    if profesion_kw:
+        match = any(
+            r.get("tipo") == "estudio" and _texto_incluye_keyword(r.get("titulo"), profesion_kw) for r in registros
+        ) or _texto_incluye_keyword(dp.get("profesion"), profesion_kw)
+        if not match:
+            motivos_estudios.append(f'Ningún título/profesión registrada incluye "{profesion_kw}".')
+
+    if nivel_min or profesion_kw:
+        motivos.extend(motivos_estudios)
+        detalle["estudios"] = {
+            "cumple": not motivos_estudios,
+            "motivo": " ".join(motivos_estudios) or None,
+        }
 
     def _marcar_conocimientos(cumple: bool, motivo: str):
         actual = detalle["conocimientos"]
@@ -279,16 +295,6 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
         if actual["cumple"] is False:
             return
         detalle["conocimientos"] = {"cumple": cumple, "motivo": None if cumple else motivo}
-
-    profesion_kw = criterios.get("profesion_keyword")
-    if profesion_kw:
-        match = any(
-            r.get("tipo") == "estudio" and _texto_incluye_keyword(r.get("titulo"), profesion_kw) for r in registros
-        ) or _texto_incluye_keyword(dp.get("profesion"), profesion_kw)
-        if not match:
-            motivo = f'Ningún título/profesión registrada incluye "{profesion_kw}".'
-            motivos.append(motivo)
-        _marcar_conocimientos(match, motivo if not match else "")
 
     exp_min = criterios.get("experiencia_min_anios")
     if exp_min:

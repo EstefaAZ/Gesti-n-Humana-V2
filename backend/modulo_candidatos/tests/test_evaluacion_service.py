@@ -324,7 +324,7 @@ def test_detalle_experiencia_independiente_de_estudios():
     assert resultado["detalle"]["experiencia"]["cumple"] is False
 
 
-def test_detalle_conocimientos_agrupa_profesion_idioma_y_certificaciones():
+def test_detalle_profesion_va_en_estudios_e_idioma_en_conocimientos():
     solicitud = {
         **SOLICITUD_BASE,
         "datos_personales": {**SOLICITUD_BASE["datos_personales"], "profesion": "Ingeniero Ambiental"},
@@ -335,7 +335,8 @@ def test_detalle_conocimientos_agrupa_profesion_idioma_y_certificaciones():
         "idioma_requerido": "Inglés", "idioma_nivel_min": "Avanzado",
     }}
     resultado = evaluar_postulacion(solicitud, vacante)
-    assert resultado["detalle"]["conocimientos"]["cumple"] is True  # ambos criterios de conocimientos se cumplen
+    assert resultado["detalle"]["estudios"]["cumple"] is True  # la profesión es parte de Estudios (GTH-FOR-04)
+    assert resultado["detalle"]["conocimientos"]["cumple"] is True  # idioma
 
 
 def test_detalle_conocimientos_no_cumple_si_falla_uno_de_varios_criterios():
@@ -486,3 +487,82 @@ def test_detalle_no_afecta_el_resultado_general_cumple_motivos():
     resultado = evaluar_postulacion(solicitud, vacante)
     assert resultado["cumple"] is True
     assert resultado["motivos"] == []
+
+
+# ---------------------------------------------------------------
+# Revisión de la evaluación (noviembre 2026)
+# ---------------------------------------------------------------
+from datetime import date, timedelta
+from app.services.evaluacion_service import _texto_incluye_keyword, _total_experiencia_anios
+
+
+def _estudio(titulo, nivel="Universitario", graduado="si"):
+    return {"tipo": "estudio", "titulo": titulo, "nivelEducativo": nivel, "graduado": graduado}
+
+
+# (1) Experiencia: sin fecha fin no suma; nada cuenta más allá de hoy.
+def test_experiencia_sin_fecha_fin_ni_actual_no_suma():
+    assert _total_experiencia_anios([{"fechaInicio": "2015-01-01"}]) == 0.0
+
+
+def test_experiencia_con_fecha_fin_futura_cuenta_solo_hasta_hoy():
+    inicio = (date.today() - timedelta(days=365)).isoformat()
+    total = _total_experiencia_anios([{"fechaInicio": inicio, "fechaTerminacion": "2099-01-01"}])
+    assert 0.99 < total < 1.01
+
+
+def test_experiencia_que_empieza_en_el_futuro_no_suma():
+    assert _total_experiencia_anios([{"fechaInicio": "2099-01-01", "actual": True}]) == 0.0
+
+
+def test_experiencia_sin_fecha_fin_no_alcanza_el_minimo():
+    solicitud = {**SOLICITUD_BASE, "experiencia": [{"fechaInicio": "2010-01-01"}]}
+    resultado = evaluar_postulacion(solicitud, {"criterios": {"experiencia_min_anios": 2}})
+    assert resultado["detalle"]["experiencia"]["cumple"] is False
+
+
+# (2) Profesión de varias palabras con distinto género/número.
+def test_profesion_de_varias_palabras_con_genero_distinto_cumple():
+    assert _texto_incluye_keyword("Ingeniero Civil", "Ingeniería Civil")
+    assert _texto_incluye_keyword("Ingeniera Industrial", "Ingeniería Industrial")
+    assert _texto_incluye_keyword("Ingeniero en Sistemas", "Ingeniería de Sistemas")
+
+
+def test_profesion_de_varias_palabras_exige_todas_las_palabras():
+    assert not _texto_incluye_keyword("Ingeniero Industrial", "Ingeniería Civil")
+
+
+def test_titulo_ingeniero_civil_cumple_vacante_de_ingenieria_civil():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Ingeniero Civil")]}
+    resultado = evaluar_postulacion(solicitud, {"criterios": {"profesion_keyword": "Ingeniería Civil"}})
+    assert resultado["cumple"] is True
+
+
+# (3) Sin coincidencias por pedazos de palabra.
+def test_keyword_no_coincide_con_pedazo_de_otra_palabra():
+    assert not _texto_incluye_keyword("Excelencia en servicio al cliente", "Excel")
+    assert not _texto_incluye_keyword("Gestión de cartera", "Arte")
+    assert not _texto_incluye_keyword("JavaScript avanzado", "Java")
+    assert _texto_incluye_keyword("Curso de Excel avanzado", "Excel")
+
+
+def test_certificacion_excel_no_se_cumple_con_curso_de_excelencia():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [{"tipo": "educacionTrabajo", "nombreEvento": "Excelencia en servicio"}]}
+    resultado = evaluar_postulacion(solicitud, {"criterios": {"certificaciones_keywords": ["Excel"]}})
+    assert resultado["detalle"]["conocimientos"]["cumple"] is False
+
+
+# (4) La profesión se califica en Estudios (columna del GTH-FOR-04), no en Conocimientos.
+def test_profesion_que_no_coincide_marca_estudios_en_no():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Derecho", "Postgrado")]}
+    vacante = {"criterios": {"nivel_educativo_min": "Universitario", "profesion_keyword": "Contaduría"}}
+    resultado = evaluar_postulacion(solicitud, vacante)
+    assert resultado["detalle"]["estudios"]["cumple"] is False
+    assert resultado["detalle"]["conocimientos"]["cumple"] is None
+    assert "Contaduría" in resultado["detalle"]["estudios"]["motivo"]
+
+
+def test_estudios_cumple_solo_si_nivel_y_profesion_cumplen():
+    solicitud = {**SOLICITUD_BASE, "registros_ii": [_estudio("Contaduría Pública", "Universitario")]}
+    vacante = {"criterios": {"nivel_educativo_min": "Universitario", "profesion_keyword": "Contaduría"}}
+    assert evaluar_postulacion(solicitud, vacante)["detalle"]["estudios"]["cumple"] is True
