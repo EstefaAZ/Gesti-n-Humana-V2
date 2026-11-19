@@ -1,6 +1,6 @@
 export const ETIQUETA_ESTADO: Record<string, string> = {
   borrador: 'Borrador',
-  publicada: 'Publicada',
+  publicada: 'Abierta',
   en_proceso: 'En proceso',
   cerrada: 'Cerrada',
   cancelada_desierta: 'Cancelada/Desierta',

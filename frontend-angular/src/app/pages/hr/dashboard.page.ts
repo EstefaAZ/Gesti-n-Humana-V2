@@ -19,7 +19,7 @@ function formatearMes(mesISO: string): string {
 
 /** Estados de la vacante (las llaves llegan en camelCase desde la API). */
 const ESTADOS_VACANTE = [
-  { llave: 'publicada', etiqueta: 'Publicada', punto: 'publicada' },
+  { llave: 'publicada', etiqueta: 'Abierta', punto: 'publicada' },
   { llave: 'enProceso', etiqueta: 'En proceso', punto: 'en_proceso' },
   { llave: 'cerrada', etiqueta: 'Cerrada', punto: 'cerrada' },
   { llave: 'borrador', etiqueta: 'Borrador', punto: 'borrador' },
@@ -86,9 +86,9 @@ const ICONO_ACTIVIDAD: Record<TipoActividad, string> = { vacante: 'briefcase', p
           </a>
           <a routerLink="/gestion-humana" class="db-kpi">
             <span class="db-kpi__icono"><app-icon name="briefcase" [size]="18" [strokeWidth]="2" /></span>
-            <span class="db-kpi__etiqueta">Procesos publicados</span>
+            <span class="db-kpi__etiqueta">Procesos abiertos</span>
             <span class="db-kpi__valor">{{ vacantes().activas }}<span class="db-kpi__de"> de {{ vacantes().total }}</span></span>
-            <span class="db-kpi__sub">{{ vacantes().abiertas }} con convocatoria abierta</span>
+            <span class="db-kpi__sub">{{ vacantes().abiertas }} con convocatoria vigente</span>
           </a>
           <a routerLink="/usuarios" class="db-kpi">
             <span class="db-kpi__icono"><app-icon name="users" [size]="18" [strokeWidth]="2" /></span>

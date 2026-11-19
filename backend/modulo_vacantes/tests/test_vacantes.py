@@ -329,7 +329,8 @@ def test_auditoria_describe_el_estado_nuevo():
 
     r_auditoria = client.get("/api/v1/vacantes/admin/auditoria/eventos", headers=HEADERS_ADMIN)
     evento = next(e for e in r_auditoria.json() if e["tipo"] == "vacante_cambio_estado")
-    assert "cancelada_desierta" in evento["descripcion"]
+    # La descripción usa el nombre legible del estado, no el valor interno.
+    assert "Cancelada/Desierta" in evento["descripcion"]
 
 
 def test_permite_hasta_5_certificaciones_requeridas():

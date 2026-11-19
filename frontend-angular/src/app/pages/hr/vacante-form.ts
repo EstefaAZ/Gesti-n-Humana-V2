@@ -11,7 +11,7 @@ import { ZonaArchivos, pesoLegible } from '../../components/zona-archivos';
 
 const ESTADOS = [
   { valor: 'borrador', etiqueta: 'Borrador' },
-  { valor: 'publicada', etiqueta: 'Publicada' },
+  { valor: 'publicada', etiqueta: 'Abierta' },
   { valor: 'en_proceso', etiqueta: 'En proceso' },
   { valor: 'cerrada', etiqueta: 'Cerrada' },
   { valor: 'cancelada_desierta', etiqueta: 'Cancelada / Desierta' },
@@ -115,7 +115,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
               <h3 class="section-title">Fechas y estado</h3>
               <p class="section-intro">Después de la fecha y hora de cierre ya no se reciben inscripciones.</p>
               <div class="field-grid">
-                <app-field label="Estado de la vacante" span2 hint='Solo las vacantes "Publicada" y vigentes aparecen en el listado de candidatos; al cerrarse o cancelarse, solo las ven quienes se postularon.'>
+                <app-field label="Estado de la vacante" span2 hint='Solo las vacantes "Abierta" y vigentes aparecen en el listado de candidatos; al cerrarse o cancelarse, solo las ven quienes se postularon.'>
                   <select [ngModel]="v.estado" (ngModelChange)="set({ estado: $event })">
                     @for (e of estados; track e.valor) {
                       <option [value]="e.valor">{{ e.etiqueta }}</option>

@@ -24,6 +24,16 @@ ROLES_GESTION = ("gestor_humano", "admin")
 # Rutas públicas — las usa el candidato, sin autenticación
 # ---------------------------------------------------------------
 
+# Nombre que ve la gente para cada estado (el valor interno no cambia).
+ETIQUETA_ESTADO = {
+    "borrador": "Borrador",
+    "publicada": "Abierta",
+    "en_proceso": "En proceso",
+    "cerrada": "Cerrada",
+    "cancelada_desierta": "Cancelada/Desierta",
+}
+
+
 @router.get("", response_model=list[VacanteOut])
 def listar_vacantes_publicas(db: Session = Depends(get_db)):
     """Solo convocatorias publicadas y abiertas — lo que ve un candidato navegando el sitio."""
@@ -151,7 +161,7 @@ def cambiar_estado(
 
     auditoria_service.registrar_evento(
         db, tipo="vacante_cambio_estado",
-        descripcion=f"{usuario.nombre or usuario.id} cambió el estado de \"{actualizada.cargo}\" a \"{datos.estado}\".",
+        descripcion=f"{usuario.nombre or usuario.id} cambió el estado de \"{actualizada.cargo}\" a \"{ETIQUETA_ESTADO.get(datos.estado, datos.estado)}\".",
         actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
         entidad_tipo="vacante", entidad_id=actualizada.id,
     )
