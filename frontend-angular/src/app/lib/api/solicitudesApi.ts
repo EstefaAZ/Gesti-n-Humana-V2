@@ -36,6 +36,17 @@ function _solicitudACamel(s) {
     estado: s.estado,
     historialEstados: s.historial_estados,
     fechaSolicitud: s.fecha_solicitud,
+    // Certificados laborales y de estudio: null hasta que Gestión Humana preselecciona.
+    certificados: s.certificados
+      ? {
+          estado: s.certificados.estado, // pendientes | recibidos | vencidos
+          habilitadosEn: s.certificados.habilitados_en,
+          plazo: s.certificados.plazo,
+          enviadosEn: s.certificados.enviados_en,
+          ampliaciones: s.certificados.ampliaciones || 0,
+          puedeAdjuntar: !!s.certificados.puede_adjuntar,
+        }
+      : null,
     // Solo en "Mis postulaciones": estado actual de la convocatoria (null si no se pudo consultar).
     convocatoria: s.convocatoria
       ? {
@@ -51,6 +62,17 @@ function _solicitudACamel(s) {
 
 // Los 4 tipos de documento con sus límites reales y la llave que usa la API
 // (snake_case) — deben coincidir con el backend.
+/**
+ * Tipos de documento que por ahora NO se piden en el formulario (hoja de
+ * documentos) ni cuentan en el progreso del candidato. Para volver a pedirlos,
+ * quitarlos de esta lista. Los archivos que ya se subieron se siguen mostrando.
+ */
+export const DOCUMENTOS_DESACTIVADOS: string[] = ['certificadosLaborales', 'certificadosEstudio'];
+
+export function documentoActivo(clave: string): boolean {
+  return !DOCUMENTOS_DESACTIVADOS.includes(clave);
+}
+
 export const CATEGORIAS_DOCUMENTOS = [
   { clave: "cedula", claveApi: "cedula", etiqueta: "Cédula de ciudadanía", max: 1 },
   { clave: "certificadosLaborales", claveApi: "certificados_laborales", etiqueta: "Certificados laborales con funciones", max: 10 },
@@ -109,6 +131,36 @@ export async function obtener(radicado, token) {
 export async function listarPorVacante(vacanteId, token) {
   const data = await apiFetch(`${BASE}/vacante/${vacanteId}`, { token });
   return data.map(_solicitudACamel);
+}
+
+/**
+ * El candidato preseleccionado adjunta sus certificados. Cada lista es la
+ * versión completa: los archivos ya subidos van solo con `nombre` y se conservan.
+ */
+export async function guardarCertificados(radicado, certificados, token) {
+  const aApi = (lista) => (lista || []).map((d) => ({ nombre: d.nombre, contenido_base64: d.contenidoBase64 || null }));
+  const data = await apiFetch(`${BASE}/${radicado}/certificados`, {
+    method: "PUT",
+    token,
+    body: {
+      certificados_laborales: aApi(certificados.certificadosLaborales),
+      certificados_estudio: aApi(certificados.certificadosEstudio),
+    },
+  });
+  return _solicitudACamel(data);
+}
+
+/** Gestión Humana da 3 días hábiles más (desde hoy) para adjuntar los certificados. */
+export async function ampliarPlazoCertificados(radicado, token) {
+  const data = await apiFetch(`${BASE}/${radicado}/certificados/ampliar-plazo`, { method: "POST", token });
+  return _solicitudACamel(data);
+}
+
+const FORMATO_PLAZO = new Intl.DateTimeFormat("es-CO", { weekday: "long", day: "numeric", month: "long", timeZone: "America/Bogota" });
+
+/** "lunes, 30 de noviembre" (el plazo vence a las 11:59 p. m. de ese día, hora Colombia). */
+export function textoPlazo(iso) {
+  return iso ? FORMATO_PLAZO.format(new Date(iso)) : "";
 }
 
 export async function cambiarEstado(radicado, estado, token) {

@@ -11,6 +11,7 @@ from app.clients import vacantes_client
 from app.models.solicitud import Solicitud, _generar_radicado
 from app.schemas.solicitud import SolicitudCrear
 from app.services.evaluacion_service import evaluar_postulacion
+from app.services import certificados_service
 from app.services import email_service, notificacion_service
 
 
@@ -178,7 +179,12 @@ MAXIMOS_DOCUMENTOS = {"cedula": 1, "certificados_laborales": 10, "certificados_e
 def _combinar_documentos(documentos_perfil: dict, documentos_extra) -> dict:
     """Documentos del perfil + los que el candidato adjunte extra para ESTA vacante en particular,
     respetando los mismos máximos por categoría."""
-    combinados = {cat: list(documentos_perfil.get(cat, [])) for cat in MAXIMOS_DOCUMENTOS}
+    # Los certificados no se copian del perfil (perfiles anteriores podían tenerlos):
+    # se piden en la postulación solo si el candidato es preseleccionado.
+    combinados = {
+        cat: [] if cat in certificados_service.CATEGORIAS_CERTIFICADOS else list(documentos_perfil.get(cat, []))
+        for cat in MAXIMOS_DOCUMENTOS
+    }
     if documentos_extra:
         extra_dict = documentos_extra.model_dump()
         for categoria, maximo in MAXIMOS_DOCUMENTOS.items():
@@ -333,6 +339,8 @@ def obtener_documento(db: Session, radicado: str, categoria: str, indice: int) -
 def actualizar_estado(db: Session, radicado: str, nuevo_estado: str) -> Solicitud:
     solicitud = _obtener_o_falla(db, radicado)
     solicitud.estado = nuevo_estado
+    # Al preseleccionar por primera vez se abre el plazo para los certificados.
+    certificados_service.habilitar_si_corresponde(solicitud)
     historial = list(solicitud.historial_estados or [])
     historial.append({"estado": nuevo_estado, "fecha": datetime.now(timezone.utc).isoformat()})
     solicitud.historial_estados = historial

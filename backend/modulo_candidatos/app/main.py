@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings, validar_configuracion_produccion
-from app.core.database import Base, engine
+from app.core.database import Base, agregar_columnas_faltantes, engine
 from app.api.v1.solicitudes import router as solicitudes_router
 from app.api.v1.perfiles import router as perfiles_router
 from app.api.v1.notificaciones import router as notificaciones_router
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     validar_configuracion_produccion()
     logger.info(f"Iniciando {settings.APP_NAME} v{settings.APP_VERSION} (ENVIRONMENT={settings.ENVIRONMENT})")
     Base.metadata.create_all(bind=engine)
+    agregar_columnas_faltantes()
     yield
     logger.info("Módulo de Candidatos detenido correctamente")
 

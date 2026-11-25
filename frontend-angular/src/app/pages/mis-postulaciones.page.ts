@@ -7,6 +7,7 @@ import { Icon } from '../shared/icon';
 import { AuthService } from '../core/auth.service';
 import * as solicitudesApi from '../lib/api/solicitudesApi';
 import { formatearFecha } from '../lib/formato';
+import { CertificadosPostulacion } from '../components/certificados-postulacion';
 
 /** Etapas del proceso, en orden. La última se reemplaza por el resultado. */
 const ETAPAS = ['Recibida', 'En revisión', 'Preseleccionado', 'Entrevista programada', 'Decisión'];
@@ -16,7 +17,7 @@ type Convocatoria = { clase: string; icono: string; titulo: string; detalle: str
 
 @Component({
   selector: 'app-mis-postulaciones-page',
-  imports: [RouterLink, DocHeader, EstadoPostulacionBadge, Icon],
+  imports: [RouterLink, DocHeader, EstadoPostulacionBadge, Icon, CertificadosPostulacion],
   host: { style: 'display: contents' },
   template: `
     <app-doc-header title="Mis postulaciones" />
@@ -104,6 +105,8 @@ type Convocatoria = { clase: string; icono: string; titulo: string; detalle: str
                   </ol>
                 }
 
+                <app-certificados-postulacion [postulacion]="p" (actualizada)="reemplazar($event)" />
+
                 <div class="cand-postulacion__acciones">
                   <button type="button" class="btn btn-secondary btn-sm" (click)="descargarPdf(p.radicado)">
                     <app-icon name="descargar" [size]="14" [strokeWidth]="2" /> Descargar solicitud (PDF)
@@ -132,6 +135,13 @@ export class MisPostulacionesPage implements AfterViewChecked {
     { valor: 'finalizadas', etiqueta: 'Finalizadas' },
   ];
   protected readonly filtro = signal('todas');
+
+  /** Reemplaza una postulación por su versión actualizada (p. ej. tras enviar certificados). */
+  protected reemplazar(actualizada: any): void {
+    this.postulaciones.update((lista) =>
+      (lista || []).map((p) => (p.radicado === actualizada.radicado ? { ...p, ...actualizada, convocatoria: p.convocatoria } : p)),
+    );
+  }
 
   // Las notificaciones y la lista de vacantes enlazan aquí con ?radicado=…: se resalta esa postulación.
   private readonly queryParams = toSignal(this.route.queryParamMap);

@@ -163,7 +163,8 @@ def test_inscribirme_a_vacante_cerrada_es_rechazado():
     assert r.status_code == 409
 
 
-def test_inscribirme_con_certificaciones_extra_las_combina_con_el_perfil():
+def test_inscribirme_no_acepta_certificados_extra():
+    # Los certificados se adjuntan solo si Gestión Humana preselecciona al candidato.
     client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
     extra_doc = {"nombre": "curso-extra.pdf", "contenido_base64": "JVBERi0xLjQ="}
     r = client.post(
@@ -171,10 +172,15 @@ def test_inscribirme_con_certificaciones_extra_las_combina_con_el_perfil():
         json={"vacante_id": "vac-1", "documentos_extra": {"certificados_estudio": [extra_doc]}},
         headers=HEADERS_CANDIDATO,
     )
-    assert r.status_code == 201
-    nombres = [d["nombre"] for d in r.json()["documentos_adjuntos"]["certificados_estudio"]]
-    assert "estudio1.pdf" in nombres  # el del perfil
-    assert "curso-extra.pdf" in nombres  # el extra de esta vacante
+    assert r.status_code == 422
+
+
+def test_el_perfil_no_guarda_certificados():
+    doc = {"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}
+    perfil = {**PERFIL_VALIDO, "documentos_adjuntos": {**PERFIL_VALIDO["documentos_adjuntos"], "certificados_laborales": [doc]}}
+    r = client.put("/api/v1/perfiles/me", json=perfil, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()["documentos_adjuntos"]["certificados_laborales"] == []
 
 
 def test_inscribirme_respeta_el_maximo_al_combinar_documentos_extra():
@@ -196,11 +202,11 @@ def test_inscribirme_documentos_extra_no_afectan_el_perfil_guardado():
     extra_doc = {"nombre": "solo-para-esta-vacante.pdf", "contenido_base64": "JVBERi0xLjQ="}
     client.post(
         "/api/v1/solicitudes/inscribirme",
-        json={"vacante_id": "vac-1", "documentos_extra": {"certificados_estudio": [extra_doc]}},
+        json={"vacante_id": "vac-1", "documentos_extra": {"tarjeta_profesional": [extra_doc]}},
         headers=HEADERS_CANDIDATO,
     )
     r_perfil = client.get("/api/v1/perfiles/me", headers=HEADERS_CANDIDATO)
-    nombres = [d["nombre"] for d in r_perfil.json()["documentos_adjuntos"]["certificados_estudio"]]
+    nombres = [d["nombre"] for d in r_perfil.json()["documentos_adjuntos"]["tarjeta_profesional"]]
     assert "solo-para-esta-vacante.pdf" not in nombres
 
 

@@ -10,10 +10,11 @@ from app.core.database import get_db
 from app.api.deps import obtener_usuario_actual, requerir_roles, UsuarioToken, oauth2_scheme
 from app.clients import vacantes_client
 from app.clients.vacantes_client import VacantesServiceError
-from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
+from app.schemas.solicitud import GuardarCertificados, SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
 from app.services import solicitud_service, retencion_service, auditoria_service, email_service, notificacion_service, reporte_service
 from app.services.pdf_service import generar_pdf_solicitud
 from app.services import zip_documentos_service
+from app.services import certificados_service
 
 router = APIRouter(prefix="/solicitudes", tags=["Solicitudes"])
 
@@ -35,6 +36,7 @@ def _solicitud_a_dict(solicitud) -> dict:
         "evaluacion": solicitud.evaluacion,
         "estado": solicitud.estado,
         "historial_estados": solicitud.historial_estados,
+        "certificados": solicitud.certificados,
         "fecha_solicitud": solicitud.fecha_solicitud,
     }
 
@@ -198,6 +200,7 @@ def cambiar_estado(
 ):
     anterior = solicitud_service.obtener_por_radicado(db, radicado)
     estado_previo = anterior.estado if anterior else None
+    ya_pedia_certificados = bool(anterior and anterior.certificados_meta)
     try:
         actualizada = solicitud_service.actualizar_estado(db, radicado, datos.estado)
     except solicitud_service.SolicitudNoEncontradaError as e:
@@ -216,6 +219,20 @@ def cambiar_estado(
     vacante = vacantes_client.obtener_vacante(actualizada.vacante_id, token=token)
     cargo = (vacante or {}).get("cargo") or "tu proceso de selección"
 
+    if actualizada.certificados_meta and not ya_pedia_certificados:
+        # Recién preseleccionado: se le piden los certificados con plazo.
+        plazo = certificados_service.texto_plazo(actualizada.certificados["plazo"])
+        notificacion_service.crear_notificacion_candidato(
+            db, actualizada.usuario_id, tipo="certificados_solicitados",
+            titulo="Pasaste a la siguiente etapa del proceso de selección, adjunta tus certificados",
+            mensaje=f'Fuiste preseleccionado en "{cargo}" (radicado {radicado}). Adjunta tus certificados '
+                    f"laborales y de estudio en Mis postulaciones a más tardar el {plazo}.",
+            entidad_tipo="solicitud", entidad_id=radicado,
+        )
+        if correo:
+            email_service.enviar_correo_certificados_solicitados(correo, nombre, cargo, radicado, plazo)
+        return actualizada
+
     notificacion_service.crear_notificacion_candidato(
         db, actualizada.usuario_id, tipo="estado_cambiado",
         titulo="Actualización de tu postulación",
@@ -225,6 +242,74 @@ def cambiar_estado(
     if correo:
         email_service.enviar_correo_cambio_estado(correo, nombre, cargo, radicado, datos.estado)
 
+    return actualizada
+
+
+@router.put("/{radicado}/certificados", response_model=SolicitudOut)
+def adjuntar_certificados(
+    radicado: str,
+    datos: GuardarCertificados,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """El candidato preseleccionado adjunta sus certificados laborales y de estudio (dentro del plazo)."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    if solicitud.usuario_id != usuario.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el candidato puede adjuntar sus certificados.")
+    try:
+        actualizada = certificados_service.guardar_certificados(db, solicitud, datos.model_dump())
+    except (certificados_service.CertificadosNoHabilitadosError, certificados_service.PlazoVencidoError) as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except (certificados_service.CertificadosVaciosError, certificados_service.DocumentoFaltanteError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    nombre = (actualizada.datos_personales or {}).get("nombreCompleto") or "Un candidato"
+    auditoria_service.registrar_evento(
+        db, tipo="certificados_adjuntados",
+        descripcion=f"{nombre} adjuntó sus certificados laborales y de estudio ({radicado}).",
+        actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    notificacion_service.crear_notificacion_gestion(
+        db, tipo="certificados_adjuntados",
+        titulo="Certificados recibidos",
+        mensaje=f"{nombre} adjuntó sus certificados ({radicado}, {actualizada.vacante_cargo or 'proceso'}).",
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    return actualizada
+
+
+@router.post("/{radicado}/certificados/ampliar-plazo", response_model=SolicitudOut)
+def ampliar_plazo_certificados(
+    radicado: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+):
+    """Gestión Humana da 3 días hábiles más (contados desde hoy) para adjuntar los certificados."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    try:
+        actualizada = certificados_service.ampliar_plazo(db, solicitud)
+    except certificados_service.CertificadosNoHabilitadosError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    plazo = certificados_service.texto_plazo(actualizada.certificados["plazo"])
+    auditoria_service.registrar_evento(
+        db, tipo="plazo_certificados_ampliado",
+        descripcion=f"{usuario.nombre or usuario.id} amplió hasta el {plazo} el plazo de certificados de {radicado}.",
+        actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    notificacion_service.crear_notificacion_candidato(
+        db, actualizada.usuario_id, tipo="certificados_solicitados",
+        titulo="Tienes más tiempo para adjuntar tus certificados",
+        mensaje=f'Gestión Humana amplió el plazo para "{actualizada.vacante_cargo or "tu proceso"}" ({radicado}) '
+                f"hasta el {plazo}.",
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
     return actualizada
 
 

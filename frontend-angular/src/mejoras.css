@@ -1544,3 +1544,36 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
 /* Aviso de Completar perfil en dos párrafos. */
 .aviso-perfil p { margin: 0; }
 .aviso-perfil p + p { margin-top: 8px; }
+
+/* ==========================================================================
+   Certificados después de la preselección — "Mis postulaciones" (cert-) y
+   panel de Gestión Humana (pd-cert).
+   ========================================================================== */
+
+.cert { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; padding: 16px 18px; border: 1px solid var(--color-border-strong); border-radius: 12px; background: var(--color-primary-tint); }
+.cert.is-pendiente { border-color: var(--color-warning); background: var(--color-warning-tint); }
+.cert.is-vencido { border-color: #F0D2D0; background: #FFFAFA; }
+.cert__cabecera { display: flex; gap: 12px; align-items: flex-start; }
+.cert__icono { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--color-surface); color: var(--color-primary); }
+.cert.is-pendiente .cert__icono { color: var(--color-warning); }
+.cert.is-vencido .cert__icono { color: var(--color-danger); }
+.cert__texto { min-width: 0; }
+.cert__titulo { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 700; color: var(--color-primary-dark); }
+.cert.is-vencido .cert__titulo { color: var(--color-danger); }
+.cert__sub { margin: 3px 0 0; font-size: 13px; line-height: 1.5; color: var(--color-text); }
+.cert__resumen { margin: 0; padding-left: 18px; font-size: 13px; color: var(--color-text); }
+.cert__categoria { margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--color-surface); border: 1px solid var(--color-border); }
+.cert__categoria > .hint { display: block; margin-bottom: 8px; }
+.cert__acciones { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.cert > .btn { align-self: flex-start; }
+
+.pd-cert { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; background: var(--color-primary-tint); color: var(--color-primary-dark); }
+.pd-cert > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-cert span { color: var(--color-text-muted); }
+.pd-cert--pendientes { background: var(--color-warning-tint); color: #7A4E06; }
+.pd-cert--vencidos { background: var(--color-danger-tint); color: var(--color-danger); }
+
+@media (max-width: 640px) {
+  .cert { padding: 14px; }
+  .cert__acciones .btn, .pd-cert .btn { width: 100%; }
+}

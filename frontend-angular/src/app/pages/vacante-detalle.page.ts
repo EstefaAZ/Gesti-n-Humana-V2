@@ -13,9 +13,9 @@ import { ApiError } from '../lib/api/httpClient';
 import { Icon } from '../shared/icon';
 import { ZonaArchivos, pesoLegible, pesoDeBase64 } from '../components/zona-archivos';
 
+// Los certificados laborales y de estudio ya no se adjuntan al inscribirse: se
+// piden en "Mis postulaciones" solo si Gestión Humana preselecciona al candidato.
 const CATEGORIAS_EXTRA = [
-  { clave: 'certificadosLaborales', etiqueta: 'Certificados laborales adicionales' },
-  { clave: 'certificadosEstudio', etiqueta: 'Certificados de estudio y/o cursos adicionales' },
   { clave: 'tarjetaProfesional', etiqueta: 'Tarjeta profesional (si no la subiste en tu perfil)' },
 ];
 
@@ -137,8 +137,10 @@ import { formatearFecha } from '../lib/formato';
                 }
 
                 <p class="text-muted" style="font-size: 12.5px; margin-top: 16px">
-                  Si esta vacante requiere alguna certificación adicional que no subiste en tu perfil, puedes adjuntarla aquí (opcional):
+                  Si pasas a la siguiente etapa del proceso de selección, Gestión Humana te pedirá tus certificados laborales y de estudio: tendrás 3 días
+                  hábiles para adjuntarlos desde "Mis postulaciones".
                 </p>
+                <p class="text-muted" style="font-size: 12.5px">Si no subiste tu tarjeta profesional en tu perfil, puedes adjuntarla aquí (opcional):</p>
                 @for (cat of categoriasExtra; track cat.clave) {
                   <div class="field" style="margin-bottom: 14px">
                     <label>{{ cat.etiqueta }}</label>

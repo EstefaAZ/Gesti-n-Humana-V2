@@ -66,6 +66,11 @@ class DocumentosAdjuntosPerfil(BaseModel):
         ]
         if faltantes:
             raise ValueError(f"Debes adjuntar: {', '.join(faltantes)}.")
+        # Los certificados ya no van en el perfil: se adjuntan en cada postulación
+        # solo si Gestión Humana preselecciona al candidato. Los que vengan de un
+        # perfil anterior se descartan al guardar.
+        self.certificados_laborales = []
+        self.certificados_estudio = []
         return self
 
 

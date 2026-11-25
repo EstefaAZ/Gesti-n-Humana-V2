@@ -5,7 +5,7 @@ import { Icon } from '../shared/icon';
 import { AuthService } from '../core/auth.service';
 import * as perfilesApi from '../lib/api/perfilesApi';
 import * as solicitudesApi from '../lib/api/solicitudesApi';
-import { CATEGORIAS_DOCUMENTOS } from '../lib/api/solicitudesApi';
+import { CATEGORIAS_DOCUMENTOS, documentoActivo } from '../lib/api/solicitudesApi';
 import { pesoDeBase64, pesoLegible } from '../components/zona-archivos';
 import { BotonDescargarTodos } from '../components/boton-descargar-todos';
 
@@ -48,12 +48,12 @@ import { BotonDescargarTodos } from '../components/boton-descargar-todos';
             </div>
           } @else {
             <div class="cand-progreso">
-              <div class="cand-progreso__barra" aria-hidden="true"><span [style.width.%]="(categoriasCompletas() / categorias.length) * 100"></span></div>
-              <span><strong style="color: var(--color-text)">{{ categoriasCompletas() }} de {{ categorias.length }}</strong> tipos de documento adjuntados</span>
+              <div class="cand-progreso__barra" aria-hidden="true"><span [style.width.%]="(categoriasCompletas() / categoriasActivas.length) * 100"></span></div>
+              <span><strong style="color: var(--color-text)">{{ categoriasCompletas() }} de {{ categoriasActivas.length }}</strong> tipos de documento adjuntados</span>
             </div>
 
             <div class="cand-docs">
-              @for (cat of categorias; track cat.clave) {
+              @for (cat of categoriasPerfil(); track cat.clave) {
                 <div class="cand-doc" [class.is-falta]="archivosPerfil(cat.clave).length === 0">
                   <div class="cand-doc__top">
                     <p class="cand-doc__nombre">{{ cat.etiqueta }}</p>
@@ -146,7 +146,15 @@ export class DocumentosPage {
   protected readonly perfil = signal<any>(undefined); // undefined = cargando, null = sin perfil
   protected readonly postulaciones = signal<any[]>([]);
   protected readonly error = signal('');
+  // Todas, para mostrar lo que ya se envió en cada postulación.
   protected readonly categorias = CATEGORIAS_DOCUMENTOS;
+  // Las que se piden por ahora: el progreso solo cuenta estas.
+  protected readonly categoriasActivas = CATEGORIAS_DOCUMENTOS.filter((c) => documentoActivo(c.clave));
+
+  /** En el perfil: las que se piden, más las desactivadas que ya tienen archivos. */
+  protected categoriasPerfil() {
+    return CATEGORIAS_DOCUMENTOS.filter((c) => documentoActivo(c.clave) || this.archivosPerfil(c.clave).length > 0);
+  }
 
   constructor() {
     const token = this.auth.token();
@@ -166,7 +174,7 @@ export class DocumentosPage {
   }
 
   protected categoriasCompletas(): number {
-    return this.categorias.filter((c) => this.archivosPerfil(c.clave).length > 0).length;
+    return this.categoriasActivas.filter((c) => this.archivosPerfil(c.clave).length > 0).length;
   }
 
   protected totalArchivos(p: any): number {

@@ -27,8 +27,6 @@ HEADERS_ADMIN = {"Authorization": f"Bearer {token_para('admin-1', rol='admin', n
 
 DOCUMENTOS_VALIDOS = {
     "cedula": [{"nombre": "cedula.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_laborales": [{"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_estudio": [{"nombre": "estudio1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
     "tarjeta_profesional": [{"nombre": "tarjeta.pdf", "contenido_base64": "JVBERi0xLjQ="}],
 }
 
@@ -297,17 +295,19 @@ def test_no_se_puede_enviar_sin_cedula():
     assert "cédula" in str(r.json()).lower()
 
 
-def test_no_se_puede_enviar_sin_certificados_laborales():
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": []}}
+def test_al_inscribirse_no_se_aceptan_certificados():
+    # Los certificados se adjuntan solo después de la preselección.
+    doc = {"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}
+    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": [doc]}}
     r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
     assert r.status_code == 422
-    assert "laboral" in str(r.json()).lower()
+    assert "preselecciona" in str(r.json())
 
 
-def test_no_se_puede_enviar_sin_certificados_estudio():
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_estudio": []}}
-    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
-    assert r.status_code == 422
+def test_se_inscribe_solo_con_cedula_y_tarjeta():
+    r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 201
+    assert r.json()["certificados"] is None  # todavía no se le piden
 
 
 def test_no_se_puede_enviar_sin_tarjeta_profesional():
@@ -319,20 +319,6 @@ def test_no_se_puede_enviar_sin_tarjeta_profesional():
 def test_cedula_rechaza_mas_de_1_archivo():
     doc = DOCUMENTOS_VALIDOS["cedula"][0]
     datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "cedula": [doc, doc]}}
-    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
-    assert r.status_code == 422
-
-
-def test_certificados_laborales_acepta_hasta_10():
-    doc = DOCUMENTOS_VALIDOS["certificados_laborales"][0]
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": [doc] * 10}}
-    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
-    assert r.status_code == 201
-
-
-def test_certificados_laborales_rechaza_mas_de_10():
-    doc = DOCUMENTOS_VALIDOS["certificados_laborales"][0]
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": [doc] * 11}}
     r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
     assert r.status_code == 422
 

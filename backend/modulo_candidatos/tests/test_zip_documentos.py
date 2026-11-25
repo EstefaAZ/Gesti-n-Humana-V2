@@ -55,7 +55,7 @@ def test_candidato_descarga_todos_los_documentos_de_su_perfil():
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/zip"
     assert "attachment" in r.headers["content-disposition"]
-    assert len(_nombres(r.content)) == 4  # cédula, laboral, estudio y tarjeta profesional
+    assert len(_nombres(r.content)) == 2  # cédula y tarjeta profesional (los certificados van después de la preselección)
 
 
 def test_zip_de_perfil_sin_perfil_da_404():
@@ -66,7 +66,7 @@ def test_gestion_humana_descarga_el_zip_del_perfil_de_un_candidato_y_otro_candid
     client.put("/api/v1/perfiles/me", json=PERFIL_VALIDO, headers=HEADERS_CANDIDATO)
     r = client.get("/api/v1/perfiles/admin/candidato-1/documentos/zip", headers=HEADERS_GESTOR)
     assert r.status_code == 200
-    assert len(_nombres(r.content)) == 4
+    assert len(_nombres(r.content)) == 2
     assert client.get("/api/v1/perfiles/admin/candidato-1/documentos/zip", headers=HEADERS_OTRO_CANDIDATO).status_code == 403
 
 
@@ -76,7 +76,7 @@ def test_zip_de_postulacion_para_el_dueno_y_gestion_humana_pero_no_para_otro_can
 
     propio = client.get(url, headers=HEADERS_CANDIDATO)
     assert propio.status_code == 200
-    assert len(_nombres(propio.content)) == 4
+    assert len(_nombres(propio.content)) == 2
     assert radicado in propio.headers["content-disposition"]
 
     assert client.get(url, headers=HEADERS_GESTOR).status_code == 200

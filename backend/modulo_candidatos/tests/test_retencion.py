@@ -35,8 +35,6 @@ def mock_vacantes(monkeypatch):
 
 DOCUMENTOS_VALIDOS = {
     "cedula": [{"nombre": "cedula.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_laborales": [{"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_estudio": [{"nombre": "estudio1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
     "tarjeta_profesional": [{"nombre": "tarjeta.pdf", "contenido_base64": "JVBERi0xLjQ="}],
 }
 

@@ -2,13 +2,16 @@ import { Component, input, output, signal } from '@angular/core';
 
 import { Icon } from '../../shared/icon';
 import { ZonaArchivos, pesoLegible, pesoDeBase64 } from '../zona-archivos';import { archivoABase64 } from '../../lib/formState';
+import { documentoActivo } from '../../lib/api/solicitudesApi';
 
-const CATEGORIAS = [
+const TODAS_LAS_CATEGORIAS = [
   { clave: 'cedula', etiqueta: 'Cédula de ciudadanía', max: 1, ayuda: 'Copia legible de tu cédula.' },
   { clave: 'certificadosLaborales', etiqueta: 'Certificados laborales con funciones', max: 10, ayuda: 'Uno por cada empleo relevante, con funciones y fechas.' },
   { clave: 'certificadosEstudio', etiqueta: 'Certificados de estudio y/o cursos', max: 10, ayuda: 'Diplomas, actas de grado, certificados de cursos.' },
   { clave: 'tarjetaProfesional', etiqueta: 'Tarjeta profesional', max: 3, ayuda: 'Si tu profesión la requiere.' },
 ];
+// Solo los tipos que se piden por ahora (ver DOCUMENTOS_DESACTIVADOS).
+const CATEGORIAS = TODAS_LAS_CATEGORIAS.filter((c) => documentoActivo(c.clave));
 
 const MAX_TAMANO_MB = 5;
 

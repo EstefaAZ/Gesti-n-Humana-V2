@@ -41,6 +41,27 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
+# Columnas agregadas después de crear la tabla: create_all() no altera tablas
+# existentes, así que se agregan aquí si faltan (SQLite y PostgreSQL).
+_COLUMNAS_NUEVAS = {
+    "solicitudes": {"certificados_meta": "JSON"},
+}
+
+
+def agregar_columnas_faltantes() -> None:
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    with engine.begin() as conexion:
+        for tabla, columnas in _COLUMNAS_NUEVAS.items():
+            if not inspector.has_table(tabla):
+                continue
+            existentes = {c["name"] for c in inspector.get_columns(tabla)}
+            for nombre, tipo in columnas.items():
+                if nombre not in existentes:
+                    conexion.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}"))
+
+
 def get_db():
     db = SessionLocal()
     try:

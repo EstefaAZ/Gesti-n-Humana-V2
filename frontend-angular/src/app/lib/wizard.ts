@@ -1,6 +1,7 @@
 import { signal } from '@angular/core';
 import { STEPS, nuevoRegistroII, nuevaExperiencia, nuevoFamiliar } from './formState';
 import { categoriasLicenciaDe } from '../data/catalogos';
+import { documentoActivo } from './api/solicitudesApi';
 
 /** Fecha de hoy como "AAAA-MM-DD" en hora local (igual que la guarda un <input type="date">). */
 export function hoyISO(): string {
@@ -153,7 +154,7 @@ export class WizardBase {
         tarjetaProfesional: 'Debes adjuntar tu tarjeta profesional.',
       };
       Object.entries(requeridos).forEach(([clave, mensaje]) => {
-        if ((state.documentos[clave] || []).length === 0) {
+        if (documentoActivo(clave) && (state.documentos[clave] || []).length === 0) {
           nuevosErrores[clave] = mensaje;
         }
       });

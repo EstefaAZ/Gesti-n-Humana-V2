@@ -6,14 +6,14 @@ import { AuthService } from '../../core/auth.service';
 import { TIPO_REGISTRO_LABELS, categoriasLicenciaDe, detalleRegistroII } from '../../data/catalogos';
 import * as authApi from '../../lib/api/authApi';
 import * as solicitudesApi from '../../lib/api/solicitudesApi';
-import { CATEGORIAS_DOCUMENTOS } from '../../lib/api/solicitudesApi';
+import { CATEGORIAS_DOCUMENTOS, documentoActivo, textoPlazo } from '../../lib/api/solicitudesApi';
 import { formatearFecha } from '../../lib/formato';
 
 // Estados que Gestión Humana puede asignar, con una ayuda corta de qué significa cada uno.
 const ESTADOS = [
   { valor: 'Recibida', clase: 'recibida', ayuda: 'La solicitud llegó y aún no se revisa.' },
   { valor: 'En revisión', clase: 'revision', ayuda: 'Gestión Humana está revisando el perfil.' },
-  { valor: 'Preseleccionado', clase: 'preseleccionado', ayuda: 'Pasa a la siguiente etapa del proceso.' },
+  { valor: 'Preseleccionado', clase: 'preseleccionado', ayuda: 'Pasa a la siguiente etapa. Tendrá 3 días hábiles para adjuntar sus certificados laborales y de estudio.' },
   { valor: 'Entrevista programada', clase: 'entrevista', ayuda: 'Se citó al candidato a entrevista.' },
   { valor: 'Aceptada', clase: 'aceptada', ayuda: 'Fue seleccionado para el cargo.' },
   { valor: 'Rechazada', clase: 'rechazada', ayuda: 'No continúa en el proceso.' },
@@ -254,8 +254,28 @@ const CRITERIOS = [
               <app-boton-descargar-todos [descargar]="descargarTodos" etiqueta="Descargar todos" />
             }
           </div>
+          @if (certificados(); as cert) {
+            <div class="pd-cert pd-cert--{{ cert.estado }}" role="status">
+              <div>
+                <strong>Certificados laborales y de estudio: {{ etiquetaCertificados[cert.estado] }}</strong>
+                <span>
+                  @switch (cert.estado) {
+                    @case ('pendientes') { Tiene hasta el {{ plazo(cert.plazo) }} para adjuntarlos. }
+                    @case ('recibidos') { Enviados el {{ fechaHora(cert.enviadosEn) }}. }
+                    @case ('vencidos') { El plazo venció el {{ plazo(cert.plazo) }} sin que los adjuntara. }
+                  }
+                  @if (cert.ampliaciones > 0) { (Plazo ampliado {{ cert.ampliaciones }} {{ cert.ampliaciones === 1 ? 'vez' : 'veces' }}.) }
+                </span>
+              </div>
+              @if (cert.estado !== 'recibidos') {
+                <button type="button" class="btn btn-secondary btn-sm" (click)="ampliarPlazo()" [disabled]="ampliando()">
+                  {{ ampliando() ? 'Ampliando…' : 'Dar 3 días hábiles más' }}
+                </button>
+              }
+            </div>
+          }
           <div class="pd-docs">
-            @for (cat of categorias; track cat.clave) {
+            @for (cat of categorias(); track cat.clave) {
               <div>
                 <p class="pd-docs__categoria">{{ cat.etiqueta }}</p>
                 @if (archivos(cat.clave).length === 0) {
@@ -308,7 +328,11 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
 
   protected readonly estados = ESTADOS;
   protected readonly criterios = CRITERIOS;
-  protected readonly categorias = CATEGORIAS_DOCUMENTOS;
+  // Los tipos que ya no se piden solo aparecen si la postulación los trae.
+  protected categorias() {
+    const docs = this.solicitud().documentosAdjuntos || {};
+    return CATEGORIAS_DOCUMENTOS.filter((c) => documentoActivo(c.clave) || (docs[c.clave] || []).length > 0);
+  }
   protected readonly fecha = formatearFecha;
   protected readonly detalle = detalleRegistroII;
   protected readonly estado = signal('');
@@ -322,6 +346,7 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
       this.estado.set(this.solicitud().estado);
       this.nuevoEstado.set(this.solicitud().estado);
       this.historial.set([...(this.solicitud().historialEstados || [])].reverse());
+      this.certificados.set(this.solicitud().certificados);
       this.cargarFoto(this.solicitud().usuarioId);
     }
   }
@@ -397,7 +422,7 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
   }
 
   protected totalArchivos(): number {
-    return this.categorias.reduce((total, c) => total + this.archivos(c.clave).length, 0);
+    return this.categorias().reduce((total, c) => total + this.archivos(c.clave).length, 0);
   }
 
   protected fechaHora(valor: string | null | undefined): string {
@@ -422,12 +447,32 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
     solicitudesApi.descargarDocumentoAdjunto(this.solicitud().radicado, categoriaApi, indice, nombre, this.auth.token());
   }
 
+  // ---- Certificados (se piden al preseleccionar) ----
+  protected readonly certificados = signal<any>(null);
+  protected readonly ampliando = signal(false);
+  protected readonly etiquetaCertificados: Record<string, string> = { pendientes: 'pendientes', recibidos: 'recibidos', vencidos: 'plazo vencido' };
+  protected readonly plazo = textoPlazo;
+
+  protected async ampliarPlazo(): Promise<void> {
+    this.ampliando.set(true);
+    try {
+      const actualizada = await solicitudesApi.ampliarPlazoCertificados(this.solicitud().radicado, this.auth.token());
+      this.certificados.set(actualizada.certificados);
+      this.cambioEstado.emit();
+    } catch {
+      alert('No se pudo ampliar el plazo.');
+    } finally {
+      this.ampliando.set(false);
+    }
+  }
+
   protected async guardarEstado(): Promise<void> {
     this.guardando.set(true);
     try {
       const actualizada = await solicitudesApi.cambiarEstado(this.solicitud().radicado, this.nuevoEstado(), this.auth.token());
       this.estado.set(actualizada.estado);
       this.historial.set([...(actualizada.historialEstados || [])].reverse());
+      this.certificados.set(actualizada.certificados);
       this.cambioEstado.emit();
     } catch {
       alert('No se pudo actualizar el estado.');

@@ -59,13 +59,13 @@ def test_cambiar_estado_genera_notificacion_de_cambio_para_el_candidato():
     r_crear = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
     radicado = r_crear.json()["radicado"]
 
-    client.patch(f"/api/v1/solicitudes/{radicado}/estado", json={"estado": "Preseleccionado"}, headers=HEADERS_GESTOR)
+    client.patch(f"/api/v1/solicitudes/{radicado}/estado", json={"estado": "En revisión"}, headers=HEADERS_GESTOR)
 
     r = client.get("/api/v1/notificaciones/me", headers=HEADERS_CANDIDATO)
     tipos = [n["tipo"] for n in r.json()]
     assert "estado_cambiado" in tipos
     evento = next(n for n in r.json() if n["tipo"] == "estado_cambiado")
-    assert "Preseleccionado" in evento["mensaje"]
+    assert "En revisión" in evento["mensaje"]
 
 
 def test_conteo_no_leidas_candidato():
