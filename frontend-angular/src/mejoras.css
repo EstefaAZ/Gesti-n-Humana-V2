@@ -1536,3 +1536,8 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
 .lic-categoria__texto { font-size: 12px; line-height: 1.3; color: var(--color-text-muted); }
 .lic-categorias.is-invalid .lic-categoria { border-color: var(--color-danger); }
 @media (prefers-reduced-motion: reduce) { .lic-categoria { transition: none; } }
+
+/* Aviso de campos obligatorios al inicio de cada hoja del formulario. */
+.nota-obligatorios { margin: -6px 0 18px; font-size: 12.5px; color: var(--color-text-muted); }
+.nota-obligatorios__marca { font-weight: 700; color: var(--color-text); }
+

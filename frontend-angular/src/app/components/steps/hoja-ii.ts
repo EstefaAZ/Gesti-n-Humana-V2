@@ -2,12 +2,13 @@ import { Component, input, output } from '@angular/core';
 import { RegistroIICard } from './registro-ii-card';
 import { Icon } from '../../shared/icon';
 import { ListaPlegable } from './lista-plegable';
+import { NotaObligatorios } from '../nota-obligatorios';
 
 const MAX_REGISTROS = 15;
 
 @Component({
   selector: 'app-hoja-ii',
-  imports: [RegistroIICard, Icon],
+  imports: [NotaObligatorios, RegistroIICard, Icon],
   host: { style: 'display: contents' },
   template: `
     <section>
@@ -17,6 +18,7 @@ const MAX_REGISTROS = 15;
         15 registros y eliminar cualquiera que haya agregado por error. Si necesita registrar más de 15, contacte a
         Gestión Humana para anexar la información adicional.
       </p>
+      <app-nota-obligatorios extra="Debe agregar al menos un estudio." />
 
       @if (errors()?.['registrosII']) {
         <div class="notice notice--danger" role="alert">{{ errors()['registrosII'] }}</div>

@@ -16,9 +16,10 @@ const MAX_TAMANO_MB = 5;
 export type ActualizadorDocumentos = (prev: any) => any;
 
 import { CampoAccesible } from '../../shared/campo-accesible';
+import { NotaObligatorios } from '../nota-obligatorios';
 
 @Component({
-  imports: [CampoAccesible, Icon, ZonaArchivos],
+  imports: [NotaObligatorios, CampoAccesible, Icon, ZonaArchivos],
   selector: 'app-hoja-documentos',
   host: { style: 'display: contents' },
   template: `
@@ -27,6 +28,7 @@ import { CampoAccesible } from '../../shared/campo-accesible';
       <p class="section-intro">
         Adjunta los siguientes documentos para poder enviar tu solicitud. Formatos aceptados: PDF o imagen, máximo {{ maxMb }} MB por archivo.
       </p>
+      <app-nota-obligatorios />
 
       @for (cat of categorias; track cat.clave) {
         <div class="field" style="margin-bottom: 22px">

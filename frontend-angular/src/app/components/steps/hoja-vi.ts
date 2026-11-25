@@ -2,12 +2,13 @@ import { Component, input, output } from '@angular/core';
 import { ExperienciaCard } from './experiencia-card';
 import { Icon } from '../../shared/icon';
 import { ListaPlegable } from './lista-plegable';
+import { NotaObligatorios } from '../nota-obligatorios';
 
 const MAX_EXPERIENCIAS = 10;
 
 @Component({
   selector: 'app-hoja-vi',
-  imports: [ExperienciaCard, Icon],
+  imports: [NotaObligatorios, ExperienciaCard, Icon],
   host: { style: 'display: contents' },
   template: `
     <section>
@@ -19,6 +20,7 @@ const MAX_EXPERIENCIAS = 10;
         únicamente experiencias relacionadas con el cargo al que aspira y absténgase de describir cargos y
         funciones que no puedan ser certificadas. Si en una misma empresa ha laborado en varios cargos, regístrelos por separado.
       </p>
+      <app-nota-obligatorios extra="Debe agregar al menos una experiencia laboral." />
 
       @if (errors()?.['experiencias']) {
         <div class="notice notice--danger" role="alert">{{ errors()['experiencias'] }}</div>

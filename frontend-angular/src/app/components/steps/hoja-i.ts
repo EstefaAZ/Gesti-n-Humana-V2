@@ -5,17 +5,19 @@ import { SelectConOtro } from '../select-con-otro';
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipiosPorDepartamento';
 import { PAISES } from '../../data/paises';
 import { CATEGORIAS_LICENCIA, categoriasLicenciaDe } from '../../data/catalogos';
+import { NotaObligatorios } from '../nota-obligatorios';
 
 
 
 @Component({
   selector: 'app-hoja-i',
-  imports: [FormsModule, Field, SelectConOtro],
+  imports: [NotaObligatorios, FormsModule, Field, SelectConOtro],
   host: { style: 'display: contents' },
   template: `
     <section>
       <h2 class="section-title">Datos Personales y Familiares</h2>
       <p class="section-intro">Diligencie su información básica de contacto e identificación.</p>
+      <app-nota-obligatorios />
 
       <div class="field-grid">
         @if (!ocultarProceso()) {

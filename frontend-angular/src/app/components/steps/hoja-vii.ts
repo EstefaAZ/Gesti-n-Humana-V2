@@ -6,14 +6,16 @@ import { Icon } from '../../shared/icon';
 const MAX_FAMILIARES = 5;
 
 import { CampoAccesible } from '../../shared/campo-accesible';
+import { NotaObligatorios } from '../nota-obligatorios';
 
 @Component({
   selector: 'app-hoja-vii',
-  imports: [CampoAccesible, FormsModule, Icon],
+  imports: [NotaObligatorios, CampoAccesible, FormsModule, Icon],
   host: { style: 'display: contents' },
   template: `
     <section>
       <h2 class="section-title">Declaración Conflicto de Interés</h2>
+      <app-nota-obligatorios />
 
       <div class="field" style="margin-bottom: 20px">
         <label>

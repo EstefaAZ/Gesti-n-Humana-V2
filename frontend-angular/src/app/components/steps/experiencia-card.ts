@@ -130,11 +130,11 @@ import { CampoAccesible } from '../../shared/campo-accesible';
           <input type="text" [value]="experiencia().cargo || ''" (input)="setCampo('cargo', $event)" />
         </div>
         <div class="field">
-          <label>Fecha inicio</label>
+          <label>Fecha inicio *</label>
           <input type="date" [attr.max]="hoy" [value]="experiencia().fechaInicio || ''" (input)="setCampo('fechaInicio', $event)" />
         </div>
         <div class="field">
-          <label>Fecha terminación</label>
+          <label>Fecha terminación *</label>
           <input
             type="date"
             [attr.max]="hoy"

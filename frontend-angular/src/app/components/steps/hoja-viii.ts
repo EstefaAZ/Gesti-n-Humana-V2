@@ -1,14 +1,16 @@
 import { Component, input, output } from '@angular/core';
 
 import { CampoAccesible } from '../../shared/campo-accesible';
+import { NotaObligatorios } from '../nota-obligatorios';
 
 @Component({
-  imports: [CampoAccesible],
+  imports: [NotaObligatorios, CampoAccesible],
   selector: 'app-hoja-viii',
   host: { style: 'display: contents' },
   template: `
     <section>
       <h2 class="section-title">Autorización del Aspirante</h2>
+      <app-nota-obligatorios />
 
       <div class="clauses">
         <ol>
