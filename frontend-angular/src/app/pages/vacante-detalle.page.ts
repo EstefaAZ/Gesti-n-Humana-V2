@@ -49,6 +49,9 @@ import { formatearFecha } from '../lib/formato';
     } @else if (!vacante()) {
       <app-doc-header title="Vacante no encontrada" />
       <main class="page">
+        <a routerLink="/" class="btn btn-secondary btn-sm ps-volver">
+          <app-icon name="arrowLeft" [size]="14" [strokeWidth]="2" /> Volver a vacantes
+        </a>
         <div class="card">
           <div class="empty-state">No encontramos esta vacante. Puede que ya no esté disponible.</div>
         </div>
@@ -56,7 +59,10 @@ import { formatearFecha } from '../lib/formato';
     } @else {
       <app-doc-header [title]="vacante().cargo" />
       <main class="page">
-        <div class="card mt-24">
+        <a routerLink="/" class="btn btn-secondary btn-sm ps-volver">
+          <app-icon name="arrowLeft" [size]="14" [strokeWidth]="2" /> Volver a vacantes
+        </a>
+        <div class="card">
           <div class="vac-card__proceso">Proceso de Selección No. {{ vacante().procesoNo }}</div>
           <h2 class="section-title" style="margin-top: 4px">{{ vacante().cargo }}</h2>
           @if (vacante().descripcion) {
