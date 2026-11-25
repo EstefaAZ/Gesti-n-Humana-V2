@@ -41,7 +41,7 @@ export function initialSolicitudState({ proceso = "", fechaEntrega = "", locked 
       proceso, fechaEntrega,
       nombreCompleto: "", cedula: "", cedulaDe: "",
       ciudadNacimiento: "", deptoNacimiento: "", paisNacimiento: "Colombia", fechaNacimiento: "",
-      licencia: "no", licenciaClase: "",
+      licencia: "no", licenciaClase: "", licenciaClases: [],
       correo: "", direccion: "", municipio: "", deptoResidencia: "",
       telResidencia: "", celular: "",
       estadoCivil: "", numHijos: "", tieneVehiculo: "no",

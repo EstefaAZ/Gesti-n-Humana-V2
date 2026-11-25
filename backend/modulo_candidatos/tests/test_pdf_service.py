@@ -40,3 +40,18 @@ def test_texto_iso_con_z_y_valores_invalidos():
 def test_pdf_se_genera_con_fecha_sin_zona_horaria():
     contenido = generar_pdf_solicitud({"radicado": "SOL-1", "fecha_solicitud": datetime(2026, 11, 19, 2, 30)})
     assert contenido[:4] == b"%PDF"
+
+
+
+# Licencia de conducción: una licencia puede tener varias categorías.
+from app.services.pdf_service import _categorias_licencia
+
+
+def test_categorias_licencia_lee_la_lista_nueva():
+    assert _categorias_licencia({"licencia": "si", "licenciaClases": ["A2", "B1"]}) == ["A2", "B1"]
+
+
+def test_categorias_licencia_lee_la_clase_anterior():
+    assert _categorias_licencia({"licencia": "si", "licenciaClase": "C1"}) == ["C1"]
+    assert _categorias_licencia({"licencia": "si", "licenciaClase": "A2, B1"}) == ["A2", "B1"]
+    assert _categorias_licencia({"licencia": "no", "licenciaClase": ""}) == []

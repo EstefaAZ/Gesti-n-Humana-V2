@@ -73,6 +73,15 @@ TIPO_REGISTRO_LABELS = {
 }
 
 
+def _categorias_licencia(dp: dict) -> list[str]:
+    """Categorías de la licencia (una licencia puede tener varias). Antes se
+    guardaba una sola clase en `licenciaClase`; se sigue leyendo."""
+    if isinstance(dp.get("licenciaClases"), list):
+        return [str(c) for c in dp["licenciaClases"] if c]
+    anterior = str(dp.get("licenciaClase") or "").strip()
+    return [c.strip() for c in re.split(r"[,;]", anterior) if c.strip()] if anterior else []
+
+
 def _sino(v) -> str:
     return "Sí" if v in (True, "si", "Si", "sí") else "No"
 
@@ -512,7 +521,11 @@ def generar_pdf_solicitud(solicitud: dict) -> bytes:
         ("Departamento", dp.get("deptoNacimiento")),
         ("País", dp.get("paisNacimiento")),
     ])
-    licencia_txt = _sino(dp.get("licencia")) + (f" (Clase {dp.get('licenciaClase') or '—'})" if dp.get("licencia") == "si" else "")
+    licencia_txt = _sino(dp.get("licencia"))
+    if dp.get("licencia") == "si":
+        categorias = _categorias_licencia(dp)
+        etiqueta = "Categorías" if len(categorias) > 1 else "Categoría"
+        licencia_txt += f" ({etiqueta} {', '.join(categorias) or '—'})"
     pdf.field_row([("Fecha de nacimiento", _fecha(dp.get("fechaNacimiento"))), ("Licencia de conducción", licencia_txt)])
     pdf.field("Correo electrónico", dp.get("correo"))
     pdf.field("Dirección de residencia", dp.get("direccion"))

@@ -3,7 +3,7 @@ import { EstadoPostulacionBadge } from '../../components/estado-postulacion-badg
 import { Icon } from '../../shared/icon';
 import { BotonDescargarTodos } from '../../components/boton-descargar-todos';
 import { AuthService } from '../../core/auth.service';
-import { TIPO_REGISTRO_LABELS, detalleRegistroII } from '../../data/catalogos';
+import { TIPO_REGISTRO_LABELS, categoriasLicenciaDe, detalleRegistroII } from '../../data/catalogos';
 import * as authApi from '../../lib/api/authApi';
 import * as solicitudesApi from '../../lib/api/solicitudesApi';
 import { CATEGORIAS_DOCUMENTOS } from '../../lib/api/solicitudesApi';
@@ -168,6 +168,7 @@ const CRITERIOS = [
             <div><dt>Fecha de nacimiento</dt><dd>{{ fecha(dp().fechaNacimiento) || '—' }}</dd></div>
             <div><dt>Profesión</dt><dd>{{ dp().profesion || '—' }}</dd></div>
             <div><dt>Tarjeta profesional</dt><dd>{{ dp().tarjetaProfesional || '—' }}</dd></div>
+            <div><dt>Licencia de conducción</dt><dd>{{ licencia() }}</dd></div>
           </dl>
         </section>
 
@@ -369,6 +370,12 @@ export class PostulacionDetalle implements OnChanges, AfterViewInit, OnDestroy {
 
   protected dp(): any {
     return this.solicitud().datosPersonales || {};
+  }
+
+  protected licencia(): string {
+    if (this.dp().licencia !== 'si') return 'No tiene';
+    const categorias = categoriasLicenciaDe(this.dp());
+    return categorias.length ? `Sí · ${categorias.join(', ')}` : 'Sí';
   }
 
   protected iniciales(): string {

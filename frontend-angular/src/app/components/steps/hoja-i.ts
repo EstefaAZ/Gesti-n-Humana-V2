@@ -4,9 +4,8 @@ import { Field } from '../field';
 import { SelectConOtro } from '../select-con-otro';
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipiosPorDepartamento';
 import { PAISES } from '../../data/paises';
+import { CATEGORIAS_LICENCIA, categoriasLicenciaDe } from '../../data/catalogos';
 
-// Categorías de licencia de conducción en Colombia (Resolución 1500 de 2005, Ministerio de Transporte).
-const CLASES_LICENCIA = ['A1', 'A2', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'];
 
 
 @Component({
@@ -73,26 +72,36 @@ const CLASES_LICENCIA = ['A1', 'A2', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3'];
               <input type="radio" name="licencia" [checked]="datos().licencia === 'si'" (change)="setDatos.emit({ licencia: 'si' })" /> Sí
             </label>
             <label class="radio-option">
-              <input type="radio" name="licencia" [checked]="datos().licencia === 'no'" (change)="setDatos.emit({ licencia: 'no', licenciaClase: '' })" /> No
+              <input type="radio" name="licencia" [checked]="datos().licencia === 'no'" (change)="setDatos.emit({ licencia: 'no', licenciaClase: '', licenciaClases: [] })" /> No
             </label>
           </div>
         </app-field>
-        <app-field label="Clase">
-          <select
-            [ngModel]="datos().licenciaClase"
-            (ngModelChange)="setDatos.emit({ licenciaClase: $event })"
-            [disabled]="datos().licencia !== 'si'"
-          >
-            <option value="">Seleccione…</option>
-            @for (c of clasesLicencia; track c) {
-              <option [value]="c">{{ c }}</option>
+        @if (datos().licencia === 'si') {
+          <fieldset class="field field--span2 lic-categorias" [class.is-invalid]="!!errors().licenciaClases">
+            <legend>Categorías de su licencia *</legend>
+            <span class="hint">Marque todas las que aparecen en su licencia.</span>
+            <div class="lic-categorias__lista">
+              @for (c of categoriasLicencia; track c.clase) {
+                <label class="lic-categoria">
+                  <input type="checkbox" [checked]="categorias().includes(c.clase)" (change)="alternarCategoria(c.clase, $any($event.target).checked)" />
+                  <span class="lic-categoria__codigo">{{ c.clase }}</span>
+                  <span class="lic-categoria__texto">{{ c.descripcion }}</span>
+                </label>
+              }
+              <!-- Clases guardadas antes que no son de la lista oficial: se conservan y se pueden desmarcar. -->
+              @for (otra of categoriasFueraDeLista(); track otra) {
+                <label class="lic-categoria">
+                  <input type="checkbox" checked (change)="alternarCategoria(otra, $any($event.target).checked)" />
+                  <span class="lic-categoria__codigo">{{ otra }}</span>
+                  <span class="lic-categoria__texto">Registrada antes</span>
+                </label>
+              }
+            </div>
+            @if (errors().licenciaClases) {
+              <span class="field-error">{{ errors().licenciaClases }}</span>
             }
-            <!-- Antes era texto libre: si ya había una clase escrita que no está en la lista, se conserva. -->
-            @if (claseFueraDeLista()) {
-              <option [value]="datos().licenciaClase">{{ datos().licenciaClase }}</option>
-            }
-          </select>
-        </app-field>
+          </fieldset>
+        }
         <app-field label="¿Tiene vehículo?">
           <div class="radio-row">
             <label class="radio-option">
@@ -172,11 +181,26 @@ export class HojaI {
   protected readonly departamentos = DEPARTAMENTOS;
   protected readonly municipios = MUNICIPIOS_POR_DEPARTAMENTO;
   protected readonly paises = PAISES;
-  protected readonly clasesLicencia = CLASES_LICENCIA;
+  protected readonly categoriasLicencia = CATEGORIAS_LICENCIA;
 
-  protected claseFueraDeLista(): boolean {
-    const clase = this.datos().licenciaClase;
-    return !!clase && !CLASES_LICENCIA.includes(clase);
+  protected categorias(): string[] {
+    return categoriasLicenciaDe(this.datos());
+  }
+
+  protected categoriasFueraDeLista(): string[] {
+    return this.categorias().filter((c) => !CATEGORIAS_LICENCIA.some((x) => x.clase === c));
+  }
+
+  /** Guarda la lista y, unida, `licenciaClase` (lo que leen el PDF y los datos anteriores). */
+  protected alternarCategoria(clase: string, marcada: boolean): void {
+    const actuales = this.categorias().filter((c) => c !== clase);
+    const nuevas = marcada ? [...actuales, clase] : actuales;
+    const orden = (c: string) => {
+      const i = CATEGORIAS_LICENCIA.findIndex((x) => x.clase === c);
+      return i === -1 ? 99 : i;
+    };
+    nuevas.sort((a, b) => orden(a) - orden(b));
+    this.setDatos.emit({ licenciaClases: nuevas, licenciaClase: nuevas.join(', ') });
   }
   protected readonly sinOpciones: string[] = [];
 

@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { STEPS, nuevoRegistroII, nuevaExperiencia, nuevoFamiliar } from './formState';
+import { categoriasLicenciaDe } from '../data/catalogos';
 
 /** Fecha de hoy como "AAAA-MM-DD" en hora local (igual que la guarda un <input type="date">). */
 export function hoyISO(): string {
@@ -96,6 +97,10 @@ export class WizardBase {
           nuevosErrores[campo] = 'Este campo es obligatorio.';
         }
       });
+    }
+
+    if (step === 'I' && state.datosPersonales.licencia === 'si' && categoriasLicenciaDe(state.datosPersonales).length === 0) {
+      nuevosErrores['licenciaClases'] = 'Marque al menos una categoría de su licencia, o responda "No".';
     }
 
     if (step === 'II' && state.registrosII.length === 0) {

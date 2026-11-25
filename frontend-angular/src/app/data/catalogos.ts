@@ -85,6 +85,29 @@ export function detalleRegistroII(registro) {
   return registro.titulo || registro.nombreEvento || registro.nombreNorma || registro.idioma || "—";
 }
 
+// Categorías de la licencia de conducción en Colombia (Ley 769 de 2002, art. 20).
+// Una misma licencia puede tener varias categorías.
+export const CATEGORIAS_LICENCIA: { clase: string; descripcion: string }[] = [
+  { clase: "A1", descripcion: "Motocicletas hasta 125 c.c." },
+  { clase: "A2", descripcion: "Motocicletas de más de 125 c.c." },
+  { clase: "B1", descripcion: "Automóviles y camionetas particulares" },
+  { clase: "B2", descripcion: "Camiones y buses particulares" },
+  { clase: "B3", descripcion: "Vehículos articulados particulares" },
+  { clase: "C1", descripcion: "Automóviles y camionetas de servicio público" },
+  { clase: "C2", descripcion: "Camiones y buses de servicio público" },
+  { clase: "C3", descripcion: "Vehículos articulados de servicio público" },
+];
+
+/**
+ * Categorías de licencia de unos datos personales. Antes se guardaba una sola
+ * clase en `licenciaClase` (y, más atrás, texto libre); se lee igual.
+ */
+export function categoriasLicenciaDe(dp: any): string[] {
+  if (Array.isArray(dp?.licenciaClases)) return dp.licenciaClases.filter(Boolean);
+  const anterior = String(dp?.licenciaClase || "").trim();
+  return anterior ? anterior.split(/\s*[,;]\s*/).filter(Boolean) : [];
+}
+
 export const TIPOS_VINCULACION = ["Término fijo", "Término indefinido", "Prestación de servicios", "Aprendizaje SENA"];
 export const PUBLICO_OBJETIVO_OPCIONES = ["Interno", "Externo", "Ambos"];
 
