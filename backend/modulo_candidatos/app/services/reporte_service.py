@@ -21,7 +21,7 @@ from openpyxl.drawing.xdr import XDRPositiveSize2D
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.units import pixels_to_EMU
 
-from app.services import evaluacion_service
+from app.services import evaluacion_service, nbc_catalogo
 
 RUTA_PLANTILLA = os.path.join(os.path.dirname(__file__), "..", "resources", "GTH-FOR-04_Resultados_Cumplimiento_de_Requisitos.xlsx")
 
@@ -44,9 +44,13 @@ def _describir_estudios(criterios: dict) -> str:
         return "Sin requisito específico configurado."
     graduado = criterios.get("graduado_requerido", True)
     texto = f"{nivel} o superior" + (" (graduado)" if graduado else "")
-    kw = criterios.get("profesion_keyword")
-    if kw:
-        texto += f'. Profesión/título relacionado con "{kw}".'
+    titulos = evaluacion_service._titulos_aceptados(criterios)
+    if titulos:
+        texto += ". Título en " + ", ".join(titulos)
+        afines = criterios.get("nbc_afines") or []
+        if criterios.get("acepta_afines") and afines:
+            texto += " o afines (" + "; ".join(nbc_catalogo.nombre_nucleo(c) for c in afines) + ")"
+        texto += "."
     return texto
 
 

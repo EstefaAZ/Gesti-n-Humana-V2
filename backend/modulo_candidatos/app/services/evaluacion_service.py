@@ -10,10 +10,11 @@
 # pedido (educativo o de idioma) también cumple. Nunca se comparan por igualdad.
 # ==============================================================
 
-import re
-import unicodedata
 from datetime import datetime
 from typing import Any
+
+from app.services import nbc_catalogo
+from app.services.coincidencia_texto import _clave, _texto_incluye_keyword  # noqa: F401 (también lo importan los tests)
 
 # Jerarquías: todo criterio de la vacante es un MÍNIMO, así que la comparación
 # siempre es "ordinal del candidato >= ordinal exigido". Un Universitario cumple
@@ -39,93 +40,10 @@ NIVEL_IDIOMA_ANTERIOR = {"Regular": "Básico", "Bien": "Intermedio", "Muy bien":
 HABILIDADES_IDIOMA_ANTERIORES = ("habla", "lee", "escribe")
 
 
-def _clave(texto) -> str:
-    """minúsculas y sin tildes — para que "Tecnico", "Técnico" y "TÉCNICO" sean lo mismo."""
-    sin_tildes = unicodedata.normalize("NFD", (texto or "").strip())
-    return "".join(c for c in sin_tildes if unicodedata.category(c) != "Mn").lower()
-
-
 def _buscar_canonico(valor, opciones: dict) -> str:
     """Devuelve la clave oficial de `opciones` que corresponde a `valor`, o ""."""
     clave = _clave(valor)
     return next((oficial for oficial in opciones if _clave(oficial) == clave), "")
-
-
-# Terminaciones de género/número más comunes en español. Se prueban de la más
-# larga a la más corta para no cortar de más (p. ej. "ia" antes que "a").
-_SUFIJOS_VARIABLES = ("es", "as", "os", "ia", "a", "o", "e", "s")
-
-
-def _raiz(palabra) -> str:
-    """
-    Raíz aproximada de una palabra: quita la terminación de género/número más
-    común para que "ingeniero", "ingeniera" e "ingenieria" compartan la misma
-    raíz ("ingenier"). No es un stemmer completo — alcanza para keywords
-    cortos de profesión/título, que es todo lo que necesita este matching.
-    """
-    clave = _clave(palabra)
-    for sufijo in _SUFIJOS_VARIABLES:
-        if clave.endswith(sufijo) and len(clave) - len(sufijo) >= 4:
-            return clave[: -len(sufijo)]
-    return clave
-
-
-# Palabras de enlace que no cambian el sentido de un título o curso: así
-# "Ingeniería de Sistemas" y "Ingeniero en Sistemas" se comparan igual.
-_PALABRAS_VACIAS = {"de", "del", "la", "las", "el", "los", "en", "y", "e", "para", "con", "a", "al"}
-
-
-def _tokens(texto) -> list[str]:
-    """Palabras de `texto` sin tildes ni mayúsculas, separando por cualquier signo
-    (espacio, guion, coma, paréntesis…) y sin palabras de enlace. "Power-BI" y
-    "Power BI" dan los mismos tokens."""
-    return [t for t in re.split(r"[^a-z0-9]+", _clave(texto)) if t and t not in _PALABRAS_VACIAS]
-
-
-def _misma_palabra(a: str, b: str) -> bool:
-    """Igual, o igual salvo la terminación de género/número (ingeniero / ingeniería)."""
-    return a == b or _raiz(a) == _raiz(b)
-
-
-def _coincide_por_ventaneo(texto_tokens, kw_tokens) -> bool:
-    """
-    True si alguna secuencia de tokens consecutivos de `texto_tokens`, unida
-    sin separador, es EXACTAMENTE igual al keyword unido sin separador. Así
-    "Power BI" (keyword) reconoce "PowerBI" (texto) y al revés. Es igualdad
-    exacta de la ventana completa: "ISO 9001" nunca confunde con "ISO 14001".
-    """
-    kw_compacto = "".join(kw_tokens)
-    if not kw_compacto:
-        return False
-    for i in range(len(texto_tokens)):
-        acumulado = ""
-        for j in range(i, len(texto_tokens)):
-            acumulado += texto_tokens[j]
-            if acumulado == kw_compacto:
-                return True
-            if len(acumulado) > len(kw_compacto):
-                break
-    return False
-
-
-def _texto_incluye_keyword(texto, keyword) -> bool:
-    """
-    True si las palabras de `keyword` aparecen seguidas, como palabras completas,
-    en `texto`. Tolera tildes, mayúsculas, palabras de enlace y la terminación de
-    género/número de CADA palabra ("Ingeniero Civil" cumple "Ingeniería Civil").
-    No acepta pedazos de palabra: "Excel" no coincide con "Excelencia", ni
-    "Java" con "JavaScript". Como último recurso compara sin espacios
-    ("PowerBI" cumple "Power BI").
-    """
-    kw = _tokens(keyword)
-    if not kw:
-        return False
-    palabras = _tokens(texto)
-    n = len(kw)
-    for i in range(len(palabras) - n + 1):
-        if all(_misma_palabra(palabras[i + k], kw[k]) for k in range(n)):
-            return True
-    return _coincide_por_ventaneo(palabras, kw)
 
 
 def _nivel_educativo_ordinal(valor) -> int:
@@ -236,6 +154,25 @@ def _formatear_anios_a_texto(valor: float) -> str:
     return f"{_pluralizar(anios, 'año', 'años')} y {_pluralizar(meses, 'mes', 'meses')}"
 
 
+def _titulos_aceptados(criterios: dict) -> list[str]:
+    """Títulos que pide la vacante. Las vacantes anteriores al cambio tienen una
+    sola palabra clave (profesion_keyword); se lee como un título aceptado."""
+    titulos = [t.strip() for t in (criterios.get("titulos_aceptados") or []) if t and str(t).strip()]
+    if not titulos and (criterios.get("profesion_keyword") or "").strip():
+        titulos = [criterios["profesion_keyword"].strip()]
+    return titulos
+
+
+def _titulo_afin(textos: list[str], nbc_afines: list[str]) -> tuple[str, str] | None:
+    """(título, código NBC) del primer título del candidato que pertenece a uno
+    de los núcleos afines de la vacante, o None."""
+    for texto in textos:
+        for codigo in nbc_catalogo.clasificar_titulo(texto):
+            if codigo in nbc_afines:
+                return texto, codigo
+    return None
+
+
 def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> dict:
     """
     Evaluación automática — SOLO INFORMATIVA (ver nota del módulo). Además del
@@ -261,7 +198,7 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
     # --- Estudios: nivel educativo mínimo y profesión/título (los dos van en la
     # misma columna del GTH-FOR-04). Basta con que uno falle para marcar NO.
     motivos_estudios: list[str] = []
-    aviso_estudios: str | None = None
+    avisos_estudios: list[str] = []
     nivel_min = criterios.get("nivel_educativo_min")
     if nivel_min:
         graduado_requerido = criterios.get("graduado_requerido", True)
@@ -278,28 +215,40 @@ def evaluar_postulacion(solicitud: dict[str, Any], vacante: dict[str, Any]) -> d
             motivos_estudios.append(f'No registra nivel educativo "{nivel_min}" o superior{sufijo}.')
         elif max_nivel > nivel_pedido:
             # Cumple (el nivel es un mínimo), pero Gestión Humana debe saberlo.
-            aviso_estudios = (
+            avisos_estudios.append(
                 f"Sobrecalificado: registra nivel {_NOMBRE_NIVEL_EDUCATIVO[max_nivel]} "
                 f"y el cargo pide {_NOMBRE_NIVEL_EDUCATIVO[nivel_pedido]}."
             )
 
-    profesion_kw = criterios.get("profesion_keyword")
-    if profesion_kw:
-        match = any(
-            r.get("tipo") == "estudio" and _texto_incluye_keyword(r.get("titulo"), profesion_kw) for r in registros
-        ) or _texto_incluye_keyword(dp.get("profesion"), profesion_kw)
-        if not match:
-            motivos_estudios.append(f'Ningún título/profesión registrada incluye "{profesion_kw}".')
+    # Títulos aceptados ("logística", "mecánica automotriz"…) y, si la vacante
+    # dice "o afines", cualquier título de los mismos núcleos NBC.
+    titulos = _titulos_aceptados(criterios)
+    if titulos:
+        textos = [r.get("titulo") for r in registros if r.get("tipo") == "estudio" and r.get("titulo")]
+        if dp.get("profesion"):
+            textos.append(dp.get("profesion"))
+        exacto = any(_texto_incluye_keyword(t, kw) for t in textos for kw in titulos)
+        nbc_afines = [str(c) for c in (criterios.get("nbc_afines") or [])] if criterios.get("acepta_afines") else []
+        afin = None if exacto else _titulo_afin(textos, nbc_afines)
+        if afin:
+            texto, codigo = afin
+            avisos_estudios.append(f'Título afín: "{texto}" ({nbc_catalogo.nombre_nucleo(codigo)}).')
+        elif not exacto:
+            lista = ", ".join(titulos)
+            motivo = f"Ningún título registrado corresponde a: {lista}" + (" ni a sus afines" if nbc_afines else "") + "."
+            if nbc_afines and textos and not any(nbc_catalogo.clasificar_titulo(t) for t in textos):
+                motivo += " No se reconoció el área de sus títulos: revisar a mano."
+            motivos_estudios.append(motivo)
 
-    if nivel_min or profesion_kw:
+    if nivel_min or titulos:
         motivos.extend(motivos_estudios)
+        aviso = " ".join(avisos_estudios) or None
         detalle["estudios"] = {
             "cumple": not motivos_estudios,
             "motivo": " ".join(motivos_estudios) or None,
-            "aviso": aviso_estudios,
+            "aviso": aviso,
         }
-        if aviso_estudios:
-            avisos.append(aviso_estudios)
+        avisos.extend(avisos_estudios)
 
     def _marcar_conocimientos(cumple: bool, motivo: str):
         actual = detalle["conocimientos"]

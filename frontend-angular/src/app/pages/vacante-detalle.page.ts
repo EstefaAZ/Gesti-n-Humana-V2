@@ -8,6 +8,7 @@ import * as perfilesApi from '../lib/api/perfilesApi';
 import { archivoABase64 } from '../lib/formState';
 import { etiquetaNivelIdioma, normalizarNivelIdioma } from '../data/catalogos';
 import { AuthService } from '../core/auth.service';
+import { titulosAceptadosDe } from '../lib/vacanteDefaults';
 import { ApiError } from '../lib/api/httpClient';
 import { Icon } from '../shared/icon';
 import { ZonaArchivos, pesoLegible, pesoDeBase64 } from '../components/zona-archivos';
@@ -71,8 +72,8 @@ import { formatearFecha } from '../lib/formato';
             @if (c().nivelEducativoMin) {
               <li>Nivel educativo mínimo: {{ c().nivelEducativoMin }} o superior{{ c().graduadoRequerido ? ' (graduado)' : '' }}</li>
             }
-            @if (c().profesionKeyword) {
-              <li>Profesión / título relacionado con: "{{ c().profesionKeyword }}"</li>
+            @if (titulos().length > 0) {
+              <li>Título en: {{ titulos().join(', ') }}{{ c().aceptaAfines && (c().nbcAfines || []).length ? ' o afines' : '' }}</li>
             }
             @if (c().experienciaMinAnios === 0) {
               <li>No se exige experiencia previa</li>
@@ -85,7 +86,7 @@ import { formatearFecha } from '../lib/formato';
             @for (cert of c().certificacionesKeywords || []; track $index) {
               <li>Certificación relacionada con: "{{ cert }}"</li>
             }
-            @if (!c().nivelEducativoMin && !c().profesionKeyword && c().experienciaMinAnios == null && !c().idiomaRequerido && (c().certificacionesKeywords || []).length === 0) {
+            @if (!c().nivelEducativoMin && titulos().length === 0 && c().experienciaMinAnios == null && !c().idiomaRequerido && (c().certificacionesKeywords || []).length === 0) {
               <li class="text-muted">Esta vacante no tiene requisitos específicos configurados.</li>
             }
           </ul>
@@ -202,6 +203,10 @@ import { formatearFecha } from '../lib/formato';
 export class VacanteDetallePage {
   protected readonly fecha = formatearFecha;
   private readonly auth = inject(AuthService);
+
+  protected titulos(): string[] {
+    return titulosAceptadosDe(this.c());
+  }
   private readonly route = inject(ActivatedRoute);
 
   protected readonly vacante = signal<any>(undefined); // undefined = cargando, null = no encontrada

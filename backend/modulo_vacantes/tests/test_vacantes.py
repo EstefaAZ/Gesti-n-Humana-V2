@@ -477,3 +477,21 @@ def test_crear_vacante_con_cero_anios_de_experiencia_es_valido():
 def test_crear_vacante_sin_conocimientos_complementarios_es_valido():
     # VACANTE_VALIDA no pide idioma, certificaciones ni profesión.
     assert client.post("/api/v1/vacantes", json=VACANTE_VALIDA, headers=HEADERS_GESTOR).status_code == 201
+
+
+
+def test_vacante_guarda_titulos_aceptados_y_nucleos_afines():
+    criterios = {**VACANTE_VALIDA["criterios"], "titulos_aceptados": [" logística ", "mecánica automotriz", ""],
+                 "acepta_afines": True, "nbc_afines": ["831", "69", "831"]}
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "criterios": criterios}, headers=HEADERS_GESTOR)
+    assert r.status_code == 201
+    c = r.json()["criterios"]
+    assert c["titulos_aceptados"] == ["logística", "mecánica automotriz"]
+    assert c["acepta_afines"] is True
+    assert c["nbc_afines"] == ["831", "69"]
+
+
+def test_vacante_rechaza_nucleo_afin_que_no_es_codigo():
+    criterios = {**VACANTE_VALIDA["criterios"], "acepta_afines": True, "nbc_afines": ["Administración"]}
+    r = client.post("/api/v1/vacantes", json={**VACANTE_VALIDA, "criterios": criterios}, headers=HEADERS_GESTOR)
+    assert r.status_code == 422

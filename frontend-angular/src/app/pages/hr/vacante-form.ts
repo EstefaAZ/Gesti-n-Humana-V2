@@ -1,4 +1,4 @@
-import { Component, OnInit, input, signal } from '@angular/core';
+import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NIVELES_EDUCATIVOS, NIVELES_IDIOMA, IDIOMAS, TIPOS_VINCULACION, PUBLICO_OBJETIVO_OPCIONES, etiquetaNivelIdioma } from '../../data/catalogos';
 import { formatearFecha, formatearMilesCOP } from '../../lib/formato';
@@ -8,6 +8,9 @@ import { normalizarVacanteParaFormulario } from '../../lib/vacanteDefaults';
 import { SelectConOtro } from '../../components/select-con-otro';
 import { Icon } from '../../shared/icon';
 import { ZonaArchivos, pesoLegible } from '../../components/zona-archivos';
+import { AuthService } from '../../core/auth.service';
+import * as catalogosApi from '../../lib/api/catalogosApi';
+import { NucleoNbc } from '../../lib/api/catalogosApi';
 
 const ESTADOS = [
   { valor: 'borrador', etiqueta: 'Borrador' },
@@ -18,6 +21,7 @@ const ESTADOS = [
 ];
 
 const MAX_CERTIFICACIONES = 5;
+const MAX_TITULOS = 10;
 
 // Mismo formulario por pasos que "Completar perfil": un paso por grupo de información.
 const PASOS = ['CONV', 'FECHAS', 'REQ', 'CRIT', 'PDF', 'REV'];
@@ -157,9 +161,10 @@ import { CampoAccesible } from '../../shared/campo-accesible';
               <h3 class="section-title">Criterios de evaluación automática</h3>
               <p class="section-intro">
                 Solo priorizan y advierten a Gestión Humana; nunca bloquean la solicitud del aspirante. Todos son
-                <strong>mínimos</strong>: un nivel superior al pedido también cumple. Estudios y experiencia son obligatorios;
-                los conocimientos complementarios (profesión, idioma y certificaciones) son opcionales.
+                <strong>mínimos</strong>: un nivel superior al pedido también cumple. El nivel educativo y la experiencia son
+                obligatorios; los títulos aceptados y los conocimientos complementarios son opcionales.
               </p>
+              <h4 class="vf-grupo">Estudios</h4>
               <div class="field-grid">
                 <app-field label="Nivel educativo mínimo *" hint='Ej. "Técnico" también lo cumple un Universitario.' [error]="errors().nivelEducativoMin">
                   <select [ngModel]="v.criterios.nivelEducativoMin" (ngModelChange)="setCriterio({ nivelEducativoMin: $event })">
@@ -175,12 +180,77 @@ import { CampoAccesible } from '../../shared/campo-accesible';
                     <option>No</option>
                   </select>
                 </app-field>
-                <app-field label="Palabra clave de profesión o título">
-                  <input type="text" [value]="v.criterios.profesionKeyword" (input)="setCriterioCampo('profesionKeyword', $event)" placeholder="Ej: Ingeniería civil" />
-                </app-field>
+              </div>
+
+              <div class="field vf-titulos" [class.is-invalid]="!!errors().nbcAfines">
+                <label>Títulos aceptados <span class="hint">(como aparecen en la convocatoria, hasta {{ maxTitulos }}; opcional)</span></label>
+                <div class="ps-certificaciones">
+                  @for (t of titulos(); track $index; let i = $index) {
+                    <div class="ps-certificacion">
+                      <input type="text" [attr.aria-label]="'Título aceptado ' + (i + 1)" [value]="t" (input)="cambiarTitulo(i, $any($event.target).value)" (blur)="sugerirNucleos($any($event.target).value)" placeholder="Ej: Mecánica automotriz" />
+                      <button type="button" class="hr-link-btn hr-link-btn--danger" [attr.aria-label]="'Quitar título ' + (i + 1)" (click)="quitarTitulo(i)">Quitar</button>
+                    </div>
+                  }
+                  @if (titulos().length < maxTitulos) {
+                    <button type="button" class="btn btn-secondary btn-sm" (click)="agregarTitulo()">
+                      <app-icon name="mas" [size]="14" [strokeWidth]="2.2" /> Agregar título
+                    </button>
+                  }
+                </div>
+
+                @if (titulos().length > 0) {
+                  <label class="radio-option vf-afines">
+                    <input type="checkbox" [checked]="v.criterios.aceptaAfines" (change)="cambiarAfines($any($event.target).checked)" />
+                    <span><strong>o afines</strong> <span class="hint"> — también cumple un título del mismo Núcleo Básico del Conocimiento (NBC, Ministerio de Educación)</span></span>
+                  </label>
+                  @if (v.criterios.aceptaAfines) {
+                    <div class="vf-nucleos">
+                      <span class="vf-nucleos__titulo">Núcleos afines</span>
+                      @if (nbcAfines().length > 0) {
+                        <ul class="ps-etiquetas">
+                          @for (codigo of nbcAfines(); track codigo) {
+                            <li class="ps-etiqueta vf-nucleo">
+                              {{ nombreNucleo(codigo) }}
+                              <button type="button" class="vf-nucleo__quitar" [attr.aria-label]="'Quitar núcleo ' + nombreNucleo(codigo)" (click)="quitarNucleo(codigo)">
+                                <app-icon name="cerrar" [size]="12" [strokeWidth]="2.4" />
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      } @else {
+                        <p class="hint" style="margin: 0">Al escribir los títulos se sugieren sus núcleos. También puedes agregarlos aquí.</p>
+                      }
+                      <select class="vf-nucleos__agregar" aria-label="Agregar núcleo afín" (change)="agregarNucleo($any($event.target))">
+                        <option value="">+ Agregar núcleo…</option>
+                        @for (area of areasNbc(); track area.nombre) {
+                          <optgroup [label]="area.nombre">
+                            @for (n of area.nucleos; track n.codigo) {
+                              <option [value]="n.codigo" [disabled]="nbcAfines().includes(n.codigo)">{{ n.nombre }}</option>
+                            }
+                          </optgroup>
+                        }
+                      </select>
+                      @if (errorCatalogo()) {
+                        <span class="hint">{{ errorCatalogo() }}</span>
+                      }
+                    </div>
+                  }
+                }
+                @if (errors().nbcAfines) {
+                  <span class="field-error">{{ errors().nbcAfines }}</span>
+                }
+              </div>
+
+
+              <h4 class="vf-grupo">Experiencia</h4>
+              <div class="field-grid">
                 <app-field label="Años mínimos de experiencia *" hint="Usa 0 si el cargo no exige experiencia (p. ej. practicantes)." [error]="errors().experienciaMinAnios">
                   <input type="number" min="0" step="0.5" [value]="v.criterios.experienciaMinAnios" (input)="setCriterioCampo('experienciaMinAnios', $event)" />
                 </app-field>
+              </div>
+
+              <h4 class="vf-grupo">Conocimientos complementarios <span class="hint">(opcionales)</span></h4>
+              <div class="field-grid">
                 <app-field label="Idioma requerido">
                   <app-select-con-otro [value]="v.criterios.idiomaRequerido" [opciones]="idiomas" (changed)="setCriterio({ idiomaRequerido: $event })" />
                 </app-field>
@@ -338,6 +408,10 @@ import { CampoAccesible } from '../../shared/campo-accesible';
 })
 export class VacanteForm implements OnInit {
   readonly vacanteInicial = input.required<any>();
+  private readonly auth = inject(AuthService);
+  protected readonly maxTitulos = MAX_TITULOS;
+  protected readonly nucleos = signal<NucleoNbc[]>([]);
+  protected readonly errorCatalogo = signal('');
   /** Recibe la vacante limpia y el PDF (o null); el padre espera a que termine de guardar. */
   readonly onGuardar = input.required<(v: any, pdfFile: File | null) => Promise<void>>();
   readonly onCancelar = input.required<() => void>();
@@ -391,6 +465,9 @@ export class VacanteForm implements OnInit {
       if (!String(v.cargo || '').trim()) errores['cargo'] = 'Este campo es obligatorio.';
     }
     if (paso === 'CRIT') {
+      if (v.criterios.aceptaAfines && this.titulos().some((t) => t.trim()) && this.nbcAfines().length === 0) {
+        errores['nbcAfines'] = 'Agrega al menos un núcleo afín, o desmarca "o afines".';
+      }
       if (!v.criterios.nivelEducativoMin) errores['nivelEducativoMin'] = 'Indica el nivel educativo mínimo.';
       const anios = v.criterios.experienciaMinAnios;
       if (anios === '' || anios == null || Number.isNaN(Number(anios))) {
@@ -437,7 +514,11 @@ export class VacanteForm implements OnInit {
     const c = this.v().criterios || {};
     const lista: { nombre: string; valor: string }[] = [];
     if (c.nivelEducativoMin) lista.push({ nombre: 'Estudios', valor: `${c.nivelEducativoMin} o superior${c.graduadoRequerido ? ', graduado' : ''}` });
-    if (String(c.profesionKeyword || '').trim()) lista.push({ nombre: 'Profesión', valor: c.profesionKeyword.trim() });
+    const titulos = (c.titulosAceptados || []).map((t: string) => t.trim()).filter(Boolean);
+    if (titulos.length) {
+      const afines = c.aceptaAfines && (c.nbcAfines || []).length ? ` o afines (${c.nbcAfines.map((x: string) => this.nombreNucleo(x)).join('; ')})` : '';
+      lista.push({ nombre: 'Títulos', valor: titulos.join(', ') + afines });
+    }
     if (c.experienciaMinAnios !== '' && c.experienciaMinAnios != null && Number(c.experienciaMinAnios) === 0) {
       lista.push({ nombre: 'Experiencia', valor: 'No exige experiencia previa' });
     } else if (c.experienciaMinAnios !== '' && c.experienciaMinAnios != null && Number(c.experienciaMinAnios) > 0) {
@@ -449,6 +530,10 @@ export class VacanteForm implements OnInit {
   }
 
   ngOnInit(): void {
+    catalogosApi
+      .listarNucleos(this.auth.token())
+      .then((n) => this.nucleos.set(n))
+      .catch(() => this.errorCatalogo.set('No se pudo cargar el catálogo de núcleos; intenta recargar la página.'));
     // Una vacante creada antes del cambio de escala trae criterios con la escala
     // anterior; se normalizan al abrir el formulario para que los selectores
     // muestren un valor válido en vez de quedar en blanco.
@@ -476,6 +561,72 @@ export class VacanteForm implements OnInit {
 
   protected setCriterioCampo(key: string, e: Event): void {
     this.setCriterio({ [key]: (e.target as HTMLInputElement).value });
+  }
+
+  // ---- Títulos aceptados y núcleos afines (NBC) ----
+
+  protected titulos(): string[] {
+    return this.v().criterios.titulosAceptados || [];
+  }
+
+  protected agregarTitulo(): void {
+    if (this.titulos().length >= MAX_TITULOS) return;
+    this.setCriterio({ titulosAceptados: [...this.titulos(), ''] });
+  }
+
+  protected cambiarTitulo(i: number, valor: string): void {
+    const copia = [...this.titulos()];
+    copia[i] = valor;
+    this.setCriterio({ titulosAceptados: copia });
+  }
+
+  protected quitarTitulo(i: number): void {
+    this.setCriterio({ titulosAceptados: this.titulos().filter((_, idx) => idx !== i) });
+  }
+
+  protected nbcAfines(): string[] {
+    return this.v().criterios.nbcAfines || [];
+  }
+
+  protected cambiarAfines(acepta: boolean): void {
+    this.setCriterio({ aceptaAfines: acepta });
+    if (acepta) this.titulos().forEach((t) => this.sugerirNucleos(t));
+  }
+
+  /** Agrega los núcleos del título escrito; los que Gestión Humana quite se pueden volver a agregar a mano. */
+  protected async sugerirNucleos(titulo: string): Promise<void> {
+    if (!this.v().criterios.aceptaAfines || !titulo.trim()) return;
+    try {
+      const codigos = await catalogosApi.clasificarTitulo(titulo.trim(), this.auth.token());
+      const nuevos = codigos.filter((c) => !this.nbcAfines().includes(c));
+      if (nuevos.length) this.setCriterio({ nbcAfines: [...this.nbcAfines(), ...nuevos] });
+    } catch {
+      // Sin sugerencia: se pueden agregar a mano.
+    }
+  }
+
+  protected agregarNucleo(select: HTMLSelectElement): void {
+    const codigo = select.value;
+    select.value = '';
+    if (codigo && !this.nbcAfines().includes(codigo)) this.setCriterio({ nbcAfines: [...this.nbcAfines(), codigo] });
+  }
+
+  protected quitarNucleo(codigo: string): void {
+    this.setCriterio({ nbcAfines: this.nbcAfines().filter((c) => c !== codigo) });
+  }
+
+  protected nombreNucleo(codigo: string): string {
+    return this.nucleos().find((n) => n.codigo === codigo)?.nombre || `Núcleo ${codigo}`;
+  }
+
+  protected areasNbc(): { nombre: string; nucleos: NucleoNbc[] }[] {
+    const areas: { nombre: string; nucleos: NucleoNbc[] }[] = [];
+    for (const n of this.nucleos()) {
+      let area = areas.find((a) => a.nombre === n.area);
+      if (!area) areas.push((area = { nombre: n.area, nucleos: [] }));
+      area.nucleos.push(n);
+    }
+    return areas;
   }
 
   protected certificaciones(): string[] {
@@ -521,6 +672,12 @@ export class VacanteForm implements OnInit {
         certificacionesKeywords: this.certificaciones()
           .map((c) => c.trim())
           .filter(Boolean),
+        // La palabra clave única quedó reemplazada por la lista de títulos.
+        profesionKeyword: '',
+        titulosAceptados: this.titulos()
+          .map((t) => t.trim())
+          .filter(Boolean),
+        nbcAfines: v.criterios.aceptaAfines ? this.nbcAfines() : [],
       },
     };
     this.guardando.set(true);

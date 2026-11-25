@@ -13,6 +13,7 @@ from app.core.database import Base, engine
 from app.api.v1.solicitudes import router as solicitudes_router
 from app.api.v1.perfiles import router as perfiles_router
 from app.api.v1.notificaciones import router as notificaciones_router
+from app.api.v1.catalogos import router as catalogos_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +55,7 @@ app.add_middleware(
 )
 
 app.include_router(solicitudes_router, prefix="/api/v1")
+app.include_router(catalogos_router, prefix="/api/v1")
 app.include_router(perfiles_router, prefix="/api/v1")
 app.include_router(notificaciones_router, prefix="/api/v1")
 

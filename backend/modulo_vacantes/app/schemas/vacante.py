@@ -32,7 +32,13 @@ class CriteriosEvaluacion(BaseModel):
     """
     nivel_educativo_min: str = ""
     graduado_requerido: bool = True
-    profesion_keyword: str = ""
+    profesion_keyword: str = ""  # anterior a "titulos_aceptados"; se sigue leyendo en vacantes viejas
+    # Títulos que pide la vacante, como los redacta Gestión Humana ("logística",
+    # "mecánica automotriz"…). Con acepta_afines, también cumple cualquier título
+    # de los núcleos NBC (Ministerio de Educación) listados en nbc_afines.
+    titulos_aceptados: list[str] = Field(default_factory=list)
+    acepta_afines: bool = False
+    nbc_afines: list[str] = Field(default_factory=list)
     experiencia_min_anios: Optional[float] = None
     idioma_requerido: str = ""
     idioma_nivel_min: str = NIVELES_IDIOMA[0]  # Básico | Intermedio | Avanzado | Experto
@@ -44,6 +50,22 @@ class CriteriosEvaluacion(BaseModel):
         v = (v or "").strip()
         v = NIVEL_IDIOMA_ANTERIOR.get(v, v)
         return v if v in NIVELES_IDIOMA else NIVELES_IDIOMA[0]
+
+    @field_validator("titulos_aceptados")
+    @classmethod
+    def maximo_10_titulos(cls, v: list[str]) -> list[str]:
+        limpios = [t.strip() for t in v if t and t.strip()]
+        if len(limpios) > 10:
+            raise ValueError("No se pueden pedir más de 10 títulos.")
+        return limpios
+
+    @field_validator("nbc_afines")
+    @classmethod
+    def codigos_nbc(cls, v: list[str]) -> list[str]:
+        codigos = list(dict.fromkeys(str(c).strip() for c in v if str(c).strip()))
+        if any(not c.isdigit() for c in codigos):
+            raise ValueError("Los núcleos afines deben ser códigos NBC numéricos.")
+        return codigos
 
     @field_validator("certificaciones_keywords")
     @classmethod

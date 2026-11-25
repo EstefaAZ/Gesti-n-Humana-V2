@@ -6,6 +6,9 @@ import { EstadoPostulacionBadge } from '../../components/estado-postulacion-badg
 import { Autofocus } from '../../shared/autofocus';
 import { PostulacionDetalle } from './postulacion-detalle';
 import { AuthService } from '../../core/auth.service';
+import * as catalogosApi from '../../lib/api/catalogosApi';
+import { NucleoNbc } from '../../lib/api/catalogosApi';
+import { titulosAceptadosDe } from '../../lib/vacanteDefaults';
 import { etiquetaNivelIdioma, normalizarNivelIdioma } from '../../data/catalogos';
 import * as solicitudesApi from '../../lib/api/solicitudesApi';
 import { CLASE_ESTADO, ETIQUETA_ESTADO, OPCIONES_ESTADO } from './estados-vacante';
@@ -105,10 +108,13 @@ import { formatearFecha } from '../../lib/formato';
 
         <div class="ps-criterios">
           <h3 class="ps-subtitulo">Criterios de evaluación automática</h3>
-          @if (c().nivelEducativoMin || c().experienciaMinAnios != null || c().idiomaRequerido || (c().certificacionesKeywords || []).length > 0) {
+          @if (c().nivelEducativoMin || titulos().length > 0 || c().experienciaMinAnios != null || c().idiomaRequerido || (c().certificacionesKeywords || []).length > 0) {
             <ul class="ps-etiquetas">
               @if (c().nivelEducativoMin) {
                 <li class="ps-etiqueta">Estudios: <strong>{{ c().nivelEducativoMin }} o superior{{ c().graduadoRequerido ? ', graduado' : '' }}</strong></li>
+              }
+              @if (titulos().length > 0) {
+                <li class="ps-etiqueta">Título en: <strong>{{ titulos().join(', ') }}{{ afines() }}</strong></li>
               }
               @if (c().experienciaMinAnios === 0) {
                 <li class="ps-etiqueta">Experiencia: <strong>no exige experiencia previa</strong></li>
@@ -198,6 +204,7 @@ import { formatearFecha } from '../../lib/formato';
 export class VacanteDetalleGestion implements OnChanges {
   protected readonly fecha = formatearFecha;
   private readonly auth = inject(AuthService);
+  protected readonly nucleos = signal<NucleoNbc[]>([]);
 
   readonly vacante = input.required<any>();
   readonly conteo = input<Record<string, number>>({});
@@ -219,6 +226,10 @@ export class VacanteDetalleGestion implements OnChanges {
   protected readonly editandoEstado = signal(false);
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (!this.nucleos().length) {
+      // Nombres de los núcleos afines; si falla, se muestran sus códigos.
+      catalogosApi.listarNucleos(this.auth.token()).then((n) => this.nucleos.set(n)).catch(() => {});
+    }
     if (changes['radicadoInicial']?.firstChange) {
       this.detalleId.set(this.radicadoInicial() || null);
     }
@@ -240,6 +251,18 @@ export class VacanteDetalleGestion implements OnChanges {
 
   protected detalle(): any {
     return (this.postulaciones() || []).find((p) => p.radicado === this.detalleId());
+  }
+
+  protected titulos(): string[] {
+    return titulosAceptadosDe(this.c());
+  }
+
+  /** " o afines (Núcleo A; Núcleo B)" cuando la vacante acepta títulos afines. */
+  protected afines(): string {
+    const codigos: string[] = this.c().aceptaAfines ? this.c().nbcAfines || [] : [];
+    if (!codigos.length) return '';
+    const nombres = codigos.map((cod) => this.nucleos().find((n) => n.codigo === cod)?.nombre || `núcleo ${cod}`);
+    return ` o afines (${nombres.join('; ')})`;
   }
 
   protected c(): any {

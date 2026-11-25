@@ -253,3 +253,11 @@ def test_reporte_escribe_el_aviso_de_sobrecalificado_en_observaciones():
     for hoja, fila in [("Aspirantes", 13), ("Resultados_reclutamiento", 16)]:
         assert wb[hoja][f"C{fila}"].value == "X"  # Estudios SÍ
         assert wb[hoja][f"K{fila}"].value == aviso
+
+
+def test_reporte_describe_titulos_aceptados_y_afines():
+    vacante = {**VACANTE_INFO, "criterios": {**VACANTE_INFO["criterios"], "titulos_aceptados": ["logística", "mecánica automotriz"],
+                                              "acepta_afines": True, "nbc_afines": ["831"]}}
+    wb = openpyxl.load_workbook(io.BytesIO(reporte_service.generar_reporte_vacante(vacante, [_solicitud_fake()])))
+    texto = wb["Aspirantes"]["D8"].value
+    assert "logística, mecánica automotriz" in texto and "o afines (Ingeniería mecánica y afines)" in texto
