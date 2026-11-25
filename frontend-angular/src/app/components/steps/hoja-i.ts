@@ -6,6 +6,7 @@ import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipio
 import { PAISES } from '../../data/paises';
 import { CATEGORIAS_LICENCIA, categoriasLicenciaDe } from '../../data/catalogos';
 import { NotaObligatorios } from '../nota-obligatorios';
+import { hoyISO } from '../../lib/wizard';
 
 
 
@@ -167,8 +168,8 @@ import { NotaObligatorios } from '../nota-obligatorios';
         <app-field label="Profesión *" [error]="errors().profesion">
           <input type="text" [value]="datos().profesion" (input)="set('profesion', $event)" />
         </app-field>
-        <app-field label="Fecha de expedición">
-          <input type="date" [value]="datos().fechaTarjeta" (input)="set('fechaTarjeta', $event)" />
+        <app-field label="Fecha de expedición de la tarjeta *" [error]="errors().fechaTarjeta">
+          <input type="date" [attr.max]="hoy" [value]="datos().fechaTarjeta" (input)="set('fechaTarjeta', $event)" />
         </app-field>
       </div>
     </section>
@@ -205,6 +206,8 @@ export class HojaI {
     this.setDatos.emit({ licenciaClases: nuevas, licenciaClase: nuevas.join(', ') });
   }
   protected readonly sinOpciones: string[] = [];
+  /** Límite del selector de fecha: la tarjeta no puede expedirse en el futuro. */
+  protected readonly hoy = hoyISO();
 
   protected set(key: string, e: Event): void {
     this.setDatos.emit({ [key]: (e.target as HTMLInputElement).value });

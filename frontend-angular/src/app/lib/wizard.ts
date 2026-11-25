@@ -90,7 +90,7 @@ export class WizardBase {
       const requeridos = [
         'nombreCompleto', 'cedula', 'cedulaDe', 'ciudadNacimiento', 'deptoNacimiento',
         'paisNacimiento', 'fechaNacimiento', 'correo', 'direccion', 'municipio',
-        'deptoResidencia', 'celular', 'estadoCivil', 'numHijos', 'tarjetaProfesional', 'profesion',
+        'deptoResidencia', 'celular', 'estadoCivil', 'numHijos', 'tarjetaProfesional', 'profesion', 'fechaTarjeta',
       ];
       requeridos.forEach((campo) => {
         if (!String(state.datosPersonales[campo] || '').trim()) {
@@ -101,6 +101,9 @@ export class WizardBase {
 
     if (step === 'I' && state.datosPersonales.licencia === 'si' && categoriasLicenciaDe(state.datosPersonales).length === 0) {
       nuevosErrores['licenciaClases'] = 'Marque al menos una categoría de su licencia, o responda "No".';
+    }
+    if (step === 'I' && state.datosPersonales.fechaTarjeta && state.datosPersonales.fechaTarjeta > hoyISO()) {
+      nuevosErrores['fechaTarjeta'] = 'La fecha de expedición no puede ser futura.';
     }
     // Quien tiene vehículo debe tener licencia de conducción.
     if (step === 'I' && state.datosPersonales.tieneVehiculo === 'si' && state.datosPersonales.licencia !== 'si') {
