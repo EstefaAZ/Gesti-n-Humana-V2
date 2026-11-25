@@ -68,11 +68,16 @@ function _perfilAEstadoWizard(perfil: any): any {
       <app-doc-header title="Completa tu perfil" />
       <main class="page">
         <div class="card formulario-app">
-          <div class="notice notice--info">
-            Este formulario se llena <strong>una sola vez</strong>. Tu progreso se guarda automáticamente mientras
-            avanzas — si te cierran, te tienes que ausentar o cierras el navegador, puedes volver más tarde y
-            retomar exactamente donde quedaste. Cuando termines, podrás inscribirte a cualquier vacante con un solo
-            clic sin volver a llenarlo, solo adjuntando certificaciones extra si una vacante en particular las requiere.
+          <div class="notice notice--info aviso-perfil">
+            <p>
+              Este formulario solo lo llenas <strong>una vez</strong>. Tu progreso se guarda automáticamente mientras
+              avanzas: si se cierra la página, tienes que ausentarte o cierras el navegador, puedes volver más tarde y
+              continuar justo donde quedaste.
+            </p>
+            <p>
+              Cuando lo termines, podrás postularte a cualquier vacante con un solo clic, sin volver a llenarlo. Solo
+              tendrás que adjuntar certificaciones adicionales si alguna vacante las pide.
+            </p>
           </div>
           @if (errorEnvio()) {
             <div class="notice notice--danger">{{ errorEnvio() }}</div>

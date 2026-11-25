@@ -1541,3 +1541,6 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
 .nota-obligatorios { margin: -6px 0 18px; font-size: 12.5px; color: var(--color-text-muted); }
 .nota-obligatorios__marca { font-weight: 700; color: var(--color-text); }
 
+/* Aviso de Completar perfil en dos párrafos. */
+.aviso-perfil p { margin: 0; }
+.aviso-perfil p + p { margin-top: 8px; }
