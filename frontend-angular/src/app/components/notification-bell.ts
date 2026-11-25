@@ -160,7 +160,7 @@ export class NotificationBell implements OnInit, OnDestroy {
    */
   protected async abrirNotificacion(n: any): Promise<void> {
     await this.marcarLeida(n);
-    const destino = await notificacionesApi.resolverDestino(n, this.auth.token()).catch(() => null);
+    const destino = await notificacionesApi.resolverDestino(n, this.auth.token(), this.auth.esGestion()).catch(() => null);
     if (!destino) return;
     this.abierto.set(false);
     this.router.navigateByUrl(destino);

@@ -60,41 +60,46 @@ export async function marcarTodasLeidas(token) {
   ]);
 }
 
+// Notificaciones de difusión para Gestión Humana sobre una postulación: llevan al
+// proceso y abren el panel de ese candidato.
+const TIPOS_GESTION_SOBRE_POSTULACION = ["nueva_postulacion", "postulacion_retirada", "certificados_adjuntados"];
+// Notificaciones del candidato sobre su propia postulación: llevan a "Mis
+// postulaciones" con esa postulación resaltada (ahí también adjunta certificados).
+const TIPOS_CANDIDATO_SOBRE_POSTULACION = ["solicitud_creada", "estado_cambiado", "certificados_solicitados"];
+
+async function destinoGestion(radicado, token) {
+  // La notificación guarda el radicado, no la vacante: se consulta para saber a cuál pertenece.
+  if (!radicado) return "/gestion-humana";
+  try {
+    const solicitud = await solicitudesApi.obtener(radicado, token);
+    return `/gestion-humana?vacante=${solicitud.vacanteId}&radicado=${encodeURIComponent(radicado)}`;
+  } catch {
+    return "/gestion-humana";
+  }
+}
+
+function destinoCandidato(radicado) {
+  return radicado ? `/mis-postulaciones?radicado=${encodeURIComponent(radicado)}` : "/mis-postulaciones";
+}
+
 /**
- * A dónde debe llevar un clic sobre esta notificación — según el tipo y la
- * entidad asociada. Devuelve null si no hay un destino claro (en ese caso el
- * clic solo marca como leída y no navega a ninguna parte).
- *
- * Se apoya en `entidad_tipo`/`entidad_id`, que las notificaciones ya guardaban;
- * las anteriores al cambio que no los tengan caen al destino genérico de su
- * tipo, así que ninguna queda sin comportamiento.
+ * A dónde debe llevar un clic sobre esta notificación, según su tipo y la
+ * entidad asociada. `esGestion` decide el destino de un tipo nuevo que se
+ * refiera a una postulación y todavía no esté en las listas de arriba.
+ * Devuelve null si no hay un destino claro (el clic solo la marca como leída).
  */
-export async function resolverDestino(notificacion, token) {
+export async function resolverDestino(notificacion, token, esGestion = false) {
   if (notificacion.servicio === "login") {
-    // cuenta_desactivada / cuenta_reactivada — es sobre la propia cuenta.
+    // cuenta_desactivada / cuenta_reactivada: siempre son sobre la propia cuenta.
     return "/perfil";
   }
 
   const radicado = notificacion.entidadTipo === "solicitud" ? notificacion.entidadId : null;
 
-  if (notificacion.tipo === "nueva_postulacion" || notificacion.tipo === "postulacion_retirada") {
-    // Difusión para Gestión Humana: abrir la vacante y, dentro, el detalle de
-    // esa postulación. La notificación guarda el radicado, no la vacante, así
-    // que hay que consultarla para saber a qué vacante pertenece.
-    if (!radicado) return "/gestion-humana";
-    try {
-      const solicitud = await solicitudesApi.obtener(radicado, token);
-      return `/gestion-humana?vacante=${solicitud.vacanteId}&radicado=${encodeURIComponent(radicado)}`;
-    } catch {
-      return "/gestion-humana";
-    }
-  }
+  if (TIPOS_GESTION_SOBRE_POSTULACION.includes(notificacion.tipo)) return destinoGestion(radicado, token);
+  if (TIPOS_CANDIDATO_SOBRE_POSTULACION.includes(notificacion.tipo)) return destinoCandidato(radicado);
 
-  if (notificacion.tipo === "solicitud_creada" || notificacion.tipo === "estado_cambiado") {
-    // Sobre la propia postulación del candidato — no hay página de detalle
-    // individual, así que se resalta su fila en "Mis postulaciones".
-    return radicado ? `/mis-postulaciones?radicado=${encodeURIComponent(radicado)}` : "/mis-postulaciones";
-  }
-
+  // Tipo nuevo que apunta a una postulación: según quién la está viendo.
+  if (radicado) return esGestion ? destinoGestion(radicado, token) : destinoCandidato(radicado);
   return null;
 }

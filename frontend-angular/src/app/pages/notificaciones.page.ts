@@ -176,7 +176,7 @@ export class NotificacionesPage {
   /** Marca como leída (comportamiento de siempre) y lleva al recurso relacionado. */
   protected async abrirNotificacion(n: any): Promise<void> {
     await this.marcarLeida(n);
-    const destino = await notificacionesApi.resolverDestino(n, this.auth.token()).catch(() => null);
+    const destino = await notificacionesApi.resolverDestino(n, this.auth.token(), this.auth.esGestion()).catch(() => null);
     if (destino) this.router.navigateByUrl(destino);
   }
 }
