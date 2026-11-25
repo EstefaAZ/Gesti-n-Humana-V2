@@ -102,6 +102,10 @@ export class WizardBase {
     if (step === 'I' && state.datosPersonales.licencia === 'si' && categoriasLicenciaDe(state.datosPersonales).length === 0) {
       nuevosErrores['licenciaClases'] = 'Marque al menos una categoría de su licencia, o responda "No".';
     }
+    // Quien tiene vehículo debe tener licencia de conducción.
+    if (step === 'I' && state.datosPersonales.tieneVehiculo === 'si' && state.datosPersonales.licencia !== 'si') {
+      nuevosErrores['tieneVehiculo'] = 'Si tiene vehículo, debe tener licencia de conducción: marque "Sí" en la licencia e indique sus categorías.';
+    }
 
     if (step === 'II' && state.registrosII.length === 0) {
       nuevosErrores['registrosII'] = 'Debes agregar al menos un estudio para continuar.';

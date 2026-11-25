@@ -102,7 +102,7 @@ import { CATEGORIAS_LICENCIA, categoriasLicenciaDe } from '../../data/catalogos'
             }
           </fieldset>
         }
-        <app-field label="¿Tiene vehículo?">
+        <app-field label="¿Tiene vehículo?" [error]="errors().tieneVehiculo">
           <div class="radio-row">
             <label class="radio-option">
               <input type="radio" name="tieneVehiculo" [checked]="datos().tieneVehiculo === 'si'" (change)="setDatos.emit({ tieneVehiculo: 'si' })" /> Sí
