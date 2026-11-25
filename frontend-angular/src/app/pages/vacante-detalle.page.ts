@@ -15,6 +15,19 @@ import { ZonaArchivos, pesoLegible, pesoDeBase64 } from '../components/zona-arch
 
 // Los certificados laborales y de estudio ya no se adjuntan al inscribirse: se
 // piden en "Mis postulaciones" solo si Gestión Humana preselecciona al candidato.
+/**
+ * Misma regla que el backend (solicitud_service._tiene_postulacion_activa_en_otra_vacante):
+ * la postulación no está retirada ni rechazada y su convocatoria sigue
+ * publicada (sin cerrar) o en proceso.
+ */
+function sigueEnCurso(s: any): boolean {
+  if (['Retirada', 'Rechazada'].includes(s.estado)) return false;
+  const c = s.convocatoria;
+  if (!c || c.eliminada) return false;
+  if (c.estado === 'en_proceso') return true;
+  return c.estado === 'publicada' && !c.estaCerrada;
+}
+
 const CATEGORIAS_EXTRA = [
   { clave: 'tarjetaProfesional', etiqueta: 'Tarjeta profesional (si no la subiste en tu perfil)' },
 ];
@@ -179,9 +192,15 @@ import { formatearFecha } from '../lib/formato';
           }
 
           <div class="wizard-actions" style="justify-content: flex-end">
-            @if (miPostulacion()) {
+            @if (esGestion()) {
+              <!-- Gestión Humana / admin no se inscriben -->
+            } @else if (miPostulacion() === undefined) {
+              <!-- Mientras se consultan sus postulaciones no se muestra el botón. -->
+              <p class="text-muted" style="margin: 0; font-size: 13px">Verificando tus postulaciones…</p>
+            } @else if (miPostulacion()) {
               <div class="notice notice--info" style="margin: 0">
                 Ya te inscribiste a esta vacante (radicado <strong>{{ miPostulacion().radicado }}</strong>).
+                <a routerLink="/mis-postulaciones">Ver en Mis postulaciones</a>
               </div>
             } @else if (vacante().estaCerrada) {
               <div class="notice notice--danger" style="margin: 0">
@@ -191,8 +210,16 @@ import { formatearFecha } from '../lib/formato';
               <div class="notice notice--info" style="margin: 0">
                 Esta convocatoria abre el <strong>{{ fecha(vacante().fechaApertura) }}</strong>. Vuelve ese día para poder inscribirte.
               </div>
-            } @else if (esGestion()) {
-              <!-- Gestión Humana / admin no se inscriben -->
+            } @else if (errorPostulaciones()) {
+              <div class="notice notice--danger" style="margin: 0">
+                No pudimos verificar tus postulaciones. Recarga la página para intentar de nuevo.
+              </div>
+            } @else if (postulacionEnCurso(); as otra) {
+              <div class="notice notice--info" style="margin: 0">
+                Ya tienes una postulación en curso en <strong>{{ otra.vacanteCargo || 'otro proceso' }}</strong>. Solo puedes
+                participar en un proceso de selección a la vez: podrás inscribirte cuando ese proceso termine o si te
+                retiras de él. <a routerLink="/mis-postulaciones">Ver mis postulaciones</a>
+              </div>
             } @else if (!mostrarConfirmacion()) {
               <button type="button" class="btn btn-primary" (click)="abrirConfirmacion()">Inscribirme</button>
             }
@@ -214,6 +241,9 @@ export class VacanteDetallePage {
   protected readonly vacante = signal<any>(undefined); // undefined = cargando, null = no encontrada
   protected readonly error = signal('');
   protected readonly miPostulacion = signal<any>(undefined); // undefined = cargando, null = no se ha postulado
+  /** Postulación en curso en OTRA vacante: solo se participa en un proceso a la vez. */
+  protected readonly postulacionEnCurso = signal<any>(null);
+  protected readonly errorPostulaciones = signal(false);
   protected readonly mostrarConfirmacion = signal(false);
   protected readonly perfil = signal<any>(null);
   protected readonly documentosExtra = signal<any>({ cedula: [], certificadosLaborales: [], certificadosEstudio: [], tarjetaProfesional: [] });
@@ -235,8 +265,14 @@ export class VacanteDetallePage {
       if (!token) return;
       solicitudesApi
         .misSolicitudes(token)
-        .then((mias) => this.miPostulacion.set(mias.find((s: any) => s.vacanteId === id) || null))
-        .catch(() => this.miPostulacion.set(null));
+        .then((mias) => {
+          this.miPostulacion.set(mias.find((s: any) => s.vacanteId === id) || null);
+          this.postulacionEnCurso.set(mias.find((s: any) => s.vacanteId !== id && sigueEnCurso(s)) || null);
+        })
+        .catch(() => {
+          this.miPostulacion.set(null);
+          this.errorPostulaciones.set(true);
+        });
     });
   }
 
