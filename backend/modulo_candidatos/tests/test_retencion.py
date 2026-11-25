@@ -35,8 +35,6 @@ def mock_vacantes(monkeypatch):
 
 DOCUMENTOS_VALIDOS = {
     "cedula": [{"nombre": "cedula.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_laborales": [{"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_estudio": [{"nombre": "estudio1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
     "tarjeta_profesional": [{"nombre": "tarjeta.pdf", "contenido_base64": "JVBERi0xLjQ="}],
 }
 
@@ -48,6 +46,8 @@ def _crear_solicitud(usuario_id, radicado_esperado_prefix="SOL"):
         json={
             "vacante_id": "vac-1",
             "datos_personales": {"nombreCompleto": "Ana Pérez", "cedula": "123", "correo": "ana@example.com"},
+            "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Universitario"}],
+            "experiencia": [{"fechaInicio": "2020-01-01", "fechaTerminacion": "2022-01-01"}],
             "autorizacion": {"nombreCompleto": "Ana Pérez"},
             "documentos_adjuntos": DOCUMENTOS_VALIDOS,
         },

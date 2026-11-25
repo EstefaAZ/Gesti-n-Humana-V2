@@ -1,0 +1,215 @@
+import { Component, booleanAttribute, input, output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Field } from '../field';
+import { SelectConOtro } from '../select-con-otro';
+import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from '../../data/municipiosPorDepartamento';
+import { PAISES } from '../../data/paises';
+import { CATEGORIAS_LICENCIA, categoriasLicenciaDe } from '../../data/catalogos';
+import { NotaObligatorios } from '../nota-obligatorios';
+import { hoyISO } from '../../lib/wizard';
+
+
+
+@Component({
+  selector: 'app-hoja-i',
+  imports: [NotaObligatorios, FormsModule, Field, SelectConOtro],
+  host: { style: 'display: contents' },
+  template: `
+    <section>
+      <h2 class="section-title">Datos Personales y Familiares</h2>
+      <p class="section-intro">Diligencie su información básica de contacto e identificación.</p>
+      <app-nota-obligatorios />
+
+      <div class="field-grid">
+        @if (!ocultarProceso()) {
+          <app-field label="Proceso de selección No.">
+            <input type="text" [value]="datos().proceso" (input)="set('proceso', $event)" [disabled]="datos().urlLocked" />
+          </app-field>
+          <app-field label="Fecha de entrega">
+            <input type="date" [value]="datos().fechaEntrega" (input)="set('fechaEntrega', $event)" [disabled]="datos().urlLocked" />
+          </app-field>
+        }
+
+        <app-field label="Nombre completo *" span2 [error]="errors().nombreCompleto">
+          <input type="text" autocomplete="name" [value]="datos().nombreCompleto" (input)="set('nombreCompleto', $event)" />
+        </app-field>
+
+        <app-field label="Cédula No. *" [error]="errors().cedula">
+          <input type="text" [value]="datos().cedula" (input)="set('cedula', $event)" />
+        </app-field>
+        <app-field label="De (lugar de expedición) *" [error]="errors().cedulaDe">
+          <input type="text" [value]="datos().cedulaDe" (input)="set('cedulaDe', $event)" />
+        </app-field>
+
+        <app-field label="Departamento de nacimiento *" [error]="errors().deptoNacimiento">
+          <app-select-con-otro
+            [value]="datos().deptoNacimiento"
+            [opciones]="departamentos"
+            (changed)="setDatos.emit({ deptoNacimiento: $event, ciudadNacimiento: '' })"
+          />
+        </app-field>
+        <app-field label="Ciudad de nacimiento *" [error]="errors().ciudadNacimiento">
+          <app-select-con-otro
+            [clave]="datos().deptoNacimiento"
+            [value]="datos().ciudadNacimiento"
+            [opciones]="municipios[datos().deptoNacimiento] || sinOpciones"
+            (changed)="setDatos.emit({ ciudadNacimiento: $event })"
+            [placeholder]="datos().deptoNacimiento ? 'Seleccione…' : 'Elige primero el departamento'"
+          />
+        </app-field>
+        <app-field label="País de nacimiento *" [error]="errors().paisNacimiento">
+          <select [ngModel]="datos().paisNacimiento" (ngModelChange)="setDatos.emit({ paisNacimiento: $event })">
+            <option value="">Seleccione…</option>
+            @for (p of paises; track p) {
+              <option [value]="p">{{ p }}</option>
+            }
+          </select>
+        </app-field>
+        <app-field label="Fecha de nacimiento *" [error]="errors().fechaNacimiento">
+          <input type="date" autocomplete="bday" [value]="datos().fechaNacimiento" (input)="set('fechaNacimiento', $event)" />
+        </app-field>
+
+        <app-field label="¿Tiene licencia de conducción?">
+          <div class="radio-row">
+            <label class="radio-option">
+              <input type="radio" name="licencia" [checked]="datos().licencia === 'si'" (change)="setDatos.emit({ licencia: 'si' })" /> Sí
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="licencia" [checked]="datos().licencia === 'no'" (change)="setDatos.emit({ licencia: 'no', licenciaClase: '', licenciaClases: [] })" /> No
+            </label>
+          </div>
+        </app-field>
+        @if (datos().licencia === 'si') {
+          <fieldset class="field field--span2 lic-categorias" [class.is-invalid]="!!errors().licenciaClases">
+            <legend>Categorías de su licencia *</legend>
+            <span class="hint">Marque todas las que aparecen en su licencia.</span>
+            <div class="lic-categorias__lista">
+              @for (c of categoriasLicencia; track c.clase) {
+                <label class="lic-categoria">
+                  <input type="checkbox" [checked]="categorias().includes(c.clase)" (change)="alternarCategoria(c.clase, $any($event.target).checked)" />
+                  <span class="lic-categoria__codigo">{{ c.clase }}</span>
+                  <span class="lic-categoria__texto">{{ c.descripcion }}</span>
+                </label>
+              }
+              <!-- Clases guardadas antes que no son de la lista oficial: se conservan y se pueden desmarcar. -->
+              @for (otra of categoriasFueraDeLista(); track otra) {
+                <label class="lic-categoria">
+                  <input type="checkbox" checked (change)="alternarCategoria(otra, $any($event.target).checked)" />
+                  <span class="lic-categoria__codigo">{{ otra }}</span>
+                  <span class="lic-categoria__texto">Registrada antes</span>
+                </label>
+              }
+            </div>
+            @if (errors().licenciaClases) {
+              <span class="field-error">{{ errors().licenciaClases }}</span>
+            }
+          </fieldset>
+        }
+        <app-field label="¿Tiene vehículo?" [error]="errors().tieneVehiculo">
+          <div class="radio-row">
+            <label class="radio-option">
+              <input type="radio" name="tieneVehiculo" [checked]="datos().tieneVehiculo === 'si'" (change)="setDatos.emit({ tieneVehiculo: 'si' })" /> Sí
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="tieneVehiculo" [checked]="datos().tieneVehiculo === 'no'" (change)="setDatos.emit({ tieneVehiculo: 'no' })" /> No
+            </label>
+          </div>
+        </app-field>
+
+        <app-field label="Correo electrónico *" span2 [error]="errors().correo">
+          <input type="email" autocomplete="email" spellcheck="false" [value]="datos().correo" (input)="set('correo', $event)" />
+        </app-field>
+
+        <app-field label="Dirección de residencia *" span2 [error]="errors().direccion">
+          <input type="text" autocomplete="street-address" [value]="datos().direccion" (input)="set('direccion', $event)" />
+        </app-field>
+        <app-field label="Departamento *" [error]="errors().deptoResidencia">
+          <app-select-con-otro
+            [value]="datos().deptoResidencia"
+            [opciones]="departamentos"
+            (changed)="setDatos.emit({ deptoResidencia: $event, municipio: '' })"
+          />
+        </app-field>
+        <app-field label="Municipio *" [error]="errors().municipio">
+          <app-select-con-otro
+            [clave]="datos().deptoResidencia"
+            [value]="datos().municipio"
+            [opciones]="municipios[datos().deptoResidencia] || sinOpciones"
+            (changed)="setDatos.emit({ municipio: $event })"
+            [placeholder]="datos().deptoResidencia ? 'Seleccione…' : 'Elige primero el departamento'"
+          />
+        </app-field>
+
+        <app-field label="Teléfono residencia">
+          <input type="tel" autocomplete="tel" [value]="datos().telResidencia" (input)="set('telResidencia', $event)" />
+        </app-field>
+        <app-field label="Celular *" [error]="errors().celular">
+          <input type="tel" autocomplete="tel" [value]="datos().celular" (input)="set('celular', $event)" />
+        </app-field>
+
+        <app-field label="Estado civil *" [error]="errors().estadoCivil">
+          <select [ngModel]="datos().estadoCivil" (ngModelChange)="setDatos.emit({ estadoCivil: $event })">
+            <option value="">Seleccione…</option>
+            <option>Soltero(a)</option>
+            <option>Casado(a)</option>
+            <option>Unión libre</option>
+            <option>Separado(a)</option>
+            <option>Divorciado(a)</option>
+            <option>Viudo(a)</option>
+          </select>
+        </app-field>
+        <app-field label="N° de hijos *" [error]="errors().numHijos">
+          <input type="number" min="0" [value]="datos().numHijos" (input)="set('numHijos', $event)" />
+        </app-field>
+
+        <app-field label="Tarjeta o matrícula profesional N° *" [error]="errors().tarjetaProfesional">
+          <input type="text" [value]="datos().tarjetaProfesional" (input)="set('tarjetaProfesional', $event)" />
+        </app-field>
+        <app-field label="Profesión *" [error]="errors().profesion">
+          <input type="text" [value]="datos().profesion" (input)="set('profesion', $event)" />
+        </app-field>
+        <app-field label="Fecha de expedición de la tarjeta *" [error]="errors().fechaTarjeta">
+          <input type="date" [attr.max]="hoy" [value]="datos().fechaTarjeta" (input)="set('fechaTarjeta', $event)" />
+        </app-field>
+      </div>
+    </section>
+  `,
+})
+export class HojaI {
+  readonly datos = input.required<any>();
+  readonly errors = input<any>({});
+  readonly ocultarProceso = input(false, { transform: booleanAttribute });
+  readonly setDatos = output<any>();
+
+  protected readonly departamentos = DEPARTAMENTOS;
+  protected readonly municipios = MUNICIPIOS_POR_DEPARTAMENTO;
+  protected readonly paises = PAISES;
+  protected readonly categoriasLicencia = CATEGORIAS_LICENCIA;
+
+  protected categorias(): string[] {
+    return categoriasLicenciaDe(this.datos());
+  }
+
+  protected categoriasFueraDeLista(): string[] {
+    return this.categorias().filter((c) => !CATEGORIAS_LICENCIA.some((x) => x.clase === c));
+  }
+
+  /** Guarda la lista y, unida, `licenciaClase` (lo que leen el PDF y los datos anteriores). */
+  protected alternarCategoria(clase: string, marcada: boolean): void {
+    const actuales = this.categorias().filter((c) => c !== clase);
+    const nuevas = marcada ? [...actuales, clase] : actuales;
+    const orden = (c: string) => {
+      const i = CATEGORIAS_LICENCIA.findIndex((x) => x.clase === c);
+      return i === -1 ? 99 : i;
+    };
+    nuevas.sort((a, b) => orden(a) - orden(b));
+    this.setDatos.emit({ licenciaClases: nuevas, licenciaClase: nuevas.join(', ') });
+  }
+  protected readonly sinOpciones: string[] = [];
+  /** Límite del selector de fecha: la tarjeta no puede expedirse en el futuro. */
+  protected readonly hoy = hoyISO();
+
+  protected set(key: string, e: Event): void {
+    this.setDatos.emit({ [key]: (e.target as HTMLInputElement).value });
+  }
+}

@@ -1,10 +1,23 @@
-import { TIPO_REGISTRO_LABELS } from "../../data/catalogos";
-
-const NIVELES_ESCALA = ["Regular", "Bien", "Muy bien"];
+import {
+  TIPO_REGISTRO_LABELS,
+  NIVELES_IDIOMA,
+  IDIOMAS,
+  CAMPOS_IDIOMA_ANTERIORES,
+  etiquetaNivelIdioma,
+  nivelDeRegistroIdioma,
+} from "../../data/catalogos";
+import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from "../../data/municipiosPorDepartamento";
+import SelectConOtro from "../SelectConOtro";
 
 export default function RegistroIICard({ registro, onChange, onRemove, index }) {
   const set = (patch) => onChange(registro.id, patch);
   const setTipo = (tipo) => onChange(registro.id, { tipo, tipoLabel: TIPO_REGISTRO_LABELS[tipo] });
+
+  // Un registro guardado con la escala anterior se muestra ya convertido; al
+  // tocarlo se guarda en la escala nueva y se descartan los campos viejos.
+  const nivelIdioma = nivelDeRegistroIdioma(registro);
+  const setNivelIdioma = (nivel) =>
+    set({ nivel, ...Object.fromEntries(CAMPOS_IDIOMA_ANTERIORES.map((c) => [c, undefined])) });
 
   return (
     <div className="repeatable-block">
@@ -58,8 +71,22 @@ export default function RegistroIICard({ registro, onChange, onRemove, index }) 
             <input type="text" value={registro.establecimiento || ""} onChange={(e) => set({ establecimiento: e.target.value })} />
           </div>
           <div className="field">
+            <label>Departamento</label>
+            <SelectConOtro
+              value={registro.departamento || ""}
+              opciones={DEPARTAMENTOS}
+              onChange={(v) => set({ departamento: v, ciudad: "" })}
+            />
+          </div>
+          <div className="field">
             <label>Ciudad</label>
-            <input type="text" value={registro.ciudad || ""} onChange={(e) => set({ ciudad: e.target.value })} />
+            <SelectConOtro
+              key={registro.departamento}
+              value={registro.ciudad || ""}
+              opciones={MUNICIPIOS_POR_DEPARTAMENTO[registro.departamento] || []}
+              onChange={(v) => set({ ciudad: v })}
+              placeholder={registro.departamento ? "Seleccione…" : "Elige primero el departamento"}
+            />
           </div>
           <div className="field">
             <label>Inicio (Año - Mes)</label>
@@ -118,7 +145,7 @@ export default function RegistroIICard({ registro, onChange, onRemove, index }) 
         <div className="field-grid field-grid--3">
           <div className="field">
             <label>Idioma</label>
-            <input type="text" value={registro.idioma || ""} onChange={(e) => set({ idioma: e.target.value })} />
+            <SelectConOtro value={registro.idioma || ""} opciones={IDIOMAS} onChange={(v) => set({ idioma: v })} />
           </div>
           <div className="field">
             <label>Establecimiento</label>
@@ -128,17 +155,16 @@ export default function RegistroIICard({ registro, onChange, onRemove, index }) 
             <label>Fecha (Año - Mes)</label>
             <input type="month" value={registro.fecha || ""} onChange={(e) => set({ fecha: e.target.value })} />
           </div>
-          {["habla", "lee", "escribe"].map((campo) => (
-            <div className="field" key={campo}>
-              <label>Lo {campo}</label>
-              <select value={registro[campo] || ""} onChange={(e) => set({ [campo]: e.target.value })}>
-                <option value="">Seleccione…</option>
-                {NIVELES_ESCALA.map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-          ))}
+          <div className="field">
+            <label>Nivel de dominio</label>
+            <select value={nivelIdioma} onChange={(e) => setNivelIdioma(e.target.value)}>
+              <option value="">Seleccione…</option>
+              {NIVELES_IDIOMA.map((n) => (
+                <option key={n} value={n}>{etiquetaNivelIdioma(n)}</option>
+              ))}
+            </select>
+            <span className="hint">Equivalencia con el Marco Común Europeo de Referencia (MCER).</span>
+          </div>
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import enum
 import uuid
 
 from sqlalchemy import Column, String, Boolean, DateTime, Enum
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -33,3 +34,15 @@ class Usuario(Base):
     # "Olvidé mi contraseña" — token de un solo uso con expiración
     reset_token = Column(String(64), unique=True, index=True, nullable=True)
     reset_token_expira = Column(DateTime(timezone=True), nullable=True)
+
+    # Foto de perfil (tabla aparte, ver models/foto_perfil.py). Se borra junto con el usuario.
+    foto = relationship("FotoPerfil", uselist=False, cascade="all, delete-orphan", lazy="select")
+
+    @property
+    def tiene_foto(self) -> bool:
+        return self.foto is not None
+
+
+# Se importa aquí para que SQLAlchemy registre el modelo de la relación de arriba
+# (y create_all cree la tabla) sin que nadie más tenga que acordarse de importarlo.
+from app.models.foto_perfil import FotoPerfil  # noqa: E402,F401

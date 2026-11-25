@@ -189,6 +189,14 @@ table.plain-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; 
 table.plain-table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-text-muted); padding: 0 8px 8px 0; font-weight: 600; }
 table.plain-table td { padding: 4px 8px 4px 0; vertical-align: top; }
 
+/* Fila a la que apunta una notificación: se resalta al llegar desde la campanita. */
+table.plain-table tr.fila-destacada td {
+  background: var(--color-primary-tint);
+  box-shadow: inset 0 -1px 0 var(--color-accent), inset 0 1px 0 var(--color-accent);
+}
+table.plain-table tr.fila-destacada td:first-child { box-shadow: inset 1px 0 0 var(--color-accent), inset 0 -1px 0 var(--color-accent), inset 0 1px 0 var(--color-accent); }
+table.plain-table tr.fila-destacada td:last-child { box-shadow: inset -1px 0 0 var(--color-accent), inset 0 -1px 0 var(--color-accent), inset 0 1px 0 var(--color-accent); }
+
 /* ---------- Notas / alertas ---------- */
 
 .notice { padding: 12px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 20px; }
@@ -271,13 +279,18 @@ table.plain-table td { padding: 4px 8px 4px 0; vertical-align: top; }
   font-size: 12px;
   white-space: nowrap;
 }
+/* Un tono propio por estado, sin repetir matiz entre ellos:
+   recibida = verde apagado · en revisión = ámbar · preseleccionado = azul
+   entrevista = morado · rechazada = rojo · aceptada = verde · retirada = terracota.
+   "Retirada" no es un rechazo (lo decide el propio candidato), por eso no
+   comparte el rojo, y lleva borde para no confundirse con el gris de "Recibida". */
 .estado-badge--recibida { background: var(--color-surface-sunken); color: var(--color-text-muted); }
 .estado-badge--en-revision { background: #FFF6D9; color: #8A6D00; }
 .estado-badge--preseleccionado { background: #E3EEFC; color: #1D5DAD; }
 .estado-badge--entrevista { background: #F0E6FA; color: #6B3FA0; }
 .estado-badge--rechazada { background: var(--color-danger-tint); color: var(--color-danger); }
 .estado-badge--aceptada { background: var(--color-accent-tint); color: var(--color-primary-dark); }
-.estado-badge--retirada { background: var(--color-surface-sunken); color: var(--color-text-muted); }
+.estado-badge--retirada { background: #F1E3D5; color: #8A5A28; box-shadow: inset 0 0 0 1px #DCC3A6; }
 
 .eval-motivos { font-size: 11.5px; color: var(--color-text-muted); margin: 6px 0 0; padding-left: 16px; }
 .eval-motivos li { margin-bottom: 2px; }

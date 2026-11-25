@@ -10,9 +10,11 @@ from app.core.database import get_db
 from app.api.deps import obtener_usuario_actual, requerir_roles, UsuarioToken, oauth2_scheme
 from app.clients import vacantes_client
 from app.clients.vacantes_client import VacantesServiceError
-from app.schemas.solicitud import SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
+from app.schemas.solicitud import GuardarCertificados, SolicitudCrear, SolicitudOut, CambiarEstado, EstadisticasSolicitudes, EventoAuditoriaOut, InscribirmeConPerfil
 from app.services import solicitud_service, retencion_service, auditoria_service, email_service, notificacion_service, reporte_service
 from app.services.pdf_service import generar_pdf_solicitud
+from app.services import zip_documentos_service
+from app.services import certificados_service
 
 router = APIRouter(prefix="/solicitudes", tags=["Solicitudes"])
 
@@ -34,6 +36,7 @@ def _solicitud_a_dict(solicitud) -> dict:
         "evaluacion": solicitud.evaluacion,
         "estado": solicitud.estado,
         "historial_estados": solicitud.historial_estados,
+        "certificados": solicitud.certificados,
         "fecha_solicitud": solicitud.fecha_solicitud,
     }
 
@@ -53,6 +56,8 @@ def crear_solicitud(
 ):
     try:
         solicitud = solicitud_service.crear_solicitud(db, datos, usuario_id=usuario.id, token=token)
+    except solicitud_service.PerfilIncompletoError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except solicitud_service.VacanteNoEncontradaError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except solicitud_service.VacanteCerradaError as e:
@@ -117,8 +122,17 @@ def inscribirme_con_perfil(
 
 
 @router.get("/mias", response_model=list[SolicitudOut])
-def mis_solicitudes(db: Session = Depends(get_db), usuario: UsuarioToken = Depends(obtener_usuario_actual)):
-    return solicitud_service.listar_por_usuario(db, usuario.id)
+def mis_solicitudes(
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+    token: str = Depends(oauth2_scheme),
+):
+    solicitudes = solicitud_service.listar_por_usuario(db, usuario.id)
+    convocatorias = solicitud_service.estado_de_convocatorias([s.vacante_id for s in solicitudes], token)
+    return [
+        SolicitudOut.model_validate(s).model_copy(update={"convocatoria": convocatorias.get(s.vacante_id)})
+        for s in solicitudes
+    ]
 
 
 @router.get("/vacante/{vacante_id}", response_model=list[SolicitudOut])
@@ -126,9 +140,17 @@ def postulaciones_de_vacante(
     vacante_id: str,
     db: Session = Depends(get_db),
     usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+    token: str = Depends(oauth2_scheme),
 ):
-    """Panel de Gestión Humana: todas las postulaciones de una vacante."""
-    return solicitud_service.listar_por_vacante(db, vacante_id)
+    """Panel de Gestión Humana: todas las postulaciones de una vacante, con la
+    evaluación recalculada según los criterios actuales de la vacante."""
+    solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    try:
+        vacante = vacantes_client.obtener_vacante(vacante_id, token=token)
+    except VacantesServiceError:
+        vacante = None  # sin el módulo de vacantes se muestra la última evaluación guardada
+    solicitud_service.reevaluar_con_criterios_actuales(db, solicitudes, vacante)
+    return solicitudes
 
 
 @router.get("/admin/reporte/{vacante_id}")
@@ -144,6 +166,7 @@ def descargar_reporte_vacante(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe una vacante con ese id.")
 
     solicitudes = solicitud_service.listar_por_vacante(db, vacante_id)
+    solicitud_service.reevaluar_con_criterios_actuales(db, solicitudes, vacante)
     contenido = reporte_service.generar_reporte_vacante(vacante, solicitudes)
 
     nombre_archivo = f"GTH-FOR-03_{vacante.get('proceso_no', vacante_id)}.xlsx".replace("/", "-")
@@ -177,6 +200,7 @@ def cambiar_estado(
 ):
     anterior = solicitud_service.obtener_por_radicado(db, radicado)
     estado_previo = anterior.estado if anterior else None
+    ya_pedia_certificados = bool(anterior and anterior.certificados_meta)
     try:
         actualizada = solicitud_service.actualizar_estado(db, radicado, datos.estado)
     except solicitud_service.SolicitudNoEncontradaError as e:
@@ -195,6 +219,20 @@ def cambiar_estado(
     vacante = vacantes_client.obtener_vacante(actualizada.vacante_id, token=token)
     cargo = (vacante or {}).get("cargo") or "tu proceso de selección"
 
+    if actualizada.certificados_meta and not ya_pedia_certificados:
+        # Recién preseleccionado: se le piden los certificados con plazo.
+        plazo = certificados_service.texto_plazo(actualizada.certificados["plazo"])
+        notificacion_service.crear_notificacion_candidato(
+            db, actualizada.usuario_id, tipo="certificados_solicitados",
+            titulo="Pasaste a la siguiente etapa del proceso de selección, adjunta tus certificados",
+            mensaje=f'Fuiste preseleccionado en "{cargo}" (radicado {radicado}). Adjunta tus certificados '
+                    f"laborales y de estudio en Mis postulaciones a más tardar el {plazo}.",
+            entidad_tipo="solicitud", entidad_id=radicado,
+        )
+        if correo:
+            email_service.enviar_correo_certificados_solicitados(correo, nombre, cargo, radicado, plazo)
+        return actualizada
+
     notificacion_service.crear_notificacion_candidato(
         db, actualizada.usuario_id, tipo="estado_cambiado",
         titulo="Actualización de tu postulación",
@@ -204,6 +242,74 @@ def cambiar_estado(
     if correo:
         email_service.enviar_correo_cambio_estado(correo, nombre, cargo, radicado, datos.estado)
 
+    return actualizada
+
+
+@router.put("/{radicado}/certificados", response_model=SolicitudOut)
+def adjuntar_certificados(
+    radicado: str,
+    datos: GuardarCertificados,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """El candidato preseleccionado adjunta sus certificados laborales y de estudio (dentro del plazo)."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    if solicitud.usuario_id != usuario.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el candidato puede adjuntar sus certificados.")
+    try:
+        actualizada = certificados_service.guardar_certificados(db, solicitud, datos.model_dump())
+    except (certificados_service.CertificadosNoHabilitadosError, certificados_service.PlazoVencidoError) as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except (certificados_service.CertificadosVaciosError, certificados_service.DocumentoFaltanteError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    nombre = (actualizada.datos_personales or {}).get("nombreCompleto") or "Un candidato"
+    auditoria_service.registrar_evento(
+        db, tipo="certificados_adjuntados",
+        descripcion=f"{nombre} adjuntó sus certificados laborales y de estudio ({radicado}).",
+        actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    notificacion_service.crear_notificacion_gestion(
+        db, tipo="certificados_adjuntados",
+        titulo="Certificados recibidos",
+        mensaje=f"{nombre} adjuntó sus certificados ({radicado}, {actualizada.vacante_cargo or 'proceso'}).",
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    return actualizada
+
+
+@router.post("/{radicado}/certificados/ampliar-plazo", response_model=SolicitudOut)
+def ampliar_plazo_certificados(
+    radicado: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(requerir_roles(*ROLES_GESTION)),
+):
+    """Gestión Humana da 3 días hábiles más (contados desde hoy) para adjuntar los certificados."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    try:
+        actualizada = certificados_service.ampliar_plazo(db, solicitud)
+    except certificados_service.CertificadosNoHabilitadosError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    plazo = certificados_service.texto_plazo(actualizada.certificados["plazo"])
+    auditoria_service.registrar_evento(
+        db, tipo="plazo_certificados_ampliado",
+        descripcion=f"{usuario.nombre or usuario.id} amplió hasta el {plazo} el plazo de certificados de {radicado}.",
+        actor_id=usuario.id, actor_nombre=usuario.nombre, actor_rol=usuario.rol,
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
+    notificacion_service.crear_notificacion_candidato(
+        db, actualizada.usuario_id, tipo="certificados_solicitados",
+        titulo="Tienes más tiempo para adjuntar tus certificados",
+        mensaje=f'Gestión Humana amplió el plazo para "{actualizada.vacante_cargo or "tu proceso"}" ({radicado}) '
+                f"hasta el {plazo}.",
+        entidad_tipo="solicitud", entidad_id=radicado,
+    )
     return actualizada
 
 
@@ -248,10 +354,38 @@ def descargar_pdf(
     _verificar_acceso(solicitud, usuario)
 
     pdf_bytes = generar_pdf_solicitud(_solicitud_a_dict(solicitud))
+    # "ID del proceso - Nombre candidato.pdf"; si falta alguno de los dos, se usa el radicado.
+    proceso = solicitud.vacante_proceso_no or (solicitud.datos_personales or {}).get("proceso")
+    nombre = (solicitud.datos_personales or {}).get("nombreCompleto")
+    nombre_pdf = f"{proceso} - {nombre}.pdf" if proceso and nombre else f"{radicado}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{radicado}.pdf"'},
+        headers={"Content-Disposition": zip_documentos_service.content_disposition(nombre_pdf, f"{radicado}.pdf")},
+    )
+
+
+@router.get("/{radicado}/documentos/zip")
+def descargar_documentos_zip(
+    radicado: str,
+    db: Session = Depends(get_db),
+    usuario: UsuarioToken = Depends(obtener_usuario_actual),
+):
+    """Todos los documentos adjuntos de una postulación en un .zip. Mismo control
+    de acceso que cada documento: dueño de la solicitud o Gestión Humana."""
+    solicitud = solicitud_service.obtener_por_radicado(db, radicado)
+    if not solicitud:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitud no encontrada.")
+    _verificar_acceso(solicitud, usuario)
+    try:
+        contenido = zip_documentos_service.armar_zip(solicitud.documentos_adjuntos or {})
+    except zip_documentos_service.SinDocumentosError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    nombre = (solicitud.datos_personales or {}).get("nombreCompleto") or "candidato"
+    return Response(
+        content=contenido,
+        media_type="application/zip",
+        headers=zip_documentos_service.respuesta_zip_headers(f"{radicado} - {nombre}.zip"),
     )
 
 

@@ -3,6 +3,7 @@
 # Lógica de negocio — crear, listar, actualizar, eliminar vacantes
 # ==============================================================
 
+import logging
 from datetime import datetime, date, time
 from typing import Optional
 
@@ -10,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.models.vacante import Vacante, ESTADOS_VISIBLES_CANDIDATO, ESTADOS_VACANTE
 from app.schemas.vacante import VacanteCrear, VacanteActualizar, VacanteOut
+
+logger = logging.getLogger(__name__)
 
 
 class VacanteNoEncontradaError(Exception):
@@ -23,12 +26,8 @@ class DocumentoNoEncontradoError(Exception):
 ESTADOS_QUE_BLOQUEAN_POSTULACION = ("cerrada", "cancelada_desierta")
 
 
-def esta_cerrada(vacante: Vacante) -> bool:
-    # Un cierre MANUAL (Gestión Humana cambió el estado a "cerrada" o
-    # "cancelada_desierta") debe bloquear postulaciones YA, sin esperar a
-    # que llegue la fecha de cierre automática.
-    if vacante.estado in ESTADOS_QUE_BLOQUEAN_POSTULACION:
-        return True
+def paso_fecha_cierre(vacante: Vacante) -> bool:
+    """True si ya pasó la fecha y hora de cierre de la convocatoria."""
     if not vacante.fecha_cierre:
         return False
     try:
@@ -37,6 +36,33 @@ def esta_cerrada(vacante: Vacante) -> bool:
     except (ValueError, AttributeError):
         cierre = datetime.combine(vacante.fecha_cierre, time(23, 59))
     return datetime.now() > cierre
+
+
+def esta_cerrada(vacante: Vacante) -> bool:
+    # Un cierre MANUAL (Gestión Humana cambió el estado a "cerrada" o
+    # "cancelada_desierta") debe bloquear postulaciones YA, sin esperar a
+    # que llegue la fecha de cierre automática.
+    if vacante.estado in ESTADOS_QUE_BLOQUEAN_POSTULACION:
+        return True
+    return paso_fecha_cierre(vacante)
+
+
+def cerrar_vencidas(db: Session, vacantes: list[Vacante]) -> None:
+    """
+    Una vacante "publicada" cuya fecha de cierre ya pasó se guarda como
+    "cerrada". Antes seguía figurando como "publicada" en el dashboard y en la
+    gestión, y además el módulo de candidatos la contaba como "en curso" (y no
+    dejaba al candidato inscribirse en otra). Se hace al leer —no hay tareas
+    programadas en el proyecto—, así que el cambio se ve apenas alguien consulta.
+    Solo toca "publicada": "en_proceso" y los demás estados los maneja Gestión Humana.
+    """
+    vencidas = [v for v in vacantes if v is not None and v.estado == "publicada" and paso_fecha_cierre(v)]
+    if not vencidas:
+        return
+    for v in vencidas:
+        v.estado = "cerrada"
+        logger.info(f'Vacante "{v.cargo}" ({v.id}) pasó a "cerrada": venció su fecha de cierre ({v.fecha_cierre} {v.hora_cierre or ""}).')
+    db.commit()
 
 
 def aun_no_abre(vacante: Vacante) -> bool:
@@ -73,11 +99,19 @@ def listar_vacantes(db: Session, solo_visibles: bool = False) -> list[VacanteOut
     if solo_visibles:
         query = query.filter(Vacante.estado.in_(ESTADOS_VISIBLES_CANDIDATO))
     vacantes = query.order_by(Vacante.fecha_creacion.desc()).all()
+    cerrar_vencidas(db, vacantes)
+    if solo_visibles:
+        # Al candidato solo se le listan convocatorias abiertas: las cerradas o
+        # canceladas no aparecen en "Vacantes". Si ya se había postulado, lo ve
+        # en "Mis postulaciones". El detalle por id sigue respondiendo para las
+        # cerradas (enlaces viejos, notificaciones), con su aviso de cierre.
+        vacantes = [v for v in vacantes if v.estado == "publicada" and not esta_cerrada(v)]
     return [_a_out(v) for v in vacantes]
 
 
 def obtener_vacante(db: Session, vacante_id: str) -> Optional[VacanteOut]:
     vacante = db.query(Vacante).filter(Vacante.id == vacante_id).first()
+    cerrar_vencidas(db, [vacante])
     return _a_out(vacante) if vacante else None
 
 
@@ -132,6 +166,7 @@ def obtener_estadisticas(db: Session) -> dict:
     """Conteos reales para el Dashboard — activas = estado "publicada";
     abiertas/cerradas se calculan (dependen de la fecha de cierre vs ahora)."""
     todas = db.query(Vacante).all()
+    cerrar_vencidas(db, todas)
     activas = sum(1 for v in todas if v.estado == "publicada")
     abiertas = sum(1 for v in todas if not esta_cerrada(v))
     por_estado = {estado: sum(1 for v in todas if v.estado == estado) for estado in ESTADOS_VACANTE}

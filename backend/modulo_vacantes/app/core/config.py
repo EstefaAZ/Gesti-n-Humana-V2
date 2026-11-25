@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "CAMBIAR-ESTA-CLAVE-EN-PRODUCCION"
     ALGORITHM: str = "HS256"
 
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:4200"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -49,6 +49,11 @@ def validar_configuracion_produccion() -> None:
         errores.append("ALLOWED_ORIGINS no debe contener '*' en producción.")
     if "localhost" in settings.ALLOWED_ORIGINS or "127.0.0.1" in settings.ALLOWED_ORIGINS:
         errores.append("ALLOWED_ORIGINS contiene 'localhost' — configúralo con el dominio real de producción.")
+    if settings.DATABASE_URL.startswith("sqlite"):
+        errores.append(
+            "DATABASE_URL sigue apuntando a SQLite. En producción usa PostgreSQL (ver README): un archivo "
+            "SQLite dentro de un contenedor sin volumen persistente se pierde por completo en cada redeploy."
+        )
 
     if errores:
         mensaje = "Configuración insegura para ENVIRONMENT=production:\n- " + "\n- ".join(errores)

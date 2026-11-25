@@ -1,6 +1,7 @@
 import Field from "../Field";
 import SelectConOtro from "../SelectConOtro";
 import { MUNICIPIOS_POR_DEPARTAMENTO, DEPARTAMENTOS } from "../../data/municipiosPorDepartamento";
+import { PAISES } from "../../data/paises";
 
 export default function HojaI({ datos, setDatos, errors, ocultarProceso = false }) {
   const set = (key) => (e) => setDatos({ [key]: e.target.value });
@@ -50,7 +51,10 @@ export default function HojaI({ datos, setDatos, errors, ocultarProceso = false 
           />
         </Field>
         <Field label="País de nacimiento *" error={errors.paisNacimiento}>
-          <input type="text" value={datos.paisNacimiento} onChange={set("paisNacimiento")} />
+          <select value={datos.paisNacimiento} onChange={set("paisNacimiento")}>
+            <option value="">Seleccione…</option>
+            {PAISES.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
         </Field>
         <Field label="Fecha de nacimiento *" error={errors.fechaNacimiento}>
           <input type="date" value={datos.fechaNacimiento} onChange={set("fechaNacimiento")} />

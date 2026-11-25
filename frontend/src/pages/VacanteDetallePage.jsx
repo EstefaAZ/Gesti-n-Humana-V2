@@ -5,6 +5,7 @@ import * as vacantesApi from "../lib/api/vacantesApi";
 import * as solicitudesApi from "../lib/api/solicitudesApi";
 import * as perfilesApi from "../lib/api/perfilesApi";
 import { archivoABase64 } from "../lib/formState";
+import { etiquetaNivelIdioma, normalizarNivelIdioma } from "../data/catalogos";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api/httpClient";
 
@@ -130,10 +131,10 @@ export default function VacanteDetallePage() {
 
           <h3 className="section-title" style={{ fontSize: 15 }}>Requisitos evaluados en la inscripción</h3>
           <ul style={{ margin: "4px 0 14px 18px", padding: 0, fontSize: 13.5 }}>
-            {c.nivelEducativoMin && <li>Nivel educativo mínimo: {c.nivelEducativoMin}{c.graduadoRequerido ? " (graduado)" : ""}</li>}
+            {c.nivelEducativoMin && <li>Nivel educativo mínimo: {c.nivelEducativoMin} o superior{c.graduadoRequerido ? " (graduado)" : ""}</li>}
             {c.profesionKeyword && <li>Profesión / título relacionado con: "{c.profesionKeyword}"</li>}
             {c.experienciaMinAnios && <li>Experiencia mínima: {c.experienciaMinAnios} años</li>}
-            {c.idiomaRequerido && <li>Idioma: {c.idiomaRequerido} — nivel mínimo {c.idiomaNivelMin} ({c.idiomaHabilidad})</li>}
+            {c.idiomaRequerido && <li>Idioma: {c.idiomaRequerido} — nivel mínimo {etiquetaNivelIdioma(normalizarNivelIdioma(c.idiomaNivelMin))} o superior</li>}
             {(c.certificacionesKeywords || []).map((cert, i) => (
               <li key={i}>Certificación relacionada con: "{cert}"</li>
             ))}

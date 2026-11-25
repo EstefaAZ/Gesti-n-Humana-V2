@@ -79,6 +79,20 @@ def enviar_correo_solicitud_recibida(destinatario: str, nombre: str, cargo: str,
     return enviar_correo(destinatario, f"Recibimos tu inscripción a {cargo} — Aguas Nacionales EPM", cuerpo)
 
 
+def enviar_correo_certificados_solicitados(destinatario: str, nombre: str, cargo: str, radicado: str, plazo_texto: str) -> bool:
+    cuerpo = _plantilla_base(
+        "Pasaste a la siguiente etapa del proceso de selección, adjunta tus certificados",
+        f"""
+        <p>Hola {nombre},</p>
+        <p>Fuiste <strong>preseleccionado</strong> en el proceso <strong>{cargo}</strong> (radicado {radicado}).</p>
+        <p>Para continuar, adjunta tus certificados laborales y de estudio desde "Mis postulaciones" a más tardar el:</p>
+        <p style="font-size:18px;font-weight:700;color:#004D20;">{plazo_texto}</p>
+        <p style="font-size:12.5px;color:#5B6B60;">Tienes 3 días hábiles. Si no los adjuntas a tiempo, escribe a Gestión Humana.</p>
+        """,
+    )
+    return enviar_correo(destinatario, f"Adjunta tus certificados para {cargo} — Aguas Nacionales EPM", cuerpo)
+
+
 def enviar_correo_cambio_estado(destinatario: str, nombre: str, cargo: str, radicado: str, nuevo_estado: str) -> bool:
     cuerpo = _plantilla_base(
         "Actualización de tu postulación",

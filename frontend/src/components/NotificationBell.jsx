@@ -77,6 +77,19 @@ export default function NotificationBell() {
     }
   }
 
+  /**
+   * Un clic hace las dos cosas: marca la notificación como leída (igual que
+   * antes) y, si el evento apunta a algo concreto, lleva hasta ese recurso.
+   * Si no hay destino, el panel se queda abierto como hasta ahora.
+   */
+  async function abrirNotificacion(n) {
+    await marcarLeida(n);
+    const destino = await notificacionesApi.resolverDestino(n, token).catch(() => null);
+    if (!destino) return;
+    setAbierto(false);
+    navigate(destino);
+  }
+
   async function marcarTodas() {
     try {
       await notificacionesApi.marcarTodasLeidas(token);
@@ -117,7 +130,10 @@ export default function NotificationBell() {
                 <li
                   key={`${n.servicio}-${n.id}`}
                   className={`notif-bell__item ${n.leida ? "" : "is-unread"}`}
-                  onClick={() => marcarLeida(n)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => abrirNotificacion(n)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirNotificacion(n); } }}
                 >
                   <span className="notif-bell__icono">{ICONO_POR_TIPO[n.tipo] || "🔔"}</span>
                   <div>

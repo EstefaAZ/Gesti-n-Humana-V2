@@ -3,12 +3,21 @@
 # Esquemas Pydantic — validación de entrada/salida
 # ==============================================================
 
-from datetime import date, datetime
+from datetime import date
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+from app.schemas.tipos import FechaUTC
 
 EstadoVacante = Literal["borrador", "publicada", "en_proceso", "cerrada", "cancelada_desierta"]
+
+# Escala única de dominio del idioma (equivalencias MCER: A1–A2 / B1 / B2–C1 / C2).
+NIVELES_IDIOMA = ("Básico", "Intermedio", "Avanzado", "Experto")
+NIVELES_EDUCATIVOS = ("Secundarios", "Técnico", "Tecnólogo", "Universitario", "Postgrado")
+
+# Escala anterior, por habilidad. Solo para poder LEER vacantes creadas antes
+# del cambio: se traducen al vuelo y al guardar quedan ya con la escala nueva.
+NIVEL_IDIOMA_ANTERIOR = {"Regular": "Básico", "Bien": "Intermedio", "Muy bien": "Avanzado"}
 
 
 class CriteriosEvaluacion(BaseModel):
@@ -16,15 +25,47 @@ class CriteriosEvaluacion(BaseModel):
     Criterios de evaluación automática — SOLO INFORMATIVOS.
     Nunca deben usarse para bloquear el envío de una solicitud; el módulo
     Candidatos los usa únicamente para calcular una etiqueta orientativa.
+
+    Todos los criterios son MÍNIMOS: superarlos también cumple. `idioma_habilidad`
+    (habla/lee/escribe) desapareció con la escala nueva; si un cliente antiguo la
+    envía, Pydantic la ignora y no rompe nada.
     """
     nivel_educativo_min: str = ""
     graduado_requerido: bool = True
-    profesion_keyword: str = ""
+    profesion_keyword: str = ""  # anterior a "titulos_aceptados"; se sigue leyendo en vacantes viejas
+    # Títulos que pide la vacante, como los redacta Gestión Humana ("logística",
+    # "mecánica automotriz"…). Con acepta_afines, también cumple cualquier título
+    # de los núcleos NBC (Ministerio de Educación) listados en nbc_afines.
+    titulos_aceptados: list[str] = Field(default_factory=list)
+    acepta_afines: bool = False
+    nbc_afines: list[str] = Field(default_factory=list)
     experiencia_min_anios: Optional[float] = None
     idioma_requerido: str = ""
-    idioma_habilidad: str = "habla"  # habla | lee | escribe
-    idioma_nivel_min: str = "Regular"  # Regular | Bien | Muy bien
+    idioma_nivel_min: str = NIVELES_IDIOMA[0]  # Básico | Intermedio | Avanzado | Experto
     certificaciones_keywords: list[str] = Field(default_factory=list)
+
+    @field_validator("idioma_nivel_min")
+    @classmethod
+    def normalizar_nivel_idioma(cls, v: str) -> str:
+        v = (v or "").strip()
+        v = NIVEL_IDIOMA_ANTERIOR.get(v, v)
+        return v if v in NIVELES_IDIOMA else NIVELES_IDIOMA[0]
+
+    @field_validator("titulos_aceptados")
+    @classmethod
+    def maximo_10_titulos(cls, v: list[str]) -> list[str]:
+        limpios = [t.strip() for t in v if t and t.strip()]
+        if len(limpios) > 10:
+            raise ValueError("No se pueden pedir más de 10 títulos.")
+        return limpios
+
+    @field_validator("nbc_afines")
+    @classmethod
+    def codigos_nbc(cls, v: list[str]) -> list[str]:
+        codigos = list(dict.fromkeys(str(c).strip() for c in v if str(c).strip()))
+        if any(not c.isdigit() for c in codigos):
+            raise ValueError("Los núcleos afines deben ser códigos NBC numéricos.")
+        return codigos
 
     @field_validator("certificaciones_keywords")
     @classmethod
@@ -54,11 +95,29 @@ class VacanteBase(BaseModel):
     criterios: CriteriosEvaluacion = Field(default_factory=CriteriosEvaluacion)
 
 
-class VacanteCrear(VacanteBase):
+class _VacanteConRequisitosObligatorios(VacanteBase):
+    """
+    Toda vacante exige estudios y experiencia; solo los conocimientos
+    complementarios (idioma, certificaciones, profesión) son opcionales.
+    Se valida al crear o editar — no en VacanteOut, para que las vacantes
+    guardadas antes de esta regla se sigan pudiendo leer.
+    """
+
+    @model_validator(mode="after")
+    def exigir_estudios_y_experiencia(self):
+        c = self.criterios
+        if c.nivel_educativo_min not in NIVELES_EDUCATIVOS:
+            raise ValueError("Indica el nivel educativo mínimo de la vacante.")
+        if c.experiencia_min_anios is None or c.experiencia_min_anios < 0:
+            raise ValueError("Indica los años mínimos de experiencia (0 si el cargo no exige experiencia).")
+        return self
+
+
+class VacanteCrear(_VacanteConRequisitosObligatorios):
     pass
 
 
-class VacanteActualizar(VacanteBase):
+class VacanteActualizar(_VacanteConRequisitosObligatorios):
     pass
 
 
@@ -72,7 +131,7 @@ class VacanteOut(VacanteBase):
     aun_no_abre: bool = False
     tiene_documento_pdf: bool = False
     creada_por_nombre: Optional[str] = None
-    fecha_creacion: Optional[datetime] = None
+    fecha_creacion: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}
 
@@ -95,6 +154,6 @@ class EventoAuditoriaOut(BaseModel):
     actor_rol: Optional[str] = None
     entidad_tipo: Optional[str] = None
     entidad_id: Optional[str] = None
-    fecha: Optional[datetime] = None
+    fecha: Optional[FechaUTC] = None
 
     model_config = {"from_attributes": True}

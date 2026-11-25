@@ -27,8 +27,6 @@ HEADERS_ADMIN = {"Authorization": f"Bearer {token_para('admin-1', rol='admin', n
 
 DOCUMENTOS_VALIDOS = {
     "cedula": [{"nombre": "cedula.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_laborales": [{"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
-    "certificados_estudio": [{"nombre": "estudio1.pdf", "contenido_base64": "JVBERi0xLjQ="}],
     "tarjeta_profesional": [{"nombre": "tarjeta.pdf", "contenido_base64": "JVBERi0xLjQ="}],
 }
 
@@ -41,8 +39,8 @@ SOLICITUD_VALIDA = {
         "celular": "3225989990",
         "municipio": "Medellín",
     },
-    "registros_ii": [],
-    "experiencia": [],
+    "registros_ii": [{"tipo": "estudio", "nivelEducativo": "Secundarios", "graduado": "si", "titulo": "Bachiller"}],
+    "experiencia": [{"empresa": "Empresa X", "cargo": "Auxiliar", "fechaInicio": "2024-01-01", "fechaTerminacion": "2024-06-01"}],
     "conflicto": {"tieneVinculo": "no", "tieneOtraInhabilidad": "no"},
     "autorizacion": {"nombreCompleto": "Estefanía Delgado Bernal"},
     "documentos_adjuntos": DOCUMENTOS_VALIDOS,
@@ -52,6 +50,13 @@ SOLICITUD_VALIDA = {
 
 def test_health_check():
     assert client.get("/health").json()["estado"] == "saludable"
+
+
+@pytest.mark.parametrize("campo", ["registros_ii", "experiencia"])
+def test_crear_solicitud_sin_estudios_o_sin_experiencia_es_rechazada(campo):
+    r = client.post("/api/v1/solicitudes", json={**SOLICITUD_VALIDA, campo: []}, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 409
+    assert "al menos" in r.json()["detail"]
 
 
 def test_crear_solicitud_sin_token_rechazada():
@@ -77,7 +82,7 @@ def test_crear_solicitud_exitosa_y_evaluacion_no_cumple():
     data = r.json()
     assert data["radicado"].startswith("SOL-")
     assert data["estado"] == "Recibida"
-    # No registró estudios ni experiencia, así que NO cumple los criterios de la vacante.
+    # Su nivel educativo y su experiencia (5 meses) no alcanzan, así que NO cumple los criterios de la vacante.
     assert data["evaluacion"]["cumple"] is False
     assert len(data["evaluacion"]["motivos"]) == 2  # nivel educativo + experiencia mínima
 
@@ -107,6 +112,36 @@ def test_mis_solicitudes_solo_devuelve_las_propias():
 
     r2 = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO)
     assert len(r2.json()) == 1
+
+
+def test_mis_solicitudes_incluye_el_estado_actual_de_la_convocatoria(monkeypatch):
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    r = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO)
+    assert r.json()[0]["convocatoria"]["estado"] == "publicada"
+    assert r.json()[0]["convocatoria"]["esta_cerrada"] is False
+
+    # Gestión Humana cancela la convocatoria después de la postulación: el candidato lo ve.
+    from app.clients import vacantes_client
+    monkeypatch.setattr(
+        vacantes_client, "obtener_estado_proceso",
+        lambda vacante_id, token=None: {"id": vacante_id, "estado": "cancelada_desierta", "esta_cerrada": True},
+    )
+    conv = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO).json()[0]["convocatoria"]
+    assert conv["estado"] == "cancelada_desierta"
+    assert conv["esta_cerrada"] is True
+
+
+def test_mis_solicitudes_funciona_aunque_vacantes_no_responda(monkeypatch):
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    from app.clients import vacantes_client
+
+    def caido(vacante_id, token=None):
+        raise vacantes_client.VacantesServiceError("sin conexión")
+
+    monkeypatch.setattr(vacantes_client, "obtener_estado_proceso", caido)
+    r = client.get("/api/v1/solicitudes/mias", headers=HEADERS_CANDIDATO)
+    assert r.status_code == 200
+    assert r.json()[0]["convocatoria"] is None
 
 
 def test_otro_candidato_no_puede_ver_solicitud_ajena_pero_gestor_si():
@@ -260,17 +295,19 @@ def test_no_se_puede_enviar_sin_cedula():
     assert "cédula" in str(r.json()).lower()
 
 
-def test_no_se_puede_enviar_sin_certificados_laborales():
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": []}}
+def test_al_inscribirse_no_se_aceptan_certificados():
+    # Los certificados se adjuntan solo después de la preselección.
+    doc = {"nombre": "laboral1.pdf", "contenido_base64": "JVBERi0xLjQ="}
+    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": [doc]}}
     r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
     assert r.status_code == 422
-    assert "laboral" in str(r.json()).lower()
+    assert "preselecciona" in str(r.json())
 
 
-def test_no_se_puede_enviar_sin_certificados_estudio():
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_estudio": []}}
-    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
-    assert r.status_code == 422
+def test_se_inscribe_solo_con_cedula_y_tarjeta():
+    r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 201
+    assert r.json()["certificados"] is None  # todavía no se le piden
 
 
 def test_no_se_puede_enviar_sin_tarjeta_profesional():
@@ -282,20 +319,6 @@ def test_no_se_puede_enviar_sin_tarjeta_profesional():
 def test_cedula_rechaza_mas_de_1_archivo():
     doc = DOCUMENTOS_VALIDOS["cedula"][0]
     datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "cedula": [doc, doc]}}
-    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
-    assert r.status_code == 422
-
-
-def test_certificados_laborales_acepta_hasta_10():
-    doc = DOCUMENTOS_VALIDOS["certificados_laborales"][0]
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": [doc] * 10}}
-    r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
-    assert r.status_code == 201
-
-
-def test_certificados_laborales_rechaza_mas_de_10():
-    doc = DOCUMENTOS_VALIDOS["certificados_laborales"][0]
-    datos = {**SOLICITUD_VALIDA, "documentos_adjuntos": {**DOCUMENTOS_VALIDOS, "certificados_laborales": [doc] * 11}}
     r = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO)
     assert r.status_code == 422
 
@@ -347,3 +370,68 @@ def test_solicitud_out_no_expone_el_contenido_base64_solo_el_nombre():
     data = r.json()
     assert data["documentos_adjuntos"]["cedula"][0]["nombre"] == "cedula.pdf"
     assert "contenido_base64" not in data["documentos_adjuntos"]["cedula"][0]
+
+
+def test_fecha_solicitud_sale_en_utc_con_zona_horaria():
+    # SQLite devuelve la fecha sin zona; la API debe marcarla como UTC ("Z") para
+    # que el navegador no la tome como hora local (5 horas corrida en Colombia).
+    r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 201
+    assert r.json()["fecha_solicitud"].endswith("Z")
+
+
+def test_pdf_se_descarga_como_id_del_proceso_y_nombre_del_candidato():
+    from urllib.parse import unquote
+
+    datos = {**SOLICITUD_VALIDA, "datos_personales": {**SOLICITUD_VALIDA["datos_personales"], "proceso": "2026-P02-05"}}
+    radicado = client.post("/api/v1/solicitudes", json=datos, headers=HEADERS_CANDIDATO).json()["radicado"]
+    cabecera = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers=HEADERS_CANDIDATO).headers["content-disposition"]
+    assert unquote(cabecera.split("filename*=UTF-8''")[1]) == "2026-P02-05 - Estefanía Delgado Bernal.pdf"
+    # Respaldo sin tildes para navegadores que no leen filename*.
+    assert 'filename="2026-P02-05 - Estefania Delgado Bernal.pdf"' in cabecera
+
+
+def test_pdf_sin_id_de_proceso_se_descarga_con_el_radicado():
+    radicado = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO).json()["radicado"]
+    cabecera = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers=HEADERS_CANDIDATO).headers["content-disposition"]
+    assert f'filename="{radicado}.pdf"' in cabecera
+
+
+def test_el_navegador_puede_leer_el_nombre_de_las_descargas():
+    from app.core.config import settings
+
+    origen = settings.ALLOWED_ORIGINS.split(",")[0].strip()
+    radicado = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO).json()["radicado"]
+    r = client.get(f"/api/v1/solicitudes/{radicado}/pdf", headers={**HEADERS_CANDIDATO, "Origin": origen})
+    assert "content-disposition" in r.headers.get("access-control-expose-headers", "").lower()
+
+
+
+# (6) Si Gestión Humana edita los criterios después, la evaluación se recalcula al consultarla.
+def test_evaluacion_se_recalcula_si_cambian_los_criterios_de_la_vacante(monkeypatch):
+    from app.clients import vacantes_client
+    r = client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    assert r.status_code == 201
+    radicado = r.json()["radicado"]
+
+    original = vacantes_client.obtener_vacante
+    def vacante_con_criterio_imposible(vacante_id, token=None):
+        v = original(vacante_id, token=token)
+        return {**v, "criterios": {**v["criterios"], "experiencia_min_anios": 80}} if v else v
+    monkeypatch.setattr(vacantes_client, "obtener_vacante", vacante_con_criterio_imposible)
+
+    lista = client.get(f"/api/v1/solicitudes/vacante/{SOLICITUD_VALIDA['vacante_id']}", headers=HEADERS_GESTOR).json()
+    evaluacion = next(s for s in lista if s["radicado"] == radicado)["evaluacion"]
+    assert evaluacion["detalle"]["experiencia"]["cumple"] is False
+    assert "80 años" in evaluacion["detalle"]["experiencia"]["motivo"]
+
+
+def test_listar_postulaciones_funciona_aunque_vacantes_no_responda(monkeypatch):
+    from app.clients import vacantes_client
+    client.post("/api/v1/solicitudes", json=SOLICITUD_VALIDA, headers=HEADERS_CANDIDATO)
+    def falla(vacante_id, token=None):
+        raise vacantes_client.VacantesServiceError("caído")
+    monkeypatch.setattr(vacantes_client, "obtener_vacante", falla)
+    r = client.get(f"/api/v1/solicitudes/vacante/{SOLICITUD_VALIDA['vacante_id']}", headers=HEADERS_GESTOR)
+    assert r.status_code == 200
+    assert len(r.json()) == 1

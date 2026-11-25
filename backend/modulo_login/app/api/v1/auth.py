@@ -3,7 +3,7 @@
 # Rutas — RF-01 Registro | RF-02 Login | RF-03 Perfil
 # ==============================================================
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,7 +15,7 @@ from app.models.usuario import Usuario, RolUsuario
 from app.schemas.usuario import (
     UsuarioRegistro, UsuarioLogin, UsuarioOut, Token, UsuarioCrearInterno,
     CambiarPassword, ActualizarPerfil, EditarUsuario,
-    SolicitarResetPassword, ConfirmarResetPassword, EstadisticasUsuarios, EventoAuditoriaOut,
+    SolicitarResetPassword, ConfirmarResetPassword, EstadisticasUsuarios, EventoAuditoriaOut, SubirFotoPerfil,
 )
 from app.services import auth_service, auditoria_service, email_service, notificacion_service
 
@@ -119,6 +119,45 @@ def restablecer_password(datos: ConfirmarResetPassword, db: Session = Depends(ge
 @router.get("/me", response_model=UsuarioOut)
 def perfil(usuario: Usuario = Depends(obtener_usuario_actual)):
     return usuario
+
+
+@router.get("/me/foto")
+def obtener_mi_foto(usuario: Usuario = Depends(obtener_usuario_actual)):
+    if not usuario.foto:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No tienes foto de perfil.")
+    # private: es una imagen personal; no debe quedar en cachés compartidas.
+    return Response(content=usuario.foto.contenido, media_type=usuario.foto.tipo, headers={"Cache-Control": "private, no-store"})
+
+
+@router.get("/usuarios/{usuario_id}/foto")
+def obtener_foto_de_usuario(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(requerir_roles(RolUsuario.gestor_humano, RolUsuario.admin)),
+):
+    """Foto de perfil de otro usuario (p. ej. el candidato en el panel de su
+    postulación). Solo Gestión Humana y admin; un candidato no ve la de otros."""
+    objetivo = db.query(Usuario).filter(Usuario.id == usuario_id).first()
+    if not objetivo or not objetivo.foto:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Este usuario no tiene foto de perfil.")
+    return Response(content=objetivo.foto.contenido, media_type=objetivo.foto.tipo, headers={"Cache-Control": "private, no-store"})
+
+
+@router.put("/me/foto", response_model=UsuarioOut)
+def subir_mi_foto(
+    datos: SubirFotoPerfil,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(obtener_usuario_actual),
+):
+    try:
+        return auth_service.guardar_foto_perfil(db, usuario, datos.contenido_base64, datos.tipo)
+    except auth_service.FotoInvalidaError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.delete("/me/foto", response_model=UsuarioOut)
+def eliminar_mi_foto(db: Session = Depends(get_db), usuario: Usuario = Depends(obtener_usuario_actual)):
+    return auth_service.eliminar_foto_perfil(db, usuario)
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

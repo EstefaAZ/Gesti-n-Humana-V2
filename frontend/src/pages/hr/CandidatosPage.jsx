@@ -3,13 +3,14 @@ import DocHeader from "../../components/DocHeader";
 import { useAuth } from "../../context/AuthContext";
 import * as authApi from "../../lib/api/authApi";
 import * as perfilesApi from "../../lib/api/perfilesApi";
+import { detalleRegistroII } from "../../data/catalogos";
 import { CATEGORIAS_DOCUMENTOS } from "../../lib/api/solicitudesApi";
 
-function tablaSimple(arr, campos, labels) {
+function tablaSimple(arr, campos, labels, sinEncabezado = false) {
   if (!arr || arr.length === 0) return <p className="text-muted" style={{ fontSize: 12.5 }}>Sin registros.</p>;
   return (
     <table className="plain-table">
-      <thead><tr>{labels.map((l) => <th key={l}>{l}</th>)}</tr></thead>
+      {!sinEncabezado && <thead><tr>{labels.map((l) => <th key={l}>{l}</th>)}</tr></thead>}
       <tbody>
         {arr.map((row, i) => (
           <tr key={i}>{campos.map((c) => <td key={c}>{row[c] ?? "—"}</td>)}</tr>
@@ -34,17 +35,22 @@ function DetalleCandidato({ candidato, perfil, onCerrar, token }) {
       ) : (
         <>
           <h3 className="section-title" style={{ fontSize: 14, marginTop: 16 }}>Datos personales</h3>
-          <p style={{ fontSize: 13 }}>
-            Cédula: {dp.cedula || "—"}<br />
-            Residencia: {dp.direccion}, {dp.municipio}, {dp.deptoResidencia}<br />
-            Celular: {dp.celular || "—"}
-          </p>
+          {tablaSimple(
+            [
+              { etiqueta: "Cédula", valor: dp.cedula || "—" },
+              { etiqueta: "Residencia", valor: `${dp.direccion}, ${dp.municipio}, ${dp.deptoResidencia}` },
+              { etiqueta: "Celular", valor: dp.celular || "—" },
+            ],
+            ["etiqueta", "valor"],
+            ["Etiqueta", "Valor"],
+            true
+          )}
 
           <h3 className="section-title" style={{ fontSize: 14 }}>Estudios, cursos, certificaciones e idiomas</h3>
           {tablaSimple(
             (perfil.registrosII || []).map((r) => ({
               tipo: r.tipoLabel,
-              detalle: r.titulo || r.nombreEvento || r.nombreNorma || r.idioma || "—",
+              detalle: detalleRegistroII(r),
               establecimiento: r.establecimiento || r.enteCertificador || "—",
             })),
             ["tipo", "detalle", "establecimiento"],

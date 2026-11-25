@@ -3,6 +3,7 @@ import EvaluacionBadge from "../../components/EvaluacionBadge";
 import EstadoPostulacionBadge from "../../components/EstadoPostulacionBadge";
 import PostulacionDetalle from "./PostulacionDetalle";
 import { useAuth } from "../../context/AuthContext";
+import { etiquetaNivelIdioma, normalizarNivelIdioma } from "../../data/catalogos";
 import * as solicitudesApi from "../../lib/api/solicitudesApi";
 
 const ETIQUETA_ESTADO = {
@@ -20,10 +21,12 @@ const CLASE_ESTADO = {
   cancelada_desierta: "vac-status-pill--cancelada",
 };
 
-export default function VacanteDetalleGestion({ vacante, conteo, onVolver, onCambiarEstado, onEditar, onCopiarEnlace, onDescargarReporte, onEliminar, enlaceCopiado }) {
+export default function VacanteDetalleGestion({ vacante, conteo, radicadoInicial, onVolver, onCambiarEstado, onEditar, onCopiarEnlace, onDescargarReporte, onEliminar, enlaceCopiado }) {
   const { token } = useAuth();
   const [postulaciones, setPostulaciones] = useState(null);
-  const [detalleId, setDetalleId] = useState(null);
+  // `radicadoInicial` llega cuando se entró desde una notificación: abre de una
+  // vez el detalle de esa postulación. Si el radicado ya no existe, no pasa nada.
+  const [detalleId, setDetalleId] = useState(radicadoInicial || null);
   const [error, setError] = useState("");
   const [editandoEstado, setEditandoEstado] = useState(false);
 
@@ -90,9 +93,9 @@ export default function VacanteDetalleGestion({ vacante, conteo, onVolver, onCam
 
         {(c.nivelEducativoMin || c.experienciaMinAnios || c.idiomaRequerido || (c.certificacionesKeywords || []).length > 0) && (
           <ul style={{ margin: "0 0 14px 18px", padding: 0, fontSize: 12.5, color: "var(--color-text-muted)" }}>
-            {c.nivelEducativoMin && <li>Nivel educativo mínimo: {c.nivelEducativoMin}{c.graduadoRequerido ? " (graduado)" : ""}</li>}
+            {c.nivelEducativoMin && <li>Nivel educativo mínimo: {c.nivelEducativoMin} o superior{c.graduadoRequerido ? " (graduado)" : ""}</li>}
             {c.experienciaMinAnios && <li>Experiencia mínima: {c.experienciaMinAnios} años</li>}
-            {c.idiomaRequerido && <li>Idioma: {c.idiomaRequerido} — mínimo {c.idiomaNivelMin} ({c.idiomaHabilidad})</li>}
+            {c.idiomaRequerido && <li>Idioma: {c.idiomaRequerido} — nivel mínimo {etiquetaNivelIdioma(normalizarNivelIdioma(c.idiomaNivelMin))} o superior</li>}
             {(c.certificacionesKeywords || []).map((cert, i) => <li key={i}>Certificación: "{cert}"</li>)}
           </ul>
         )}
@@ -123,7 +126,7 @@ export default function VacanteDetalleGestion({ vacante, conteo, onVolver, onCam
               <col style={{ width: "8%" }} />
             </colgroup>
             <thead>
-              <tr><th>Aspirante</th><th>Celular</th><th>Recibido</th><th>Estado</th><th>Evaluación</th><th></th></tr>
+              <tr><th>Aspirante</th><th>Celular</th><th>Recibido</th><th>Estado</th><th style={{ maxWidth: 220 }}>Evaluación</th><th></th></tr>
             </thead>
             <tbody>
               {postulaciones.map((p) => (
@@ -133,9 +136,9 @@ export default function VacanteDetalleGestion({ vacante, conteo, onVolver, onCam
                     <br /><span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>C.C. {p.datosPersonales?.cedula}</span>
                   </td>
                   <td>{p.datosPersonales?.celular}</td>
-                  <td>{new Date(p.fechaSolicitud).toLocaleString("es-CO")}</td>
+                  <td>{new Date(p.fechaSolicitud).toLocaleDateString("es-CO")}</td>
                   <td><EstadoPostulacionBadge estado={p.estado} /></td>
-                  <td><EvaluacionBadge evaluacion={p.evaluacion} /></td>
+                  <td style={{ maxWidth: 220, whiteSpace: "normal" }}><EvaluacionBadge evaluacion={p.evaluacion} /></td>
                   <td><button className="hr-link-btn" onClick={() => setDetalleId(p.radicado)}>Ver detalle</button></td>
                 </tr>
               ))}

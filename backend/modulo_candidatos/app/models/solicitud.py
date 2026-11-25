@@ -48,6 +48,11 @@ class Solicitud(Base):
     # Evaluación automática — SOLO INFORMATIVA (ver services/evaluacion_service.py)
     evaluacion = Column(JSON, default=dict)
 
+    # Certificados laborales y de estudio: se piden solo al preseleccionar
+    # (ver services/certificados_service.py). {habilitados_en, plazo,
+    # enviados_en, ampliaciones}; None mientras no se piden.
+    certificados_meta = Column(JSON, nullable=True)
+
     estado = Column(String(50), default="Recibida", nullable=False)
     historial_estados = Column(JSON, default=list)
 
@@ -56,3 +61,9 @@ class Solicitud(Base):
     fecha_anonimizacion = Column(DateTime(timezone=True), nullable=True)
 
     fecha_solicitud = Column(DateTime(timezone=True), server_default=func.now())
+
+    @property
+    def certificados(self):
+        """Resumen para la API (estado pendientes/recibidos/vencidos, plazo…)."""
+        from app.services import certificados_service
+        return certificados_service.resumen(self)

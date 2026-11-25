@@ -18,11 +18,12 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "CAMBIAR-ESTA-CLAVE-EN-PRODUCCION"
     ALGORITHM: str = "HS256"
 
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:4200"
 
     # URL base del módulo Vacantes — se consulta por HTTP para traer la vacante
     # y sus criterios de evaluación (cada módulo tiene su propia base de datos).
-    VACANTES_SERVICE_URL: str = "http://localhost:8001"
+    # 127.0.0.1 y no "localhost": en Windows, localhost prueba IPv6 primero y cada llamada tarda ~2 s más.
+    VACANTES_SERVICE_URL: str = "http://127.0.0.1:8001"
 
     # Habeas data (Ley 1581 de 2012): meses tras los cuales se anonimiza
     # automáticamente la solicitud de un candidato NO contratado.
@@ -66,6 +67,11 @@ def validar_configuracion_produccion() -> None:
         errores.append("ALLOWED_ORIGINS no debe contener '*' en producción.")
     if "localhost" in settings.ALLOWED_ORIGINS or "127.0.0.1" in settings.ALLOWED_ORIGINS:
         errores.append("ALLOWED_ORIGINS contiene 'localhost' — configúralo con el dominio real de producción.")
+    if settings.DATABASE_URL.startswith("sqlite"):
+        errores.append(
+            "DATABASE_URL sigue apuntando a SQLite. En producción usa PostgreSQL (ver README): un archivo "
+            "SQLite dentro de un contenedor sin volumen persistente se pierde por completo en cada redeploy."
+        )
 
     if errores:
         mensaje = "Configuración insegura para ENVIRONMENT=production:\n- " + "\n- ".join(errores)

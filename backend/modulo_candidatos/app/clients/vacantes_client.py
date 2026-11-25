@@ -44,6 +44,26 @@ def _get_con_reintentos(client: httpx.Client, url: str, headers: Optional[dict] 
     raise VacantesServiceError(f"No se pudo contactar al módulo de Vacantes tras {REINTENTOS} intentos: {ultimo_error}")
 
 
+def obtener_estado_proceso(vacante_id: str, token: Optional[str] = None) -> Optional[dict]:
+    """
+    Solo {"id", "estado", "esta_cerrada"} de una vacante, AUNQUE esté oculta para
+    candidatos ("en_proceso", "cancelada_desierta"). Sirve para la regla de "una
+    postulación a la vez": obtener_vacante() con el token de un candidato cae a la
+    ruta pública, que da 404 para "en_proceso", y esa postulación no se contaba.
+    Devuelve None si la vacante ya no existe; lanza VacantesServiceError si el
+    servicio no responde o responde con un error inesperado.
+    """
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    url = f"{settings.VACANTES_SERVICE_URL}/api/v1/vacantes/{vacante_id}/estado-proceso"
+    with httpx.Client(timeout=5.0) as client:
+        r = _get_con_reintentos(client, url, headers)
+    if r.status_code == 200:
+        return r.json()
+    if r.status_code == 404:
+        return None
+    raise VacantesServiceError(f"Vacantes respondió {r.status_code} al consultar el estado de {vacante_id}.")
+
+
 def obtener_vacante(vacante_id: str, token: Optional[str] = None) -> Optional[dict]:
     """
     Devuelve el dict de la vacante (incluye `esta_cerrada` y `criterios`), o

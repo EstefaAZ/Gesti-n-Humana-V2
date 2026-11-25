@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import VacanteForm from "./VacanteForm";
 import VacanteDetalleGestion from "./VacanteDetalleGestion";
 import AccionesMenu from "../../components/AccionesMenu";
@@ -26,6 +27,10 @@ const CLASE_ESTADO = {
 
 export default function VacantesTab() {
   const { token } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vacanteEnUrl = searchParams.get("vacante");
+  const radicadoEnUrl = searchParams.get("radicado");
+  const yaAbriDesdeUrl = useRef(false);
   const [vacantes, setVacantes] = useState([]);
   const [conteo, setConteo] = useState({});
   const [modo, setModo] = useState("lista"); // 'lista' | 'form' | 'detalle'
@@ -54,6 +59,22 @@ export default function VacantesTab() {
     recargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Se abre una sola vez por llegada: después el usuario manda, y una recarga
+  // de la lista no lo devuelve al detalle contra su voluntad.
+  useEffect(() => {
+    if (yaAbriDesdeUrl.current || !vacanteEnUrl || vacantes.length === 0) return;
+    yaAbriDesdeUrl.current = true;
+    if (!vacantes.some((v) => v.id === vacanteEnUrl)) return;
+    setVacanteDetalleId(vacanteEnUrl);
+    setModo("detalle");
+  }, [vacanteEnUrl, vacantes]);
+
+  function volverALista() {
+    setVacanteDetalleId(null);
+    setModo("lista");
+    if (vacanteEnUrl || radicadoEnUrl) setSearchParams({}, { replace: true });
+  }
 
   function nuevaVacante() {
     setVacanteEnEdicion(vacanteVacia());
@@ -142,7 +163,8 @@ export default function VacantesTab() {
       <VacanteDetalleGestion
         vacante={vacante}
         conteo={conteo}
-        onVolver={() => { setVacanteDetalleId(null); setModo("lista"); }}
+        radicadoInicial={vacanteEnUrl === vacante.id ? radicadoEnUrl : null}
+        onVolver={volverALista}
         onCambiarEstado={cambiarEstado}
         onEditar={editar}
         onCopiarEnlace={copiarEnlace}

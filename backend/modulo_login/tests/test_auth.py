@@ -780,6 +780,30 @@ def test_login_con_recordar_da_token_de_larga_duracion():
     assert dias_de_vida > 20  # ~30 días configurados, con margen
 
 
+def test_login_con_recordar_de_cuenta_interna_dura_7_dias():
+    from app.core.security import hash_password
+    from app.models.usuario import Usuario, RolUsuario as R
+
+    db = TestingSessionLocal()
+    db.add(Usuario(nombre_completo="Gestora Semilla", email="gestora.recordar@example.com",
+                   password_hash=hash_password("ClaveGestora123"), rol=R.gestor_humano))
+    db.commit()
+    db.close()
+
+    r = client.post("/api/v1/auth/login", json={"email": "gestora.recordar@example.com", "password": "ClaveGestora123", "recordar": True})
+    payload = _decodificar(r.json()["access_token"])
+    dias_de_vida = (payload["exp"] - payload_iat_o_ahora(payload)) / 86400
+    assert 6 < dias_de_vida <= 7.01
+
+
+def test_login_sin_recordar_dura_8_horas():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    payload = _decodificar(r.json()["access_token"])
+    horas_de_vida = (payload["exp"] - payload_iat_o_ahora(payload)) / 3600
+    assert 7 < horas_de_vida <= 8.01
+
+
 def test_olvide_password_responde_igual_exista_o_no_el_correo():
     r_existe = client.post("/api/v1/auth/olvide-password", json={"email": "nadie-existe@example.com"})
     assert r_existe.status_code == 200
@@ -920,12 +944,27 @@ def test_validar_configuracion_produccion_rechaza_cors_abierto(monkeypatch):
         config_module.validar_configuracion_produccion()
 
 
+def test_validar_configuracion_produccion_rechaza_sqlite(monkeypatch):
+    # Bug reportado: datos "desaparecían" tras redeploy — SQLite dentro de un
+    # contenedor sin volumen persistente se pierde en cada redeploy. En
+    # producción esto debe bloquear el arranque, igual que un SECRET_KEY inseguro.
+    from app.core import config as config_module
+
+    monkeypatch.setattr(config_module.settings, "ENVIRONMENT", "production")
+    monkeypatch.setattr(config_module.settings, "SECRET_KEY", "una-clave-real-generada-aleatoriamente")
+    monkeypatch.setattr(config_module.settings, "ALLOWED_ORIGINS", "https://seleccion.aguasnacionales.com")
+    monkeypatch.setattr(config_module.settings, "DATABASE_URL", "sqlite:///./login_dev.db")
+    with pytest.raises(RuntimeError, match="DATABASE_URL"):
+        config_module.validar_configuracion_produccion()
+
+
 def test_validar_configuracion_produccion_pasa_con_valores_reales(monkeypatch):
     from app.core import config as config_module
 
     monkeypatch.setattr(config_module.settings, "ENVIRONMENT", "production")
     monkeypatch.setattr(config_module.settings, "SECRET_KEY", "una-clave-real-generada-aleatoriamente")
     monkeypatch.setattr(config_module.settings, "ALLOWED_ORIGINS", "https://seleccion.aguasnacionales.com")
+    monkeypatch.setattr(config_module.settings, "DATABASE_URL", "postgresql://usuario:clave@db:5432/aguas_nacionales_seleccion")
     config_module.validar_configuracion_produccion()  # no debe lanzar nada
 
 
@@ -1011,3 +1050,103 @@ def test_auditoria_ordena_del_mas_reciente_al_mas_antiguo():
     assert len(eventos) == 2
     assert "segundo@example.com" in eventos[0]["descripcion"]  # el más reciente va primero
     assert "primero@example.com" in eventos[1]["descripcion"]
+
+
+# ---------------------------------------------------------------
+# Foto de perfil
+# ---------------------------------------------------------------
+
+import base64 as _b64
+
+PNG_1x1 = _b64.b64encode(
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+    b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+).decode()
+
+
+def _headers_registrado():
+    client.post("/api/v1/auth/registro", json=USUARIO_VALIDO)
+    r = client.post("/api/v1/auth/login", json={"email": USUARIO_VALIDO["email"], "password": USUARIO_VALIDO["password"]})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_foto_subir_ver_y_quitar():
+    h = _headers_registrado()
+    assert client.get("/api/v1/auth/me", headers=h).json()["tiene_foto"] is False
+    assert client.get("/api/v1/auth/me/foto", headers=h).status_code == 404
+
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h)
+    assert r.status_code == 200
+    assert r.json()["tiene_foto"] is True
+
+    foto = client.get("/api/v1/auth/me/foto", headers=h)
+    assert foto.status_code == 200
+    assert foto.headers["content-type"] == "image/png"
+    assert foto.content == _b64.b64decode(PNG_1x1)
+
+    # Reemplazarla no duplica nada
+    assert client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h).status_code == 200
+
+    r = client.delete("/api/v1/auth/me/foto", headers=h)
+    assert r.status_code == 200
+    assert r.json()["tiene_foto"] is False
+    assert client.get("/api/v1/auth/me/foto", headers=h).status_code == 404
+
+
+def test_foto_rechaza_tipo_no_permitido_y_contenido_falso():
+    h = _headers_registrado()
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/gif"}, headers=h)
+    assert r.status_code == 422
+    # Dice ser JPG pero los bytes son de un PNG
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/jpeg"}, headers=h)
+    assert r.status_code == 422
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": "esto no es base64!!", "tipo": "image/png"}, headers=h)
+    assert r.status_code == 422
+
+
+def test_foto_rechaza_mas_de_2mb():
+    h = _headers_registrado()
+    grande = _b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * (2 * 1024 * 1024)).decode()
+    r = client.put("/api/v1/auth/me/foto", json={"contenido_base64": grande, "tipo": "image/png"}, headers=h)
+    assert r.status_code == 422
+    assert "2 MB" in r.json()["detail"]
+
+
+def test_foto_requiere_sesion():
+    assert client.get("/api/v1/auth/me/foto").status_code == 401
+    assert client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}).status_code == 401
+
+
+def test_eliminar_cuenta_borra_tambien_la_foto():
+    from app.models.foto_perfil import FotoPerfil
+
+    h = _headers_registrado()
+    client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h)
+    assert client.delete("/api/v1/auth/me", headers=h).status_code == 204
+
+    db = next(override_get_db())
+    assert db.query(FotoPerfil).count() == 0
+
+
+def test_gestion_humana_ve_la_foto_del_candidato_y_otro_candidato_no():
+    from app.core.security import hash_password
+    from app.models.usuario import Usuario, RolUsuario as R
+
+    h_candidato = _headers_registrado()
+    client.put("/api/v1/auth/me/foto", json={"contenido_base64": PNG_1x1, "tipo": "image/png"}, headers=h_candidato)
+    candidato_id = client.get("/api/v1/auth/me", headers=h_candidato).json()["id"]
+
+    db = TestingSessionLocal()
+    db.add(Usuario(nombre_completo="Gestora Fotos", email="gestora.fotos@example.com",
+                   password_hash=hash_password("ClaveGestora123"), rol=R.gestor_humano))
+    db.commit()
+    db.close()
+    h_gestora = {"Authorization": f"Bearer {_token_de('gestora.fotos@example.com', 'ClaveGestora123')}"}
+
+    r = client.get(f"/api/v1/auth/usuarios/{candidato_id}/foto", headers=h_gestora)
+    assert r.status_code == 200
+    assert r.content == _b64.b64decode(PNG_1x1)
+
+    # Un candidato no puede ver la foto de otra persona (ni la suya por esta ruta).
+    assert client.get(f"/api/v1/auth/usuarios/{candidato_id}/foto", headers=h_candidato).status_code == 403
+    assert client.get("/api/v1/auth/usuarios/no-existe/foto", headers=h_gestora).status_code == 404

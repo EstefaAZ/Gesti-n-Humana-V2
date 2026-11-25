@@ -1,16 +1,17 @@
 import { useState } from "react";
 import EvaluacionBadge from "../../components/EvaluacionBadge";
 import { useAuth } from "../../context/AuthContext";
+import { detalleRegistroII } from "../../data/catalogos";
 import * as solicitudesApi from "../../lib/api/solicitudesApi";
 import { CATEGORIAS_DOCUMENTOS } from "../../lib/api/solicitudesApi";
 
 const ESTADOS = ["Recibida", "En revisión", "Preseleccionado", "Entrevista programada", "Rechazada", "Aceptada"];
 
-function tablaSimple(arr, campos, labels) {
+function tablaSimple(arr, campos, labels, sinEncabezado = false) {
   if (!arr || arr.length === 0) return <p className="text-muted" style={{ fontSize: 12.5 }}>Sin registros.</p>;
   return (
     <table className="plain-table">
-      <thead><tr>{labels.map((l) => <th key={l}>{l}</th>)}</tr></thead>
+      {!sinEncabezado && <thead><tr>{labels.map((l) => <th key={l}>{l}</th>)}</tr></thead>}
       <tbody>
         {arr.map((row, i) => (
           <tr key={i}>{campos.map((c) => <td key={c}>{row[c] ?? "—"}</td>)}</tr>
@@ -71,20 +72,25 @@ export default function PostulacionDetalle({ solicitud, onCerrar, onCambioEstado
       </div>
 
       <h3 className="section-title" style={{ fontSize: 14, marginTop: 20 }}>Datos personales</h3>
-      <p style={{ fontSize: 13 }}>
-        Cédula: {dp.cedula}<br />
-        Correo: {dp.correo}<br />
-        Celular: {dp.celular}<br />
-        Residencia: {dp.direccion}, {dp.municipio}, {dp.deptoResidencia}<br />
-        Profesión: {dp.profesion || "—"}<br />
-        Estado civil: {dp.estadoCivil}
-      </p>
+      {tablaSimple(
+        [
+          { etiqueta: "Cédula", valor: dp.cedula },
+          { etiqueta: "Correo", valor: dp.correo },
+          { etiqueta: "Celular", valor: dp.celular },
+          { etiqueta: "Residencia", valor: `${dp.direccion}, ${dp.municipio}, ${dp.deptoResidencia}` },
+          { etiqueta: "Profesión", valor: dp.profesion || "—" },
+          { etiqueta: "Estado civil", valor: dp.estadoCivil },
+        ],
+        ["etiqueta", "valor"],
+        ["Etiqueta", "Valor"],
+        true
+      )}
 
       <h3 className="section-title" style={{ fontSize: 14 }}>Estudios, cursos, certificaciones e idiomas</h3>
       {tablaSimple(
         (solicitud.registrosII || []).map((r) => ({
           tipo: r.tipoLabel,
-          detalle: r.titulo || r.nombreEvento || r.nombreNorma || r.idioma || "—",
+          detalle: detalleRegistroII(r),
           establecimiento: r.establecimiento || r.enteCertificador || "—",
         })),
         ["tipo", "detalle", "establecimiento"],
