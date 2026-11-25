@@ -1577,3 +1577,6 @@ button.vac-status-pill { display: inline-flex; align-items: center; gap: 4px; }
   .cert { padding: 14px; }
   .cert__acciones .btn, .pd-cert .btn { width: 100%; }
 }
+
+/* Lista de vacantes: aviso de un solo proceso a la vez. */
+.cand-aviso-simultaneo { font-weight: 600; }

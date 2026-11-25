@@ -77,6 +77,12 @@ function avisoCierre(v: any): string | null {
             </div>
           </div>
 
+          @if (esCandidato()) {
+            <div class="notice notice--warning cand-aviso-simultaneo" role="note">
+              No está permitido participar de forma simultánea en dos procesos de selección.
+            </div>
+          }
+
           @if (filtradas().length === 0) {
             <div class="ps-tarjeta cand-vacio">
               <p class="cand-vacio__titulo">Ninguna vacante coincide con "{{ busqueda() }}"</p>
