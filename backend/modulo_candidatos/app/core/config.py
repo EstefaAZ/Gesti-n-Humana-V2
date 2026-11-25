@@ -22,7 +22,8 @@ class Settings(BaseSettings):
 
     # URL base del módulo Vacantes — se consulta por HTTP para traer la vacante
     # y sus criterios de evaluación (cada módulo tiene su propia base de datos).
-    VACANTES_SERVICE_URL: str = "http://localhost:8001"
+    # 127.0.0.1 y no "localhost": en Windows, localhost prueba IPv6 primero y cada llamada tarda ~2 s más.
+    VACANTES_SERVICE_URL: str = "http://127.0.0.1:8001"
 
     # Habeas data (Ley 1581 de 2012): meses tras los cuales se anonimiza
     # automáticamente la solicitud de un candidato NO contratado.
